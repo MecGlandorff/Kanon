@@ -2,7 +2,9 @@
 
 Never lose the thread of a repo again.
 
-Kanon briefs, resumes, and verifies repositories for humans and AI coding agents. It reconstructs what the repo appears to do right now, how it works, what is stale, what is left, and where to start, backed by files, config, tests, docs, and local Kanon state.
+Kanon changes what an AI coding agent knows about a repo before it answers, plans, or edits.
+
+It briefs the current repo state from files, config, tests, docs, and local Kanon memory: what the repo does, how it works, what is stale, what is unknown, and where to start.
 
 ```bash
 npx @mecglandorff/kanon brief
@@ -11,11 +13,15 @@ npx @mecglandorff/kanon verify README.md
 
 ## Why
 
-README files go stale. Agents trust stale README files. You come back after a month and forget what mattered.
+AI coding agents answer from the context they are given. If that context is a stale README, a partial file view, or an old project memory, the agent can sound confident while being wrong.
+
+Kanon changes the starting point. Before the agent speaks, it reconstructs the repo's current state from evidence and gives humans and agents a shared brief of what is known, likely, unknown, stale, and suggested.
+
+Use it when you clone or fork a repo, return to old work, review someone else's project, or want Codex/Claude to work from reliable repo context instead of guesswork.
 
 Kanon answers:
 
-> I just opened this repo. What is going on, and what should I do next?
+> I just opened this repo. What does it do, what is trustworthy, what is stale, and where should I start?
 
 ## Commands
 
