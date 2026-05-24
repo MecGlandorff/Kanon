@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kanon"
+  short_description: "Evidence-backed repo continuity"
+  default_prompt: "Use $kanon to brief this repo and identify the safest next step."
