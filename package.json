@@ -15,7 +15,7 @@
     "access": "public"
   },
   "bin": {
-    "kanon": "./bin/kanon.js"
+    "kanon": "bin/kanon.js"
   },
   "exports": {
     ".": "./src/index.js"

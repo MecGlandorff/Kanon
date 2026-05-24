@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-kanon ask "$@"
+COMMAND="ask"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_KANON="$SCRIPT_DIR/../../../bin/kanon.js"
+
+if [[ -x "$LOCAL_KANON" ]]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Kanon requires Node.js 20+ to run the local package CLI." >&2
+    exit 127
+  fi
+  exec node "$LOCAL_KANON" "$COMMAND" "$@"
+fi
+
+if command -v kanon >/dev/null 2>&1; then
+  exec kanon "$COMMAND" "$@"
+fi
+
+echo "Kanon CLI not found. Install it with: npm install -g @mecglandorff/kanon" >&2
+exit 127
