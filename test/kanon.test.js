@@ -583,7 +583,6 @@ test("writeKanonImproveOutput persists only improvement direction files", () => 
   assert.ok(JSON.parse(fs.readFileSync(path.join(root, ".kanon", "STATE.json"), "utf8")).improvements);
   assert.equal(fs.existsSync(path.join(root, ".kanon", "KANON.md")), false);
 });
-
 test("README command extraction ignores markdown blockquotes", () => {
   const commands = extractCommandsFromMarkdown("> I just opened this repo.\n\n```bash\n$ npm test\nkanon brief\n```\n");
   assert.deepEqual(commands, ["npm test", "kanon brief"]);
