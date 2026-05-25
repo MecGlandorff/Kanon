@@ -94,6 +94,8 @@ Code, config, and tests outrank README content for current behavior. README cont
 
 The repo ships a Codex/Claude-compatible skill under `skills/kanon/`. Use it when opening, resuming, onboarding, auditing, or explaining a repository.
 
+The skill includes Bash wrappers for Unix/macOS and PowerShell `.ps1` wrappers for Windows.
+
 ```text
 $kanon
 Brief this repo and tell me the safest first contribution.
