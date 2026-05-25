@@ -6,10 +6,39 @@ Kanon changes what an AI coding agent knows about a repo before it answers, plan
 
 It briefs the current repo state from files, config, tests, docs, and local Kanon memory: what the repo does, how it works, what is stale, what is unknown, and where to start.
 
+## Quickstart
+
+Run Kanon from the root of a repository you want to inspect:
+
 ```bash
 npx @mecglandorff/kanon brief
-npx @mecglandorff/kanon verify README.md
 ```
+
+Useful commands:
+
+```bash
+# Check whether README instructions look stale
+npx @mecglandorff/kanon verify README.md
+
+# Ask a repo-orientation question
+npx @mecglandorff/kanon ask "what should I read first?"
+
+# Optional: write continuity notes
+npx @mecglandorff/kanon refresh
+```
+
+`brief`, `verify`, `ask`, and `resume` are read-only by default. `refresh` writes `.kanon/` continuity files. The shareable file is `.kanon/KANON.md`; volatile state stays local.
+
+For local development or before using the npm package:
+
+```bash
+git clone https://github.com/MecGlandorff/Kanon.git
+cd Kanon
+npm test
+node ./bin/kanon.js brief --root /path/to/other/repo
+```
+
+Use Kanon before asking Codex or Claude to work in an unfamiliar repo. Paste the brief into the agent, or let the bundled skill call Kanon first, so repo claims are separated into Known, Likely, Unknown, Stale/Suspicious, and Suggested.
 
 ## Why
 
