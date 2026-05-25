@@ -23,11 +23,22 @@ npx @mecglandorff/kanon verify README.md
 # Ask a repo-orientation question
 npx @mecglandorff/kanon ask "what should I read first?"
 
+# Get project improvement direction
+npx @mecglandorff/kanon improve --mode top
+
+# Make a one-session refactor plan for messy code
+npx @mecglandorff/kanon refactor --mode plan --agent codex
+
 # Optional: write continuity notes
 npx @mecglandorff/kanon refresh
+
+# Track human follow-up work for later resume
+npx @mecglandorff/kanon todo add "add a README quickstart"
+npx @mecglandorff/kanon todo add --stdin < review-notes.md
+npx @mecglandorff/kanon todo list
 ```
 
-`brief`, `verify`, `ask`, and `resume` are read-only by default. `refresh` writes `.kanon/` continuity files. The shareable file is `.kanon/KANON.md`; volatile state stays local.
+`brief`, `verify`, `ask`, `resume`, `improve`, and `refactor` are read-only by default. `refresh` writes `.kanon/` continuity files. `todo` writes human-owned follow-up work to `.kanon/TODO.md`. `improve --write` writes `.kanon/IMPROVEMENTS.md`; `refactor --write` writes `.kanon/REFACTOR_PLAN.md`. The shareable generated brief is `.kanon/KANON.md`; volatile state stays local.
 
 For local development or before using the npm package:
 
@@ -59,16 +70,28 @@ kanon brief              # Evidence-backed repo orientation
 kanon verify README.md   # README / repo drift report
 kanon ask "what is left?"
 kanon resume             # Resume from the last Kanon checkpoint
+kanon improve            # Choose a 1/2/3 improvement report
+kanon improve --mode top # Prioritized project direction
+kanon refactor           # Ask steering questions and make a cleanup plan
+kanon refactor --mode audit
+kanon refactor --mode prompt --agent claude
+kanon todo add "..."     # Store human follow-up work
+kanon todo add --stdin   # Store a longer note from stdin
+kanon todo list          # Show open Kanon todos
+kanon todo done 1        # Mark a Kanon todo complete
 kanon refresh            # Write .kanon/ continuity files
 ```
 
-`kanon brief`, `kanon verify`, `kanon ask`, and `kanon resume` are read-only by default. Use `kanon refresh` or `--write` to write `.kanon/`.
+`kanon brief`, `kanon verify`, `kanon ask`, `kanon resume`, `kanon improve`, and `kanon refactor` are read-only by default. Use `kanon refresh`, `kanon todo`, `kanon improve --write`, `kanon refactor --write`, or `--write` on supported commands to write `.kanon/`.
 
 ## What Kanon Writes
 
 ```text
 .kanon/
   KANON.md        human-readable repo continuity
+  TODO.md         human-owned follow-up work
+  IMPROVEMENTS.md evidence-backed improvement direction
+  REFACTOR_PLAN.md one-session cleanup/refactor plan
   STATE.json      machine-readable repo state
   EVIDENCE.jsonl  append-only evidence trail
   HANDOFF.md      latest resume brief
@@ -76,7 +99,27 @@ kanon refresh            # Write .kanon/ continuity files
   snapshots/      timestamped state snapshots
 ```
 
-By default, `.kanon/KANON.md` is the shareable continuity doc. Volatile machine files are ignored by `.kanon/.gitignore`.
+By default, `.kanon/KANON.md`, `.kanon/TODO.md`, `.kanon/IMPROVEMENTS.md`, and `.kanon/REFACTOR_PLAN.md` are shareable. Volatile machine files are ignored by `.kanon/.gitignore`.
+
+## Improvement Direction
+
+`kanon improve` helps decide where to steer the project next from local repo evidence. It uses deterministic rules, not an LLM, so the same repo state produces the same recommendations.
+
+When run in an interactive terminal without `--mode`, Kanon asks:
+
+```text
+Choose improvement report: 1) Top 5  2) Full audit  3) Scorecard [1]:
+```
+
+Use `--mode top`, `--mode audit`, or `--mode scorecard` for scripts and agents. Non-interactive runs default to `top`.
+
+## Refactor Planning
+
+`kanon refactor` helps turn messy, oversized, or vibecoded areas into a bounded one-session cleanup plan. It scans code, tests, and config evidence first; docs can provide context, but they do not drive refactor claims.
+
+When run interactively, Kanon asks steering questions about the cleanup goal, what must not break, deletion of dead-code candidates, test expectations, and one-session scope. Non-interactive runs use conservative defaults and print the same questions for the coding agent to confirm with the user.
+
+Use `--mode plan`, `--mode audit`, or `--mode prompt`. Use `--agent codex` or `--agent claude` to label the ready-to-paste prompt for the target coding agent. `--write` writes only `.kanon/REFACTOR_PLAN.md` and updates `.kanon/STATE.json`.
 
 ## Evidence Model
 

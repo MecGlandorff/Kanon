@@ -1,3 +1,5 @@
+import { groupRecommendations } from "./improve.js";
+
 export function renderBrief(analysis, options = {}) {
   const state = analysis.state;
   const lines = [];
@@ -84,8 +86,9 @@ export function renderVerify(analysis) {
   return `${lines.join("\n")}\n`;
 }
 
-export function renderResume(analysis, previousState = null) {
+export function renderResume(analysis, previousState = null, options = {}) {
   const state = analysis.state;
+  const openTodos = (options.todos || []).filter((todo) => !todo.done);
   const lines = [];
   lines.push("# Resume This Repo");
   lines.push("");
@@ -98,6 +101,17 @@ export function renderResume(analysis, previousState = null) {
     lines.push(`Current analysis: ${state.generated_at}`);
     lines.push("");
     appendStateDiff(lines, previousState, state);
+  }
+
+  if (openTodos.length) {
+    lines.push("## Open Kanon Todos");
+    for (const todo of openTodos.slice(0, 8)) {
+      lines.push(`- ${todo.number}. ${todo.text}`);
+      for (const detail of (todo.details || []).slice(0, 3)) {
+        lines.push(`  ${detail}`);
+      }
+    }
+    lines.push("");
   }
 
   lines.push("## Start Here");
@@ -116,6 +130,232 @@ export function renderResume(analysis, previousState = null) {
   appendClaimList(lines, "Unknowns", state.current_state.unknown, 8);
 
   return `${lines.join("\n")}\n`;
+}
+
+export function renderTodoList(todos, options = {}) {
+  const visible = options.all ? todos : todos.filter((todo) => !todo.done);
+  const lines = [];
+  lines.push("# Kanon Todos");
+  lines.push("");
+
+  if (!visible.length) {
+    lines.push(options.all ? "No Kanon todos found." : "No open Kanon todos.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  for (const todo of visible) {
+    lines.push(`${todo.number}. [${todo.done ? "x" : " "}] ${todo.text}`);
+    for (const detail of todo.details || []) {
+      lines.push(`   ${detail}`);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderImprove(improvements, options = {}) {
+  const mode = options.mode || "top";
+  if (mode === "audit") {
+    return renderImproveAudit(improvements);
+  }
+  if (mode === "scorecard") {
+    return renderImproveScorecard(improvements);
+  }
+  return renderImproveTop(improvements);
+}
+
+export function renderRefactor(refactor, options = {}) {
+  const mode = options.mode || "plan";
+  if (mode === "audit") {
+    return renderRefactorAudit(refactor);
+  }
+  if (mode === "prompt") {
+    return renderRefactorPrompt(refactor);
+  }
+  return renderRefactorPlan(refactor);
+}
+
+function renderRefactorPlan(refactor) {
+  const lines = [];
+  lines.push("# Kanon Refactor Plan");
+  lines.push("");
+  lines.push("Mode: plan");
+  lines.push("");
+  appendRefactorSteering(lines, refactor);
+  appendPrimaryTarget(lines, refactor);
+  lines.push("## One-Session Plan");
+  refactor.plan.steps.forEach((step, index) => {
+    lines.push(`${index + 1}. ${step}`);
+  });
+  lines.push("");
+  appendDoNotTouch(lines, refactor);
+  appendDeletionPolicy(lines, refactor);
+  appendAgentPrompt(lines, refactor);
+  return `${lines.join("\n")}\n`;
+}
+
+function renderRefactorAudit(refactor) {
+  const lines = [];
+  lines.push("# Kanon Refactor Plan");
+  lines.push("");
+  lines.push("Mode: audit");
+  lines.push("");
+  appendRefactorSteering(lines, refactor);
+  lines.push("## Hotspots");
+  if (!refactor.hotspots.length) {
+    lines.push("- No strong refactor hotspots found by the current checks.");
+  }
+  for (const hotspot of refactor.hotspots.slice(0, 20)) {
+    lines.push(`- ${hotspot.title} (${hotspot.payoff} payoff, ${hotspot.risk} risk, ${hotspot.confidence})${formatEvidenceRefs(hotspot.evidence)}`);
+    lines.push(`  Target: ${hotspot.target}`);
+    lines.push(`  Action: ${hotspot.suggested_action}`);
+    for (const reason of hotspot.reasons.slice(0, 3)) {
+      lines.push(`  Reason: ${reason}`);
+    }
+  }
+  lines.push("");
+  appendDoNotTouch(lines, refactor);
+  appendDeletionPolicy(lines, refactor);
+  return `${lines.join("\n")}\n`;
+}
+
+function renderRefactorPrompt(refactor) {
+  const lines = [];
+  lines.push("# Kanon Refactor Prompt");
+  lines.push("");
+  lines.push("Mode: prompt");
+  lines.push("");
+  appendAgentPrompt(lines, refactor);
+  return `${lines.join("\n")}\n`;
+}
+
+function appendRefactorSteering(lines, refactor) {
+  lines.push("## User Steering");
+  for (const question of refactor.questions) {
+    lines.push(`- ${question.prompt} ${refactor.answers[question.id] || question.default}`);
+  }
+  lines.push("");
+}
+
+function appendPrimaryTarget(lines, refactor) {
+  lines.push("## Primary Target");
+  const primary = refactor.plan.primary_target;
+  if (!primary) {
+    lines.push("- No strong primary target found. Start with a short source inspection and choose one bounded cleanup.");
+    lines.push("");
+    return;
+  }
+
+  lines.push(`- ${primary.title} (${primary.payoff} payoff, ${primary.risk} risk, ${primary.confidence})`);
+  lines.push(`  Target: ${primary.target}`);
+  lines.push(`  Action: ${primary.suggested_action}`);
+  for (const reason of primary.reasons.slice(0, 4)) {
+    lines.push(`  Reason: ${reason}`);
+  }
+  if (refactor.plan.secondary_targets.length) {
+    lines.push("");
+    lines.push("## Secondary Targets");
+    for (const item of refactor.plan.secondary_targets) {
+      lines.push(`- ${item.target}: ${item.title} (${item.payoff} payoff, ${item.risk} risk)`);
+    }
+  }
+  lines.push("");
+}
+
+function appendDoNotTouch(lines, refactor) {
+  lines.push("## Do Not Touch");
+  for (const item of refactor.do_not_touch) {
+    lines.push(`- ${item}`);
+  }
+  lines.push("");
+}
+
+function appendDeletionPolicy(lines, refactor) {
+  lines.push("## Deletion Policy");
+  lines.push(`- ${refactor.deletion_policy.rule}`);
+  lines.push(`- User answer/default: ${refactor.deletion_policy.user_answer}`);
+  lines.push("");
+}
+
+function appendAgentPrompt(lines, refactor) {
+  lines.push("## Agent Prompt");
+  lines.push("");
+  lines.push("```text");
+  lines.push(refactor.agent_prompt);
+  lines.push("```");
+}
+
+function renderImproveTop(improvements) {
+  const lines = [];
+  lines.push("# Kanon Improve");
+  lines.push("");
+  lines.push("Mode: top");
+  lines.push("");
+  lines.push("## Top Recommendations");
+
+  const top = improvements.recommendations.slice(0, 5);
+  if (!top.length) {
+    lines.push("- No major improvement recommendations found by the current checks.");
+  }
+  top.forEach((item, index) => {
+    lines.push(`${index + 1}. ${item.title} (${item.impact} impact, ${item.confidence})${formatEvidenceRefs(item.evidence)}`);
+    lines.push(`   Why: ${item.why}`);
+    lines.push(`   Next: ${item.next_action}`);
+  });
+
+  lines.push("");
+  appendScorecardSummary(lines, improvements.scorecard);
+  return `${lines.join("\n")}\n`;
+}
+
+function renderImproveAudit(improvements) {
+  const lines = [];
+  lines.push("# Kanon Improve");
+  lines.push("");
+  lines.push("Mode: audit");
+  lines.push("");
+
+  const groups = groupRecommendations(improvements.recommendations);
+  if (!groups.length) {
+    lines.push("No major improvement recommendations found by the current checks.");
+    lines.push("");
+  }
+
+  let currentGroup = null;
+  for (const group of groups) {
+    if (group.group !== currentGroup) {
+      currentGroup = group.group;
+      lines.push(`## ${currentGroup}`);
+    }
+    lines.push(`### ${labelForCategory(group.category)}`);
+    for (const item of group.items) {
+      lines.push(`- ${item.title} (${item.impact} impact, ${item.confidence})${formatEvidenceRefs(item.evidence)}`);
+      lines.push(`  Why: ${item.why}`);
+      lines.push(`  Next: ${item.next_action}`);
+    }
+    lines.push("");
+  }
+
+  appendScorecardSummary(lines, improvements.scorecard);
+  return `${lines.join("\n")}\n`;
+}
+
+function renderImproveScorecard(improvements) {
+  const lines = [];
+  lines.push("# Kanon Improve");
+  lines.push("");
+  lines.push("Mode: scorecard");
+  lines.push("");
+  appendScorecardSummary(lines, improvements.scorecard);
+  return `${lines.join("\n")}\n`;
+}
+
+function appendScorecardSummary(lines, scorecard) {
+  lines.push("## Scorecard");
+  for (const item of scorecard) {
+    lines.push(`- ${item.label}: ${item.score}/100 (${item.status})${formatEvidenceRefs(item.evidence)}`);
+    lines.push(`  ${item.reason}`);
+  }
 }
 
 export function renderAsk(analysis, question) {
@@ -251,6 +491,16 @@ function formatClaim(item) {
 function formatEvidenceRefs(evidence = []) {
   const refs = evidence.filter(Boolean);
   return refs.length ? ` [${refs.join(", ")}]` : "";
+}
+
+function labelForCategory(category) {
+  if (category === "ci") {
+    return "CI";
+  }
+  return category
+    .split("-")
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }
 
 function collectEvidenceIds(text) {
