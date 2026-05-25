@@ -106,10 +106,30 @@ test("CLI supports top-level version flag", async () => {
   assert.equal(output, "0.1.0\n");
 });
 
+test("README presents Kanon as an agent skill, not a terminal package", () => {
+  const readme = readText(path.join(repoRoot, "README.md"));
+
+  assert.match(readme, /Use Kanon inside an agent session/);
+  assert.match(readme, /\$kanon/);
+  assert.doesNotMatch(readme, /\bnpx\b/);
+  assert.doesNotMatch(readme, /npm install -g/);
+  assert.doesNotMatch(readme, /^## Commands$/m);
+});
+
+test("package metadata does not expose a terminal binary", () => {
+  const pkg = JSON.parse(readText(path.join(repoRoot, "package.json")));
+
+  assert.equal(pkg.bin, undefined);
+  assert.equal(pkg.scripts.kanon, undefined);
+});
+
 test("skill artifact keeps line-separated metadata and executable wrappers", () => {
   const skill = readText(path.join(repoRoot, "skills/kanon/SKILL.md"));
   assert.match(skill, /^---\nname: kanon\ndescription: "[^"]+"\n---\n\n# Kanon\n/);
   assert.match(skill, /\n## Runtime Contract\n/);
+  assert.match(skill, /not a standalone terminal interface/);
+  assert.match(skill, /must not fall back to a globally installed `kanon` command/);
+  assert.doesNotMatch(skill, /npm install -g/);
 
   const agentYaml = readText(path.join(repoRoot, "skills/kanon/agents/openai.yaml"));
   assert.match(
@@ -122,6 +142,7 @@ test("skill artifact keeps line-separated metadata and executable wrappers", () 
     ["kanon-brief", "brief"],
     ["kanon-improve", "improve"],
     ["kanon-refactor", "refactor"],
+    ["kanon-refresh", "refresh"],
     ["kanon-resume", "resume"],
     ["kanon-todo", "todo"],
     ["kanon-verify", "verify"]
@@ -133,7 +154,10 @@ test("skill artifact keeps line-separated metadata and executable wrappers", () 
     assert.match(script, /^#!\/usr\/bin\/env bash\nset -euo pipefail\n\nCOMMAND="/);
     assert.match(script, new RegExp(`\\nCOMMAND="${command}"\\n`));
     assert.match(script, /\nLOCAL_KANON="\$SCRIPT_DIR\/\.\.\/\.\.\/\.\.\/bin\/kanon\.js"\n/);
-    assert.match(script, /Kanon CLI not found/);
+    assert.match(script, /Kanon skill runtime is incomplete/);
+    assert.match(script, /not a standalone terminal interface/);
+    assert.doesNotMatch(script, /command -v kanon/);
+    assert.doesNotMatch(script, /npm install -g/);
     if (process.platform !== "win32") {
       assert.notEqual(fs.statSync(scriptPath).mode & 0o111, 0);
     }
@@ -145,12 +169,31 @@ test("skill artifact keeps line-separated metadata and executable wrappers", () 
     assert.ok(script.includes(`$KanonCommand = "${command}"`));
     assert.ok(script.includes('$LocalKanon = Join-Path $PSScriptRoot "../../../bin/kanon.js"'));
     assert.match(script, /Get-Command node/);
-    assert.match(script, /Get-Command kanon/);
-    assert.match(script, /Kanon CLI not found/);
+    assert.doesNotMatch(script, /Get-Command kanon/);
+    assert.match(script, /Kanon skill runtime is incomplete/);
+    assert.match(script, /not a standalone terminal interface/);
+    assert.doesNotMatch(script, /npm install -g/);
   }
 });
 
-test("skill wrapper fails clearly when Kanon CLI is unavailable", (t) => {
+test("skill wrapper invokes the bundled local runtime in the package checkout", (t) => {
+  if (process.platform === "win32") {
+    t.skip("Bash wrapper execution is covered on Unix CI.");
+    return;
+  }
+
+  const target = path.join(repoRoot, "skills", "kanon", "scripts", "kanon-brief");
+  const result = spawnSync(target, ["--json"], {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.repo.name, "@mecglandorff/kanon");
+});
+
+test("skill wrapper fails clearly when the bundled runtime is unavailable", (t) => {
   if (process.platform === "win32") {
     t.skip("Bash wrapper execution is covered on Unix CI.");
     return;
@@ -164,11 +207,12 @@ test("skill wrapper fails clearly when Kanon CLI is unavailable", (t) => {
   });
 
   assert.equal(result.status, 127);
-  assert.match(result.stderr, /Kanon CLI not found/);
-  assert.match(result.stderr, /npm install -g @mecglandorff\/kanon/);
+  assert.match(result.stderr, /Kanon skill runtime is incomplete/);
+  assert.match(result.stderr, /not a standalone terminal interface/);
+  assert.doesNotMatch(result.stderr, /npm install -g/);
 });
 
-test("skill wrapper invokes PATH Kanon CLI with the expected command", (t) => {
+test("skill wrapper does not fall back to PATH Kanon CLI", (t) => {
   if (process.platform === "win32") {
     t.skip("Bash wrapper execution is covered on Unix CI.");
     return;
@@ -188,11 +232,12 @@ test("skill wrapper invokes PATH Kanon CLI with the expected command", (t) => {
     encoding: "utf8"
   });
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(fs.readFileSync(markerPath, "utf8"), "brief\n--json\n");
+  assert.equal(result.status, 127);
+  assert.equal(fs.existsSync(markerPath), false);
+  assert.match(result.stderr, /Kanon skill runtime is incomplete/);
 });
 
-test("PowerShell skill wrapper invokes PATH Kanon CLI with the expected command", (t) => {
+test("PowerShell skill wrapper does not fall back to PATH Kanon CLI", (t) => {
   const pwsh = findPowerShell();
   if (!pwsh) {
     t.skip("pwsh not available.");
@@ -217,8 +262,9 @@ test("PowerShell skill wrapper invokes PATH Kanon CLI with the expected command"
     encoding: "utf8"
   });
 
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(fs.readFileSync(markerPath, "utf8"), "brief\n--json\n");
+  assert.equal(result.status, 127);
+  assert.equal(fs.existsSync(markerPath), false);
+  assert.match(result.stderr, /Kanon skill runtime is incomplete/);
 });
 
 test("Kanon todos are human-owned and included in resume output", () => {
@@ -544,7 +590,9 @@ test("README command extraction ignores markdown blockquotes", () => {
 });
 
 test("README command extraction ignores inline paths", () => {
-  const commands = extractCommandsFromMarkdown("State lives in `.kanon/` and the skill is in `skills/kanon/`.");
+  const commands = extractCommandsFromMarkdown(
+    "State lives in `.kanon/` and the skill is in `skills/kanon/`.\n\n```text\nKANON.md        human-readable repo continuity\n```\n"
+  );
   assert.deepEqual(commands, []);
 });
 

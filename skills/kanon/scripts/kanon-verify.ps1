@@ -13,18 +13,6 @@ if (Test-Path -LiteralPath $LocalKanon -PathType Leaf) {
   exit $LASTEXITCODE
 }
 
-$PathKanon = $null
-if ($env:OS -eq "Windows_NT" -or $IsWindows) {
-  $PathKanon = Get-Command kanon.cmd -ErrorAction SilentlyContinue
-}
-if (-not $PathKanon) {
-  $PathKanon = Get-Command kanon -ErrorAction SilentlyContinue
-}
-
-if ($PathKanon) {
-  & $PathKanon.Source $KanonCommand @args
-  exit $LASTEXITCODE
-}
-
-[Console]::Error.WriteLine("Kanon CLI not found. Install it with: npm install -g @mecglandorff/kanon")
+[Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
+[Console]::Error.WriteLine("Install the full Kanon skill package in Codex or Claude Code; these wrappers are not a standalone terminal interface.")
 exit 127
