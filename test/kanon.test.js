@@ -87,27 +87,52 @@ test("CLI supports top-level version flag", async () => {
 });
 
 test("skill artifact keeps line-separated metadata and executable wrappers", () => {
-  const skill = fs.readFileSync(path.join(repoRoot, "skills/kanon/SKILL.md"), "utf8");
+  const skill = readText(path.join(repoRoot, "skills/kanon/SKILL.md"));
   assert.match(skill, /^---\nname: kanon\ndescription: "[^"]+"\n---\n\n# Kanon\n/);
   assert.match(skill, /\n## Runtime Contract\n/);
 
-  const agentYaml = fs.readFileSync(path.join(repoRoot, "skills/kanon/agents/openai.yaml"), "utf8");
+  const agentYaml = readText(path.join(repoRoot, "skills/kanon/agents/openai.yaml"));
   assert.match(
     agentYaml,
     /^interface:\n  display_name: "Kanon"\n  short_description: "Evidence-backed repo continuity"\n  default_prompt: ".+"\n$/
   );
 
-  for (const scriptName of ["kanon-ask", "kanon-brief", "kanon-resume", "kanon-verify"]) {
+  const skillWrappers = [
+    ["kanon-ask", "ask"],
+    ["kanon-brief", "brief"],
+    ["kanon-resume", "resume"],
+    ["kanon-verify", "verify"]
+  ];
+
+  for (const [scriptName, command] of skillWrappers) {
     const scriptPath = path.join(repoRoot, "skills/kanon/scripts", scriptName);
-    const script = fs.readFileSync(scriptPath, "utf8");
+    const script = readText(scriptPath);
     assert.match(script, /^#!\/usr\/bin\/env bash\nset -euo pipefail\n\nCOMMAND="/);
+    assert.match(script, new RegExp(`\\nCOMMAND="${command}"\\n`));
     assert.match(script, /\nLOCAL_KANON="\$SCRIPT_DIR\/\.\.\/\.\.\/\.\.\/bin\/kanon\.js"\n/);
     assert.match(script, /Kanon CLI not found/);
-    assert.notEqual(fs.statSync(scriptPath).mode & 0o111, 0);
+    if (process.platform !== "win32") {
+      assert.notEqual(fs.statSync(scriptPath).mode & 0o111, 0);
+    }
+  }
+
+  for (const [scriptName, command] of skillWrappers) {
+    const scriptPath = path.join(repoRoot, "skills/kanon/scripts", `${scriptName}.ps1`);
+    const script = readText(scriptPath);
+    assert.ok(script.includes(`$KanonCommand = "${command}"`));
+    assert.ok(script.includes('$LocalKanon = Join-Path $PSScriptRoot "../../../bin/kanon.js"'));
+    assert.match(script, /Get-Command node/);
+    assert.match(script, /Get-Command kanon/);
+    assert.match(script, /Kanon CLI not found/);
   }
 });
 
-test("skill wrapper fails clearly when Kanon CLI is unavailable", () => {
+test("skill wrapper fails clearly when Kanon CLI is unavailable", (t) => {
+  if (process.platform === "win32") {
+    t.skip("Bash wrapper execution is covered on Unix CI.");
+    return;
+  }
+
   const { root, target } = copyStandaloneSkillScript("kanon-brief");
   const result = spawnSync(target, [], {
     cwd: root,
@@ -120,7 +145,12 @@ test("skill wrapper fails clearly when Kanon CLI is unavailable", () => {
   assert.match(result.stderr, /npm install -g @mecglandorff\/kanon/);
 });
 
-test("skill wrapper invokes PATH Kanon CLI with the expected command", () => {
+test("skill wrapper invokes PATH Kanon CLI with the expected command", (t) => {
+  if (process.platform === "win32") {
+    t.skip("Bash wrapper execution is covered on Unix CI.");
+    return;
+  }
+
   const { root, target } = copyStandaloneSkillScript("kanon-brief");
   const binDir = path.join(root, "fake-bin");
   const markerPath = path.join(root, "args.txt");
@@ -132,6 +162,35 @@ test("skill wrapper invokes PATH Kanon CLI with the expected command", () => {
   const result = spawnSync(target, ["--json"], {
     cwd: root,
     env: { ...process.env, PATH: `${binDir}:/usr/bin:/bin` },
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(markerPath, "utf8"), "brief\n--json\n");
+});
+
+test("PowerShell skill wrapper invokes PATH Kanon CLI with the expected command", (t) => {
+  const pwsh = findPowerShell();
+  if (!pwsh) {
+    t.skip("pwsh not available.");
+    return;
+  }
+
+  const { root, target } = copyStandalonePowerShellSkillScript("kanon-brief.ps1");
+  const binDir = path.join(root, "fake-bin");
+  const markerPath = path.join(root, "args.txt");
+  fs.mkdirSync(binDir, { recursive: true });
+  writeFakeKanonCommand(binDir, markerPath);
+
+  const args = ["-NoProfile"];
+  if (process.platform === "win32") {
+    args.push("-ExecutionPolicy", "Bypass");
+  }
+  args.push("-File", target, "--json");
+
+  const result = spawnSync(pwsh, args, {
+    cwd: root,
+    env: withPrependedPath(process.env, binDir),
     encoding: "utf8"
   });
 
@@ -190,6 +249,10 @@ function makeFixture(files) {
   return root;
 }
 
+function readText(filePath) {
+  return fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
+}
+
 function copyStandaloneSkillScript(scriptName) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-skill-"));
   const scriptDir = path.join(root, "skills", "kanon", "scripts");
@@ -199,4 +262,53 @@ function copyStandaloneSkillScript(scriptName) {
   fs.copyFileSync(source, target);
   fs.chmodSync(target, 0o755);
   return { root, target };
+}
+
+function copyStandalonePowerShellSkillScript(scriptName) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-skill-"));
+  const scriptDir = path.join(root, "skills", "kanon", "scripts");
+  fs.mkdirSync(scriptDir, { recursive: true });
+  const source = path.join(repoRoot, "skills", "kanon", "scripts", scriptName);
+  const target = path.join(scriptDir, scriptName);
+  fs.copyFileSync(source, target);
+  return { root, target };
+}
+
+function findPowerShell() {
+  for (const candidate of ["pwsh", "pwsh.exe"]) {
+    const result = spawnSync(candidate, ["-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], {
+      encoding: "utf8"
+    });
+    if (!result.error && result.status === 0) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function writeFakeKanonCommand(binDir, markerPath) {
+  const fakeJs = path.join(binDir, "fake-kanon.cjs");
+  fs.writeFileSync(
+    fakeJs,
+    `const fs = require("node:fs");\nfs.writeFileSync(${JSON.stringify(markerPath)}, process.argv.slice(2).join("\\n") + "\\n", "utf8");\n`,
+    "utf8"
+  );
+
+  if (process.platform === "win32") {
+    fs.writeFileSync(path.join(binDir, "kanon.cmd"), '@echo off\r\nnode "%~dp0fake-kanon.cjs" %*\r\n', "utf8");
+    return;
+  }
+
+  const fakeKanon = path.join(binDir, "kanon");
+  fs.writeFileSync(fakeKanon, '#!/usr/bin/env sh\nnode "$(dirname "$0")/fake-kanon.cjs" "$@"\n', "utf8");
+  fs.chmodSync(fakeKanon, 0o755);
+}
+
+function withPrependedPath(env, binDir) {
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") || "PATH";
+  return {
+    ...env,
+    [pathKey]: `${binDir}${path.delimiter}${env[pathKey] || ""}`
+  };
 }

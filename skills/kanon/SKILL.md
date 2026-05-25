@@ -21,6 +21,8 @@ Do not claim repo state as known unless it is backed by evidence.
 
 ## Workflow
 
+Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps1` on Windows.
+
 1. Run `scripts/kanon-brief` to get an evidence-backed orientation.
 2. Run `scripts/kanon-verify README.md` when README drift or setup accuracy matters.
 3. Run `scripts/kanon-resume` when returning to a repo with `.kanon/` state.
@@ -39,7 +41,13 @@ Do not claim repo state as known unless it is backed by evidence.
 
 The wrapper scripts expect the Kanon CLI to be available.
 
-They first try the local package CLI at `../../../bin/kanon.js`, which works when the skill is used from this package checkout or npm package. If that is not available, they use `kanon` from `PATH`.
+Unix/macOS wrappers are Bash scripts such as `scripts/kanon-brief`. Windows wrappers are PowerShell scripts such as:
+
+```powershell
+pwsh -NoProfile -File scripts/kanon-brief.ps1
+```
+
+Both wrapper families first try the local package CLI at `../../../bin/kanon.js`, which works when the skill is used from this package checkout or npm package. If that is not available, they use `kanon` from `PATH`.
 
 If neither is available, install the CLI with:
 
