@@ -35,4 +35,18 @@ Do not claim repo state as known unless it is backed by evidence.
 - Repo verify: strict README drift and hallucination check
 - Repo ask: cited answers to repo questions
 
+## Runtime Contract
+
+The wrapper scripts expect the Kanon CLI to be available.
+
+They first try the local package CLI at `../../../bin/kanon.js`, which works when the skill is used from this package checkout or npm package. If that is not available, they use `kanon` from `PATH`.
+
+If neither is available, install the CLI with:
+
+```bash
+npm install -g @mecglandorff/kanon
+```
+
+The scripts should fail with a clear dependency error instead of silently producing partial output.
+
 Keep answers concise and cite evidence IDs, file paths, or both.
