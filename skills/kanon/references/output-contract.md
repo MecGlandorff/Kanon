@@ -42,9 +42,9 @@ Kanon output must help a human or coding agent answer: what is going on in this 
 
 `.kanon/TODO.md` is the human-owned follow-up list. Preserve it during refresh; do not rewrite it destructively.
 
-`.kanon/IMPROVEMENTS.md` is the write-on-request direction report from `kanon improve --write`.
+`.kanon/IMPROVEMENTS.md` is the write-on-request direction report from `scripts/kanon-improve --write`.
 
-`.kanon/REFACTOR_PLAN.md` is the write-on-request cleanup plan from `kanon refactor --write`.
+`.kanon/REFACTOR_PLAN.md` is the write-on-request cleanup plan from `scripts/kanon-refactor --write`.
 
 `.kanon/STATE.json` is machine-readable state.
 

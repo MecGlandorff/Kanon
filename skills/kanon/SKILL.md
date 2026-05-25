@@ -30,8 +30,9 @@ Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps
 5. Run `scripts/kanon-improve --mode top` when the user asks how to steer the project in a better direction.
 6. Run `scripts/kanon-refactor --mode plan` when the user asks to clean up messy, oversized, or vibecoded code.
 7. Run `scripts/kanon-todo list` to check human-owned follow-up work.
-8. Read `references/evidence-policy.md` before resolving conflicting repo claims.
-9. Read `references/output-contract.md` before producing or modifying Kanon outputs.
+8. Run `scripts/kanon-refresh` only when the user asks to write or refresh `.kanon/` continuity files.
+9. Read `references/evidence-policy.md` before resolving conflicting repo claims.
+10. Read `references/output-contract.md` before producing or modifying Kanon outputs.
 
 ## Output Modes
 
@@ -42,10 +43,11 @@ Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps
 - Repo improve: deterministic project health, code quality, and product direction recommendations
 - Repo refactor: one-session cleanup/refactor plan plus a Codex/Claude-ready prompt
 - Repo todo: human-owned follow-up work stored in `.kanon/TODO.md`
+- Repo refresh: write `.kanon/` continuity files when explicitly requested
 
 ## Runtime Contract
 
-The wrapper scripts expect the Kanon CLI to be available.
+The wrapper scripts are implementation hooks for Codex and Claude Code. They are not a standalone terminal interface.
 
 Unix/macOS wrappers are Bash scripts such as `scripts/kanon-brief`. Windows wrappers are PowerShell scripts such as:
 
@@ -53,14 +55,8 @@ Unix/macOS wrappers are Bash scripts such as `scripts/kanon-brief`. Windows wrap
 pwsh -NoProfile -File scripts/kanon-brief.ps1
 ```
 
-Both wrapper families first try the local package CLI at `../../../bin/kanon.js`, which works when the skill is used from this package checkout or npm package. If that is not available, they use `kanon` from `PATH`.
+Both wrapper families require the local runtime at `../../../bin/kanon.js`, which works when the skill is installed with this package checkout or a complete skill package. They must not fall back to a globally installed `kanon` command.
 
-If neither is available, install the CLI with:
-
-```bash
-npm install -g @mecglandorff/kanon
-```
-
-The scripts should fail with a clear dependency error instead of silently producing partial output.
+The scripts should fail with a clear incomplete-runtime error instead of silently producing partial output.
 
 Keep answers concise and cite evidence IDs, file paths, or both.

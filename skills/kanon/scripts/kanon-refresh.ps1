@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$KanonCommand = "refactor"
+$KanonCommand = "refresh"
 $LocalKanon = Join-Path $PSScriptRoot "../../../bin/kanon.js"
 
 if (Test-Path -LiteralPath $LocalKanon -PathType Leaf) {

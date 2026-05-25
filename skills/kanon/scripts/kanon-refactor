@@ -13,9 +13,6 @@ if [[ -x "$LOCAL_KANON" ]]; then
   exec node "$LOCAL_KANON" "$COMMAND" "$@"
 fi
 
-if command -v kanon >/dev/null 2>&1; then
-  exec kanon "$COMMAND" "$@"
-fi
-
-echo "Kanon CLI not found. Install it with: npm install -g @mecglandorff/kanon" >&2
+echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
+echo "Install the full Kanon skill package in Codex or Claude Code; these wrappers are not a standalone terminal interface." >&2
 exit 127

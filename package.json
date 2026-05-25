@@ -1,7 +1,7 @@
 {
   "name": "@mecglandorff/kanon",
   "version": "0.1.0",
-  "description": "Repo continuity for AI coding agents.",
+  "description": "Evidence-backed repo continuity skill runtime for Codex and Claude Code.",
   "type": "module",
   "repository": {
     "type": "git",
@@ -11,18 +11,11 @@
     "url": "https://github.com/MecGlandorff/Kanon/issues"
   },
   "homepage": "https://github.com/MecGlandorff/Kanon#readme",
-  "publishConfig": {
-    "access": "public"
-  },
-  "bin": {
-    "kanon": "bin/kanon.js"
-  },
   "exports": {
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "node --test",
-    "kanon": "node ./bin/kanon.js"
+    "test": "node --test"
   },
   "files": [
     "bin/",

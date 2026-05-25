@@ -42,7 +42,7 @@ export function verifyReadme(context) {
 export function extractCommandsFromMarkdown(markdown) {
   const commands = new Set();
   const promptPattern = /^\s*\$\s+(.+)$/gm;
-  const inlinePattern = /`((?:npm|npx|pnpm|yarn|pytest|python3?|node|docker|kanon)\b[^`\n]*)`/gi;
+  const inlinePattern = /`(((?:(?:npm|npx|pnpm|yarn|pytest|python3?|node|docker)\b)|kanon(?=\s|$))[^`\n]*)`/gi;
   let match;
 
   while ((match = promptPattern.exec(markdown))) {
@@ -63,7 +63,7 @@ export function extractCommandsFromMarkdown(markdown) {
 function extractFencedCodeCommands(markdown) {
   const commands = [];
   const fencePattern = /```[A-Za-z0-9_-]*\n([\s\S]*?)```/g;
-  const commandLinePattern = /^\s*((?:npm|npx|pnpm|yarn|pytest|python3?|node|docker|kanon)\b[^\n]*)$/i;
+  const commandLinePattern = /^\s*(((?:(?:npm|npx|pnpm|yarn|pytest|python3?|node|docker)\b)|kanon(?=\s|$))[^\n]*)$/i;
   let match;
 
   while ((match = fencePattern.exec(markdown))) {

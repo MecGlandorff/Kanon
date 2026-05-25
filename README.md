@@ -2,54 +2,38 @@
 
 Never lose the thread of a repo again.
 
-Kanon changes what an AI coding agent knows about a repo before it answers, plans, or edits.
+Kanon is a Codex/Claude Code skill that changes what an AI coding agent knows about a repo before it answers, plans, or edits.
 
 It briefs the current repo state from files, config, tests, docs, and local Kanon memory: what the repo does, how it works, what is stale, what is unknown, and where to start.
 
 ## Quickstart
 
-Run Kanon from the root of a repository you want to inspect:
+Install or copy the bundled skill from `skills/kanon/` into Codex or Claude Code. Use Kanon inside an agent session, not as a package-runner, npm global, or standalone shell command.
 
-```bash
-npx @mecglandorff/kanon brief
+```text
+$kanon
+Brief this repo and tell me the safest first contribution.
 ```
 
-Useful commands:
+Useful agent prompts:
 
-```bash
-# Check whether README instructions look stale
-npx @mecglandorff/kanon verify README.md
+```text
+$kanon
+Check whether README instructions look stale.
 
-# Ask a repo-orientation question
-npx @mecglandorff/kanon ask "what should I read first?"
+$kanon
+What should I read first?
 
-# Get project improvement direction
-npx @mecglandorff/kanon improve --mode top
+$kanon
+Give me the top project improvement direction.
 
-# Make a one-session refactor plan for messy code
-npx @mecglandorff/kanon refactor --mode plan --agent codex
-
-# Optional: write continuity notes
-npx @mecglandorff/kanon refresh
-
-# Track human follow-up work for later resume
-npx @mecglandorff/kanon todo add "add a README quickstart"
-npx @mecglandorff/kanon todo add --stdin < review-notes.md
-npx @mecglandorff/kanon todo list
+$kanon
+Make a one-session refactor plan for the messy parts of this repo.
 ```
 
-`brief`, `verify`, `ask`, `resume`, `improve`, and `refactor` are read-only by default. `refresh` writes `.kanon/` continuity files. `todo` writes human-owned follow-up work to `.kanon/TODO.md`. `improve --write` writes `.kanon/IMPROVEMENTS.md`; `refactor --write` writes `.kanon/REFACTOR_PLAN.md`. The shareable generated brief is `.kanon/KANON.md`; volatile state stays local.
+The scripts under `skills/kanon/scripts/` are agent runtime hooks. They call the internal Node runtime when the skill is installed with this repository's package files, but they are not a supported user-facing terminal interface.
 
-For local development or before using the npm package:
-
-```bash
-git clone https://github.com/MecGlandorff/Kanon.git
-cd Kanon
-npm test
-node ./bin/kanon.js brief --root /path/to/other/repo
-```
-
-Use Kanon before asking Codex or Claude to work in an unfamiliar repo. Paste the brief into the agent, or let the bundled skill call Kanon first, so repo claims are separated into Known, Likely, Unknown, Stale/Suspicious, and Suggested.
+Use Kanon before asking Codex or Claude to work in an unfamiliar repo. Let the bundled skill call Kanon first so repo claims are separated into Known, Likely, Unknown, Stale/Suspicious, and Suggested.
 
 ## Why
 
@@ -63,26 +47,20 @@ Kanon answers:
 
 > I just opened this repo. What does it do, what is trustworthy, what is stale, and where should I start?
 
-## Commands
+## Skill Workflows
 
-```bash
-kanon brief              # Evidence-backed repo orientation
-kanon verify README.md   # README / repo drift report
-kanon ask "what is left?"
-kanon resume             # Resume from the last Kanon checkpoint
-kanon improve            # Choose a 1/2/3 improvement report
-kanon improve --mode top # Prioritized project direction
-kanon refactor           # Ask steering questions and make a cleanup plan
-kanon refactor --mode audit
-kanon refactor --mode prompt --agent claude
-kanon todo add "..."     # Store human follow-up work
-kanon todo add --stdin   # Store a longer note from stdin
-kanon todo list          # Show open Kanon todos
-kanon todo done 1        # Mark a Kanon todo complete
-kanon refresh            # Write .kanon/ continuity files
-```
+The skill tells Codex or Claude Code when to call these bundled wrappers:
 
-`kanon brief`, `kanon verify`, `kanon ask`, `kanon resume`, `kanon improve`, and `kanon refactor` are read-only by default. Use `kanon refresh`, `kanon todo`, `kanon improve --write`, `kanon refactor --write`, or `--write` on supported commands to write `.kanon/`.
+- `scripts/kanon-brief`: evidence-backed repo orientation
+- `scripts/kanon-verify README.md`: README / repo drift report
+- `scripts/kanon-ask "question"`: cited answers from repo evidence
+- `scripts/kanon-resume`: resume from the last Kanon checkpoint
+- `scripts/kanon-improve --mode top`: prioritized project direction
+- `scripts/kanon-refactor --mode plan --agent codex`: one-session cleanup plan
+- `scripts/kanon-todo`: human-owned follow-up work
+- `scripts/kanon-refresh`: write `.kanon/` continuity files
+
+`brief`, `verify`, `ask`, `resume`, `improve`, and `refactor` are read-only by default. `refresh` writes `.kanon/` continuity files. `todo` writes human-owned follow-up work to `.kanon/TODO.md`. `improve --write` writes `.kanon/IMPROVEMENTS.md`; `refactor --write` writes `.kanon/REFACTOR_PLAN.md`. The shareable generated brief is `.kanon/KANON.md`; volatile state stays local.
 
 ## What Kanon Writes
 
@@ -103,21 +81,15 @@ By default, `.kanon/KANON.md`, `.kanon/TODO.md`, `.kanon/IMPROVEMENTS.md`, and `
 
 ## Improvement Direction
 
-`kanon improve` helps decide where to steer the project next from local repo evidence. It uses deterministic rules, not an LLM, so the same repo state produces the same recommendations.
+The improve workflow helps decide where to steer the project next from local repo evidence. It uses deterministic rules, not an LLM, so the same repo state produces the same recommendations.
 
-When run in an interactive terminal without `--mode`, Kanon asks:
-
-```text
-Choose improvement report: 1) Top 5  2) Full audit  3) Scorecard [1]:
-```
-
-Use `--mode top`, `--mode audit`, or `--mode scorecard` for scripts and agents. Non-interactive runs default to `top`.
+Codex and Claude Code should use `--mode top`, `--mode audit`, or `--mode scorecard`. Non-interactive runs default to `top`.
 
 ## Refactor Planning
 
-`kanon refactor` helps turn messy, oversized, or vibecoded areas into a bounded one-session cleanup plan. It scans code, tests, and config evidence first; docs can provide context, but they do not drive refactor claims.
+The refactor workflow helps turn messy, oversized, or vibecoded areas into a bounded one-session cleanup plan. It scans code, tests, and config evidence first; docs can provide context, but they do not drive refactor claims.
 
-When run interactively, Kanon asks steering questions about the cleanup goal, what must not break, deletion of dead-code candidates, test expectations, and one-session scope. Non-interactive runs use conservative defaults and print the same questions for the coding agent to confirm with the user.
+When the agent needs steering, Kanon surfaces questions about the cleanup goal, what must not break, deletion of dead-code candidates, test expectations, and one-session scope. Non-interactive runs use conservative defaults and print the same questions for the coding agent to confirm with the user.
 
 Use `--mode plan`, `--mode audit`, or `--mode prompt`. Use `--agent codex` or `--agent claude` to label the ready-to-paste prompt for the target coding agent. `--write` writes only `.kanon/REFACTOR_PLAN.md` and updates `.kanon/STATE.json`.
 
@@ -135,7 +107,7 @@ Code, config, and tests outrank README content for current behavior. README cont
 
 ## Skill Package
 
-The repo ships a Codex/Claude-compatible skill under `skills/kanon/`. Use it when opening, resuming, onboarding, auditing, or explaining a repository.
+The repo's supported integration artifact is the Codex/Claude-compatible skill under `skills/kanon/`. Use it when opening, resuming, onboarding, auditing, or explaining a repository.
 
 The skill includes Bash wrappers for Unix/macOS and PowerShell `.ps1` wrappers for Windows.
 
@@ -146,8 +118,10 @@ Brief this repo and tell me the safest first contribution.
 
 ## Development
 
+For maintainers working on the internal skill runtime:
+
 ```bash
 npm test
-node ./bin/kanon.js brief
-node ./bin/kanon.js verify README.md
 ```
+
+`bin/kanon.js` is an implementation detail for the bundled skill wrappers and tests, not a supported user-facing terminal interface.
