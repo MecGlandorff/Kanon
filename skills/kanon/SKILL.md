@@ -27,8 +27,11 @@ Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps
 2. Run `scripts/kanon-verify README.md` when README drift or setup accuracy matters.
 3. Run `scripts/kanon-resume` when returning to a repo with `.kanon/` state.
 4. Run `scripts/kanon-ask "question"` for cited answers from repo evidence.
-5. Read `references/evidence-policy.md` before resolving conflicting repo claims.
-6. Read `references/output-contract.md` before producing or modifying Kanon outputs.
+5. Run `scripts/kanon-improve --mode top` when the user asks how to steer the project in a better direction.
+6. Run `scripts/kanon-refactor --mode plan` when the user asks to clean up messy, oversized, or vibecoded code.
+7. Run `scripts/kanon-todo list` to check human-owned follow-up work.
+8. Read `references/evidence-policy.md` before resolving conflicting repo claims.
+9. Read `references/output-contract.md` before producing or modifying Kanon outputs.
 
 ## Output Modes
 
@@ -36,6 +39,9 @@ Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps
 - Resume repo: action-oriented continuation from the last checkpoint
 - Repo verify: strict README drift and hallucination check
 - Repo ask: cited answers to repo questions
+- Repo improve: deterministic project health, code quality, and product direction recommendations
+- Repo refactor: one-session cleanup/refactor plan plus a Codex/Claude-ready prompt
+- Repo todo: human-owned follow-up work stored in `.kanon/TODO.md`
 
 ## Runtime Contract
 

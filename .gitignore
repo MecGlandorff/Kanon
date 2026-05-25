@@ -3,8 +3,12 @@ node_modules/
 coverage/
 .nyc_output/
 npm-debug.log*
+improvements/
 
 .kanon/*
 !.kanon/
 !.kanon/.gitignore
 !.kanon/KANON.md
+!.kanon/TODO.md
+!.kanon/IMPROVEMENTS.md
+!.kanon/REFACTOR_PLAN.md
