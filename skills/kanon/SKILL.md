@@ -1,11 +1,21 @@
 ---
 name: kanon
-description: "Use when opening, resuming, onboarding, auditing, verifying, or explaining a repository. Produces an evidence-backed repo brief: what the repo does, how it works, what is done, what is stale, what is left, and where to start. Helps Codex avoid hallucinating repo state from stale docs, incomplete context, or old memory."
+description: "Use when opening, resuming, onboarding, auditing, verifying, improving, refactoring, or explaining a repository. Run the bundled Kanon wrapper from this skill directory with the target repo as the working directory, then answer from evidence using Known, Likely, Unknown, Stale/Suspicious, and Suggested claims."
 ---
 
 # Kanon
 
-Kanon provides repo continuity. Use it to orient yourself or another coding agent before changing a repository.
+Kanon is a repo-orientation skill for coding agents. It scans the current repository first, then you use the scan output to answer, plan, or edit with less guessing.
+
+## Mental Model
+
+- The target repo is the user's current repository.
+- This skill directory is the folder that contains this `SKILL.md`.
+- Wrapper scripts live under this skill directory in `scripts/`.
+- Run wrappers with the target repo as the command working directory.
+- Resolve wrapper paths relative to this skill directory, not relative to the target repo. Do not try `scripts/kanon-brief` from the target repo unless that path actually exists there.
+- Default scan commands are read-only. `scripts/kanon-refresh`, `scripts/kanon-todo add|done`, and commands with `--write` write `.kanon/` files.
+- Treat an incomplete scan as an explicit unknown. Never convert absence into proof when Kanon reports truncation, unreadable entries, or excluded sensitive files.
 
 ## Core Rule
 
@@ -21,18 +31,24 @@ Do not claim repo state as known unless it is backed by evidence.
 
 ## Workflow
 
-Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps1` on Windows.
+Use the smallest matching wrapper before making repo claims:
 
-1. Run `scripts/kanon-brief` to get an evidence-backed orientation.
-2. Run `scripts/kanon-verify README.md` when README drift or setup accuracy matters.
-3. Run `scripts/kanon-resume` when returning to a repo with `.kanon/` state.
-4. Run `scripts/kanon-ask "question"` for cited answers from repo evidence.
-5. Run `scripts/kanon-improve --mode top` when the user asks how to steer the project in a better direction.
-6. Run `scripts/kanon-refactor --mode plan` when the user asks to clean up messy, oversized, or vibecoded code.
-7. Run `scripts/kanon-todo list` to check human-owned follow-up work.
-8. Run `scripts/kanon-refresh` only when the user asks to write or refresh `.kanon/` continuity files.
-9. Read `references/evidence-policy.md` before resolving conflicting repo claims.
-10. Read `references/output-contract.md` before producing or modifying Kanon outputs.
+- New repo, onboarding, "what is this?", "where should I start?": run `scripts/kanon-brief`.
+- README drift, setup accuracy, docs verification: run `scripts/kanon-verify README.md`.
+- Resume old work or continue from Kanon state: run `scripts/kanon-resume` when `.kanon/` exists; otherwise run `scripts/kanon-brief`.
+- Specific repo question: run `scripts/kanon-ask "question"`.
+- Project direction, product/code quality, "what should improve?": run `scripts/kanon-improve --mode top`.
+- Messy, oversized, or vibecoded code cleanup: run `scripts/kanon-refactor --mode plan --agent codex`.
+- Human follow-up work: run `scripts/kanon-todo list`.
+- Write or refresh continuity files: run `scripts/kanon-refresh` only when the user explicitly asks to write/refresh repo memory.
+
+On Unix/macOS, run the Bash wrapper from this skill directory. On Windows, run the matching PowerShell wrapper:
+
+```powershell
+pwsh -NoProfile -File scripts/kanon-brief.ps1
+```
+
+Read `references/evidence-policy.md` before resolving conflicting repo claims. Read `references/output-contract.md` before producing or modifying Kanon output files. Read `references/security-policy.md` before sharing raw evidence or changing scan boundaries.
 
 ## Output Modes
 
@@ -49,14 +65,14 @@ Use `scripts/<name>` on Unix/macOS. Use `pwsh -NoProfile -File scripts/<name>.ps
 
 The wrapper scripts are implementation hooks for Codex and Claude Code. They are not a standalone terminal interface.
 
-Unix/macOS wrappers are Bash scripts such as `scripts/kanon-brief`. Windows wrappers are PowerShell scripts such as:
-
-```powershell
-pwsh -NoProfile -File scripts/kanon-brief.ps1
-```
-
-Both wrapper families require the local runtime at `../../../bin/kanon.js`, which works when the skill is installed with this package checkout or a complete skill package. They must not fall back to a globally installed `kanon` command.
+Both wrapper families use the self-contained runtime under `runtime/`. Copying the complete `skills/kanon/` directory must be enough to run Kanon with Node.js 20+. The wrappers must not fall back to a globally installed `kanon` command.
 
 The scripts should fail with a clear incomplete-runtime error instead of silently producing partial output.
 
-Keep answers concise and cite evidence IDs, file paths, or both.
+## Using Kanon Output
+
+- Treat wrapper output as evidence input, not as the whole final answer.
+- Keep the final answer concise and shaped to the user's question.
+- Cite evidence IDs, file paths, or both when making concrete repo claims.
+- If code/config/tests conflict with README/docs, call that stale or suspicious.
+- Mark missing evidence as unknown instead of filling gaps from assumptions.

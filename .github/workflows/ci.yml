@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -16,16 +19,19 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
+        node:
+          - 20
+          - 22
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
 
-      - run: npm test
-      - run: npm pack --dry-run
-      - run: node ./bin/kanon.js brief
+      - run: npm run validate
+      - run: node ./bin/kanon.js brief --json
