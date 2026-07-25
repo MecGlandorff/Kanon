@@ -1,5 +1,8 @@
 # Kanon
 
+> **If you only read one line:** Kanon gives coding agents a grounded read of a
+> repo before they touch it.
+
 **Kanon — deep repo ingestion before agent action & more.**
 
 Kanon is **ambient repo intelligence** for coding agents. Install it once; Codex
