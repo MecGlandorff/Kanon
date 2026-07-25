@@ -1,4 +1,5 @@
 # Kanon
+Package at NPM: https://www.npmjs.com/package/@mecglandorff/kanon
 
 > **If you only read one line:** Kanon gives coding agents a grounded read of a
 > repo before they touch it.
