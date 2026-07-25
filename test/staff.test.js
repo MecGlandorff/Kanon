@@ -362,21 +362,20 @@ test("standalone copied skill contains a working runtime", (t) => {
 
 test("packed npm artifact retains a runnable self-contained skill", { timeout: 60_000 }, () => {
   const packRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-pack-"));
-  const pack = spawnSync(npmCommand(), ["pack", "--json", "--pack-destination", packRoot], {
+  const pack = runNpm(["pack", "--json", "--pack-destination", packRoot], {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...process.env, npm_config_audit: "false", npm_config_fund: "false" }
   });
-  assert.equal(pack.status, 0, pack.stderr);
+  assert.equal(pack.status, 0, pack.error?.stack || pack.stderr);
   const metadata = JSON.parse(pack.stdout);
   const tarball = path.join(packRoot, metadata[0].filename);
   const installRoot = path.join(packRoot, "install");
-  const install = spawnSync(
-    npmCommand(),
+  const install = runNpm(
     ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", installRoot, tarball],
     { encoding: "utf8" }
   );
-  assert.equal(install.status, 0, install.stderr);
+  assert.equal(install.status, 0, install.error?.stack || install.stderr);
 
   const installedSkill = path.join(
     installRoot,
@@ -426,6 +425,12 @@ function git(root, args) {
   };
 }
 
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+function runNpm(args, options = {}) {
+  if (process.env.npm_execpath) {
+    return spawnSync(process.execPath, [process.env.npm_execpath, ...args], options);
+  }
+  if (process.platform === "win32") {
+    return spawnSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "npm", ...args], options);
+  }
+  return spawnSync("npm", args, options);
 }
