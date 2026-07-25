@@ -3,16 +3,23 @@ set -euo pipefail
 
 COMMAND="refresh"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../../../bin/kanon.js"
+LOCAL_KANON="$SCRIPT_DIR/../runtime/bin/kanon.js"
 
-if [[ -x "$LOCAL_KANON" ]]; then
-  if ! command -v node >/dev/null 2>&1; then
-    echo "Kanon requires Node.js 20+ to run the local package CLI." >&2
-    exit 127
-  fi
-  exec node "$LOCAL_KANON" "$COMMAND" "$@"
+if [[ ! -f "$LOCAL_KANON" ]]; then
+  echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
+  echo "Reinstall the complete self-contained Kanon skill." >&2
+  exit 127
 fi
 
-echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
-echo "Install the full Kanon skill package in Codex or Claude Code; these wrappers are not a standalone terminal interface." >&2
-exit 127
+if ! command -v node >/dev/null 2>&1; then
+  echo "Kanon requires Node.js 20+." >&2
+  exit 127
+fi
+
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]] || (( NODE_MAJOR < 20 )); then
+  echo "Kanon requires Node.js 20+; found $(node --version)." >&2
+  exit 127
+fi
+
+exec node "$LOCAL_KANON" "$COMMAND" "$@"

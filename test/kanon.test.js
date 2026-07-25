@@ -103,7 +103,7 @@ test("CLI supports top-level version flag", async () => {
     process.stdout.write = originalWrite;
   }
 
-  assert.equal(output, "0.1.0\n");
+  assert.equal(output, "0.2.0\n");
 });
 
 test("README presents Kanon as an agent skill, not a terminal package", () => {
@@ -126,6 +126,9 @@ test("package metadata does not expose a terminal binary", () => {
 test("skill artifact keeps line-separated metadata and executable wrappers", () => {
   const skill = readText(path.join(repoRoot, "skills/kanon/SKILL.md"));
   assert.match(skill, /^---\nname: kanon\ndescription: "[^"]+"\n---\n\n# Kanon\n/);
+  assert.match(skill, /\n## Mental Model\n/);
+  assert.match(skill, /Run wrappers with the target repo as the command working directory/);
+  assert.match(skill, /Resolve wrapper paths relative to this skill directory/);
   assert.match(skill, /\n## Runtime Contract\n/);
   assert.match(skill, /not a standalone terminal interface/);
   assert.match(skill, /must not fall back to a globally installed `kanon` command/);
@@ -153,9 +156,9 @@ test("skill artifact keeps line-separated metadata and executable wrappers", () 
     const script = readText(scriptPath);
     assert.match(script, /^#!\/usr\/bin\/env bash\nset -euo pipefail\n\nCOMMAND="/);
     assert.match(script, new RegExp(`\\nCOMMAND="${command}"\\n`));
-    assert.match(script, /\nLOCAL_KANON="\$SCRIPT_DIR\/\.\.\/\.\.\/\.\.\/bin\/kanon\.js"\n/);
+    assert.match(script, /\nLOCAL_KANON="\$SCRIPT_DIR\/\.\.\/runtime\/bin\/kanon\.js"\n/);
     assert.match(script, /Kanon skill runtime is incomplete/);
-    assert.match(script, /not a standalone terminal interface/);
+    assert.match(script, /self-contained Kanon skill/);
     assert.doesNotMatch(script, /command -v kanon/);
     assert.doesNotMatch(script, /npm install -g/);
     if (process.platform !== "win32") {
@@ -167,11 +170,11 @@ test("skill artifact keeps line-separated metadata and executable wrappers", () 
     const scriptPath = path.join(repoRoot, "skills/kanon/scripts", `${scriptName}.ps1`);
     const script = readText(scriptPath);
     assert.ok(script.includes(`$KanonCommand = "${command}"`));
-    assert.ok(script.includes('$LocalKanon = Join-Path $PSScriptRoot "../../../bin/kanon.js"'));
+    assert.ok(script.includes('$LocalKanon = Join-Path $PSScriptRoot "../runtime/bin/kanon.js"'));
     assert.match(script, /Get-Command node/);
     assert.doesNotMatch(script, /Get-Command kanon/);
     assert.match(script, /Kanon skill runtime is incomplete/);
-    assert.match(script, /not a standalone terminal interface/);
+    assert.match(script, /self-contained Kanon skill/);
     assert.doesNotMatch(script, /npm install -g/);
   }
 });
@@ -208,7 +211,7 @@ test("skill wrapper fails clearly when the bundled runtime is unavailable", (t) 
 
   assert.equal(result.status, 127);
   assert.match(result.stderr, /Kanon skill runtime is incomplete/);
-  assert.match(result.stderr, /not a standalone terminal interface/);
+  assert.match(result.stderr, /self-contained Kanon skill/);
   assert.doesNotMatch(result.stderr, /npm install -g/);
 });
 
@@ -265,6 +268,28 @@ test("PowerShell skill wrapper does not fall back to PATH Kanon CLI", (t) => {
   assert.equal(result.status, 127);
   assert.equal(fs.existsSync(markerPath), false);
   assert.match(result.stderr, /Kanon skill runtime is incomplete/);
+});
+
+test("PowerShell skill wrapper invokes the self-contained runtime", (t) => {
+  const pwsh = findPowerShell();
+  if (!pwsh) {
+    t.skip("PowerShell is not available.");
+    return;
+  }
+
+  const target = path.join(repoRoot, "skills", "kanon", "scripts", "kanon-brief.ps1");
+  const args = ["-NoProfile"];
+  if (process.platform === "win32") {
+    args.push("-ExecutionPolicy", "Bypass");
+  }
+  args.push("-File", target, "--json");
+  const result = spawnSync(pwsh, args, {
+    cwd: repoRoot,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).repo.name, "@mecglandorff/kanon");
 });
 
 test("Kanon todos are human-owned and included in resume output", () => {
@@ -662,7 +687,7 @@ function copyStandalonePowerShellSkillScript(scriptName) {
 }
 
 function findPowerShell() {
-  for (const candidate of ["pwsh", "pwsh.exe"]) {
+  for (const candidate of ["pwsh", "pwsh.exe", "powershell.exe", "powershell"]) {
     const result = spawnSync(candidate, ["-NoProfile", "-Command", "$PSVersionTable.PSVersion.Major"], {
       encoding: "utf8"
     });

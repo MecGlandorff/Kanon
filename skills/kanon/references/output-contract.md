@@ -53,3 +53,11 @@ Kanon output must help a human or coding agent answer: what is going on in this 
 `.kanon/HANDOFF.md` is the quick resume brief.
 
 Do not store large, volatile repo summaries in `AGENTS.md`; use `AGENTS.md` only to point agents to Kanon.
+
+## Machine Contract
+
+- Include `schema_version` in machine-readable state.
+- Include scan completeness and exclusion diagnostics.
+- Preserve user-owned `.kanon/config.json`, `.kanon/.gitignore`, and `.kanon/TODO.md`.
+- Write replaceable state files atomically.
+- Keep evidence append-only and give each run collision-resistant evidence IDs.
