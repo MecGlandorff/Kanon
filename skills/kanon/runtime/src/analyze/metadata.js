@@ -1,12 +1,12 @@
 import { findByPath, readText } from "../scanner.js";
 import { firstHeadingOrLine } from "./utils.js";
 
-export function readPackageJson(root, files, evidence) {
+export function readPackageJson(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "package.json");
   if (!file) {
     return null;
   }
-  const text = readText(root, file.path);
+  const text = readText(root, file.path, readOptions);
   let json;
   try {
     json = JSON.parse(text);
@@ -37,12 +37,12 @@ export function readPackageJson(root, files, evidence) {
   };
 }
 
-export function readPyproject(root, files, evidence) {
+export function readPyproject(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "pyproject.toml");
   if (!file) {
     return null;
   }
-  const text = readText(root, file.path);
+  const text = readText(root, file.path, readOptions);
   const hasPytest = /\[tool\.pytest\b/.test(text);
   return {
     path: file.path,
@@ -59,7 +59,7 @@ export function readPyproject(root, files, evidence) {
   };
 }
 
-export function readPythonHints(root, files, evidence) {
+export function readPythonHints(root, files, evidence, readOptions = {}) {
   const hints = {
     requirements: null,
     pytestConfig: null,
@@ -75,7 +75,10 @@ export function readPythonHints(root, files, evidence) {
     if (!file) {
       continue;
     }
-    const text = readText(root, file.path, { limit: 40_000 });
+    const text = readText(root, file.path, {
+      ...readOptions,
+      limit: 40_000
+    });
     const id = evidence.add(
       "config",
       file.path,
@@ -93,12 +96,15 @@ export function readPythonHints(root, files, evidence) {
   return hints;
 }
 
-export function readSkillInfo(root, files, evidence) {
+export function readSkillInfo(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "SKILL.md");
   if (!file) {
     return null;
   }
-  const text = readText(root, file.path, { limit: 40_000 });
+  const text = readText(root, file.path, {
+    ...readOptions,
+    limit: 40_000
+  });
   const description =
     text.match(/^description:\s*["']?(.+?)["']?\s*$/m)?.[1] || null;
   return {
@@ -126,14 +132,16 @@ export function detectPurpose(input, evidence) {
     return {
       claim: packageInfo.json.description,
       confidence: "likely",
-      evidence: [packageInfo.evidence]
+      evidence: [packageInfo.evidence],
+      trust: "repository-untrusted"
     };
   }
   if (pyprojectInfo?.description) {
     return {
       claim: pyprojectInfo.description,
       confidence: "likely",
-      evidence: [pyprojectInfo.evidence]
+      evidence: [pyprojectInfo.evidence],
+      trust: "repository-untrusted"
     };
   }
   if (readmeFile && readmeText) {
@@ -149,20 +157,23 @@ export function detectPurpose(input, evidence) {
     return {
       claim: excerpt || `Declared in ${readmeFile.path}`,
       confidence: "likely",
-      evidence: [id]
+      evidence: [id],
+      trust: "repository-untrusted"
     };
   }
   if (skillInfo?.description) {
     return {
       claim: skillInfo.description,
       confidence: "likely",
-      evidence: [skillInfo.evidence]
+      evidence: [skillInfo.evidence],
+      trust: "repository-untrusted"
     };
   }
   return {
     claim: "No README or package metadata found to describe the repo purpose.",
     confidence: "unknown",
-    evidence: []
+    evidence: [],
+    trust: "kanon-generated"
   };
 }
 

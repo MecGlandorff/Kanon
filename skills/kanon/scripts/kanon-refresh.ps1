@@ -11,14 +11,14 @@ if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
 
 $Node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $Node) {
-  [Console]::Error.WriteLine("Kanon requires Node.js 20+.")
+  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
   exit 127
 }
 
 $NodeMajor = [int](& $Node.Source -p 'process.versions.node.split(".")[0]')
-if ($NodeMajor -lt 20) {
+if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
   $NodeVersion = & $Node.Source --version
-  [Console]::Error.WriteLine("Kanon requires Node.js 20+; found $NodeVersion.")
+  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
   exit 127
 }
 

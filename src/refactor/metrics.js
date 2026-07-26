@@ -34,7 +34,8 @@ const TEST_NAME = /\.(test|spec)\.[cm]?[jt]sx?$|test_.*\.py$|_test\.py$/;
 
 export function collectFileMetrics(root, files) {
   const metrics = [];
-  const allTexts = new Map();
+  const referenceTargets = buildReferenceTargets(files);
+  const referenceCounts = new Map();
 
   for (const file of files) {
     if (!file.text) {
@@ -42,13 +43,17 @@ export function collectFileMetrics(root, files) {
     }
     const kind = classifyFile(file);
     const text = readText(root, file.path, { limit: 300_000 });
-    allTexts.set(file.path, text);
+    countReferences(
+      file.path,
+      text,
+      referenceTargets,
+      referenceCounts
+    );
     metrics.push(analyzeFile(file, text, kind));
   }
 
-  const referenceIndex = buildReferenceIndex(metrics, allTexts);
   for (const metric of metrics) {
-    metric.reference_count = referenceIndex.get(metric.path) || 0;
+    metric.reference_count = referenceCounts.get(metric.path) || 0;
   }
 
   return metrics;
@@ -128,31 +133,38 @@ function classifyFile(file) {
   return "other";
 }
 
-function buildReferenceIndex(metrics, allTexts) {
-  const index = new Map();
-  for (const metric of metrics) {
-    if (metric.kind !== "source") {
+function buildReferenceTargets(files) {
+  const targets = new Map();
+  for (const file of files) {
+    if (classifyFile(file) !== "source") {
       continue;
     }
     const stem = path.basename(
-      metric.path,
-      metric.extension
+      file.path,
+      file.extension
     ).toLowerCase();
     if (!stem || stem.length < 4) {
       continue;
     }
-    let count = 0;
-    for (const [filePath, text] of allTexts.entries()) {
-      if (filePath === metric.path) {
-        continue;
-      }
-      if (text.toLowerCase().includes(stem)) {
-        count += 1;
+    if (!targets.has(stem)) {
+      targets.set(stem, []);
+    }
+    targets.get(stem).push(file.path);
+  }
+  return targets;
+}
+
+function countReferences(filePath, text, targets, counts) {
+  const tokens = new Set(
+    String(text || "").toLowerCase().match(/[a-z0-9_$-]{4,}/g) || []
+  );
+  for (const token of tokens) {
+    for (const target of targets.get(token) || []) {
+      if (target !== filePath) {
+        counts.set(target, (counts.get(target) || 0) + 1);
       }
     }
-    index.set(metric.path, count);
   }
-  return index;
 }
 
 function normalizeCodeLine(line) {

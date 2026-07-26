@@ -2,10 +2,11 @@ import {
   extractCommandsFromMarkdown,
   verifyCommand
 } from "./commands.js";
-import { verifyFeatureClaims } from "./claims.js";
+import { observeFeatureClaims } from "./claims.js";
 
 export function verifyReadme(context) {
   const issues = [];
+  const unknowns = [];
   const target = context.readmeTarget ||
     context.readmeFile?.path ||
     "README.md";
@@ -18,7 +19,8 @@ export function verifyReadme(context) {
         applicable: false,
         scan_complete: context.scan.complete,
         note: "README verification is not applicable to a self-contained skill package with SKILL.md.",
-        issues: []
+        issues: [],
+        unknowns: []
       };
     }
     return {
@@ -26,10 +28,12 @@ export function verifyReadme(context) {
       checked: false,
       applicable: true,
       scan_complete: context.scan.complete,
-      issues: [
+      issues: [],
+      unknowns: [
         {
           type: "missing_readme",
           severity: "info",
+          conclusion: "unknown",
           claim: `No README file found at ${target}.`,
           observation: `Kanon could not verify README claims because ${target} was not detected.`,
           evidence: []
@@ -42,11 +46,15 @@ export function verifyReadme(context) {
   for (const command of commands) {
     const issue = verifyCommand(command, context);
     if (issue) {
-      issues.push(issue);
+      if (issue.conclusion === "contradiction") {
+        issues.push(issue);
+      } else {
+        unknowns.push(issue);
+      }
     }
   }
 
-  issues.push(...verifyFeatureClaims(context));
+  unknowns.push(...observeFeatureClaims(context));
 
   return {
     target,
@@ -54,6 +62,7 @@ export function verifyReadme(context) {
     applicable: true,
     scan_complete: context.scan.complete,
     commands_checked: commands.length,
-    issues
+    issues,
+    unknowns
   };
 }

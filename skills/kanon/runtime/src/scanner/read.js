@@ -3,40 +3,127 @@ import { isSensitivePath } from "./policy.js";
 import {
   normalizeExcerpt,
   normalizeRelPath,
-  safeResolve
+  resolveContainedPath
 } from "./shared.js";
 
 export function readText(root, relPath, options = {}) {
-  const limit = options.limit ?? 300_000;
+  const result = readTextResult(root, relPath, options);
+  return result.ok ? result.text : "";
+}
+
+export function readTextResult(root, relPath, options = {}) {
+  const limit = boundedReadLimit(options.limit);
   if (isSensitivePath(relPath)) {
-    return "";
+    return recordFailure(options.diagnostics, {
+      ok: false,
+      status: "rejected",
+      relativePath: normalizeRelPath(relPath),
+      reason: "Likely secret-bearing files are excluded from reads.",
+      code: "SENSITIVE_PATH_REJECTED"
+    });
   }
 
-  const abs = safeResolve(root, relPath);
-  if (!abs) {
-    return "";
+  const resolved = resolveContainedPath(root, relPath, { type: "file" });
+  if (!resolved.ok) {
+    if (resolved.status === "missing" && options.optional) {
+      return resolved;
+    }
+    return recordFailure(options.diagnostics, resolved);
+  }
+
+  const budget = options.budget;
+  const remaining = budget
+    ? Math.max(0, budget.maxBytes - budget.bytesRead)
+    : limit;
+  if (remaining === 0 && resolved.stat.size > 0) {
+    return recordFailure(options.diagnostics, {
+      ok: false,
+      status: "budget-exceeded",
+      relativePath: resolved.relativePath,
+      reason: "The total repository text-read budget was exhausted.",
+      code: "TOTAL_TEXT_BUDGET_EXCEEDED"
+    });
   }
 
   let fd;
   try {
-    const stat = fs.lstatSync(abs);
-    if (!stat.isFile() || stat.isSymbolicLink()) {
-      return "";
+    const noFollow = Number(fs.constants.O_NOFOLLOW) || 0;
+    fd = fs.openSync(
+      resolved.path,
+      fs.constants.O_RDONLY | noFollow
+    );
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || fileIdentityChanged(resolved.stat, stat)) {
+      return recordFailure(options.diagnostics, {
+        ok: false,
+        status: "rejected",
+        relativePath: resolved.relativePath,
+        reason: "The file changed after containment validation.",
+        code: "FILE_REPLACED_DURING_READ"
+      });
     }
-    if (stat.size > limit) {
-      fd = fs.openSync(abs, "r");
-      const buffer = Buffer.alloc(limit);
-      const bytes = fs.readSync(fd, buffer, 0, limit, 0);
-      return buffer.subarray(0, bytes).toString("utf8");
+    const bytesToRead = Math.min(stat.size, limit, remaining);
+    const buffer = Buffer.alloc(bytesToRead);
+    const bytes = bytesToRead > 0
+      ? fs.readSync(fd, buffer, 0, bytesToRead, 0)
+      : 0;
+    if (budget) {
+      budget.bytesRead += bytes;
     }
-
-    return fs.readFileSync(abs, "utf8");
-  } catch {
-    return "";
+    const output = {
+      ok: true,
+      status: "ok",
+      relativePath: resolved.relativePath,
+      text: buffer.subarray(0, bytes).toString("utf8"),
+      bytes,
+      truncated: stat.size > bytes,
+      size: stat.size
+    };
+    if (
+      output.truncated &&
+      options.diagnostics &&
+      options.recordTruncation !== false
+    ) {
+      markReadLimit(
+        options.diagnostics,
+        resolved.relativePath,
+        limit,
+        options.budgetName || "max_file_bytes"
+      );
+    }
+    return output;
+  } catch (error) {
+    return recordFailure(options.diagnostics, {
+      ok: false,
+      status: error?.code === "ENOENT" ? "missing" : "unreadable",
+      relativePath: resolved.relativePath,
+      reason: "The contained file could not be opened safely.",
+      code: error?.code || "SAFE_OPEN_FAILED"
+    });
   } finally {
     if (fd !== undefined) {
       fs.closeSync(fd);
     }
+  }
+}
+
+function markReadLimit(diagnostics, relativePath, limit, budgetName) {
+  diagnostics.complete = false;
+  diagnostics.truncated = true;
+  diagnostics.budgets_reached ||= [];
+  if (!diagnostics.budgets_reached.includes(budgetName)) {
+    diagnostics.budgets_reached.push(budgetName);
+  }
+  diagnostics.path_failures ||= [];
+  if (diagnostics.path_failures.length < 50) {
+    diagnostics.path_failures.push({
+      path: relativePath,
+      status: "budget-exceeded",
+      code: `${budgetName.toUpperCase()}_EXCEEDED`,
+      reason: `The file exceeded its ${limit}-byte text-read limit.`
+    });
+  } else {
+    diagnostics.path_failures_truncated = true;
   }
 }
 
@@ -78,7 +165,9 @@ export function findTextHits(root, files, terms, options = {}) {
     }
 
     const text = readText(root, file.path, {
-      limit: options.readLimit ?? 120_000
+      limit: options.readLimit ?? 120_000,
+      budget: options.budget,
+      diagnostics: options.diagnostics
     });
     const lines = text.split(/\r?\n/);
     for (let index = 0; index < lines.length; index += 1) {
@@ -102,4 +191,71 @@ export function findTextHits(root, files, terms, options = {}) {
   }
 
   return matches;
+}
+
+export function createReadBudget(maxBytes) {
+  return {
+    maxBytes: Number.isInteger(maxBytes) && maxBytes >= 0
+      ? maxBytes
+      : 8 * 1024 * 1024,
+    bytesRead: 0
+  };
+}
+
+function boundedReadLimit(value) {
+  if (value === undefined) {
+    return 300_000;
+  }
+  if (!Number.isInteger(value) || value < 0) {
+    return 0;
+  }
+  return Math.min(value, 64 * 1024 * 1024);
+}
+
+function fileIdentityChanged(before, after) {
+  return (
+    before.dev !== undefined &&
+    before.ino !== undefined &&
+    after.dev !== undefined &&
+    after.ino !== undefined &&
+    (
+      before.dev !== after.dev ||
+      before.ino !== after.ino
+    )
+  );
+}
+
+function recordFailure(diagnostics, result) {
+  if (!diagnostics) {
+    return result;
+  }
+  diagnostics.path_failures ||= [];
+  if (diagnostics.path_failures.length < 50) {
+    diagnostics.path_failures.push({
+      path: result.relativePath || null,
+      status: result.status,
+      code: result.code,
+      reason: result.reason
+    });
+  } else {
+    diagnostics.path_failures_truncated = true;
+  }
+  if (result.status === "rejected") {
+    diagnostics.rejected_paths = (diagnostics.rejected_paths || 0) + 1;
+  } else if (result.status === "outside-root") {
+    diagnostics.outside_root_paths =
+      (diagnostics.outside_root_paths || 0) + 1;
+  } else if (result.status === "unreadable") {
+    diagnostics.unreadable_entries =
+      (diagnostics.unreadable_entries || 0) + 1;
+  } else if (result.status === "budget-exceeded") {
+    diagnostics.budgets_reached ||= [];
+    if (!diagnostics.budgets_reached.includes("max_total_text_bytes")) {
+      diagnostics.budgets_reached.push("max_total_text_bytes");
+    }
+  }
+  if (result.code !== "SENSITIVE_PATH_REJECTED") {
+    diagnostics.complete = false;
+  }
+  return result;
 }

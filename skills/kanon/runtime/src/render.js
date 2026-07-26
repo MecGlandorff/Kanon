@@ -5,5 +5,3 @@ export {
   renderTodoList,
   renderVerify
 } from "./render/continuity.js";
-export { renderImprove } from "./render/improve.js";
-export { renderRefactor } from "./render/refactor.js";

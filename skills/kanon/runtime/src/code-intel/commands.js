@@ -7,10 +7,21 @@ import {
 import { addDocumentedCommands } from "./documented-commands.js";
 import { addConventionalCommands } from "./conventional-commands.js";
 import { selectCommand } from "./command-utils.js";
+import { registeredHeuristic } from "./heuristics.js";
 
 export function detectRepoCommands(root, files, fileMap, texts, options) {
+  for (const heuristic of [
+    "manifest-command",
+    "documented-command",
+    "ecosystem-command-convention"
+  ]) {
+    registeredHeuristic(heuristic);
+  }
   const candidates = { run: [], test: [], build: [], dev: [] };
   const packageManager = detectPackageManager(files, options.packageJson);
+  if (fileMap.has("go.mod")) {
+    registeredHeuristic("polyglot-root-precedence");
+  }
   addPackageCommands(
     candidates,
     options.packageJson,

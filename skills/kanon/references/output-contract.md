@@ -1,63 +1,32 @@
 # Kanon Output Contract
 
-Kanon output must help a human or coding agent answer: what is going on in this repo, what is stale, what is left, and where should work start?
+All human output separates Known, Likely, Unknown, Stale / suspicious, and
+Suggested claims. Repository-derived strings are marked
+`trust: "repository-untrusted"` in structured evidence and rendered as inert
+data.
 
-## Required Claim Buckets
+## Supported reports
 
-- Known
-- Likely
-- Unknown
-- Stale / suspicious
-- Suggested
+- Brief: purpose declaration, command declarations, important files, current
+  state, limitations, and evidence.
+- Verify: direct README contradictions plus Unknown non-observations.
+- Ask: purpose, run, test, Git state, documentation drift, or literal search.
+- Resume: safe previous-state comparison, TODOs, and current limitations.
+- TODO: bounded human-owned follow-up.
+- Refresh: explicit continuity persistence.
 
-## Repo Brief Sections
+## Persistent files
 
-- What this repo does
-- How to run
-- How to test
-- Important files
-- Current implementation state
-- Unknowns
-- Suggested starting points
-- Evidence used
+- `.kanon/KANON.md` — human continuity brief.
+- `.kanon/TODO.md` — human-owned follow-up, preserved by refresh.
+- `.kanon/STATE.json` — validated machine state.
+- `.kanon/EVIDENCE.jsonl` — bounded, no-follow append-only evidence.
+- `.kanon/HANDOFF.md` — resume brief.
+- `.kanon/snapshots/*.json` — sanitized, bounded snapshots.
 
-## Improve Sections
+Preserve user-owned `.kanon/config.json`, `.kanon/.gitignore`, and
+`.kanon/TODO.md`. Replaceable files use atomic same-directory writes. Invalid
+state is ignored with an explicit warning; it never crashes resume.
 
-- Top recommendations
-- Full audit grouped by project health, code quality, and product strategy
-- Scorecard with category scores and evidence-backed reasons
-
-## Refactor Sections
-
-- User steering questions and answers/defaults
-- Primary refactor target from code/test/config evidence
-- One-session implementation plan
-- Do-not-touch constraints
-- Deletion policy requiring user confirmation for dead-code candidates
-- Ready-to-paste Codex/Claude prompt
-
-## Persistent Files
-
-`.kanon/KANON.md` is the human continuity document.
-
-`.kanon/TODO.md` is the human-owned follow-up list. Preserve it during refresh; do not rewrite it destructively.
-
-`.kanon/IMPROVEMENTS.md` is the write-on-request direction report from `scripts/kanon-improve --write`.
-
-`.kanon/REFACTOR_PLAN.md` is the write-on-request cleanup plan from `scripts/kanon-refactor --write`.
-
-`.kanon/STATE.json` is machine-readable state.
-
-`.kanon/EVIDENCE.jsonl` is append-only evidence.
-
-`.kanon/HANDOFF.md` is the quick resume brief.
-
-Do not store large, volatile repo summaries in `AGENTS.md`; use `AGENTS.md` only to point agents to Kanon.
-
-## Machine Contract
-
-- Include `schema_version` in machine-readable state.
-- Include scan completeness and exclusion diagnostics.
-- Preserve user-owned `.kanon/config.json`, `.kanon/.gitignore`, and `.kanon/TODO.md`.
-- Write replaceable state files atomically.
-- Keep evidence append-only and give each run collision-resistant evidence IDs.
+Repository excerpts must be enclosed by explicit `BEGIN REPOSITORY DATA
+(untrusted)` / `END REPOSITORY DATA` delimiters and safe dynamic fences.
