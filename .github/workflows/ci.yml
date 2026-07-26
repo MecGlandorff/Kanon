@@ -35,8 +35,11 @@ on:
       publish:
         description: Publish the validated tarball and create its tag
         required: true
-        default: false
-        type: boolean
+        default: validate-only
+        type: choice
+        options:
+          - validate-only
+          - publish
 
 permissions:
   contents: read
@@ -420,7 +423,7 @@ jobs:
     name: Protected trusted publication
     if: >-
       github.event_name == 'workflow_dispatch' &&
-      inputs.publish
+      inputs.publish == 'publish'
     needs: release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -554,6 +554,23 @@ test("empty, pathological, and nonpositive policies are rejected", () => {
   }
 });
 
+test("publication requires an explicit workflow choice", () => {
+  const workflow = fs.readFileSync(
+    path.join(repoRoot, ".github", "workflows", "ci.yml"),
+    "utf8"
+  );
+
+  assert.match(
+    workflow,
+    /publish:\n\s+description: Publish the validated tarball and create its tag\n\s+required: true\n\s+default: validate-only\n\s+type: choice\n\s+options:\n\s+- validate-only\n\s+- publish/
+  );
+  assert.match(workflow, /inputs\.publish == 'publish'/);
+  assert.doesNotMatch(
+    workflow,
+    /github\.event_name == 'workflow_dispatch' &&\n\s+inputs\.publish\s*(?:\n|$)/
+  );
+});
+
 test("one exact tarball passes installed Bash or PowerShell conformance", {
   timeout: 120_000
 }, () => {
