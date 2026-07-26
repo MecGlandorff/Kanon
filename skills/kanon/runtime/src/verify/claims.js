@@ -1,50 +1,68 @@
 import { excerptAround, hasAffirmedMatch } from "./language.js";
 
-const CONTAINER_CLAIM =
-  /\bdocker(?:file)?\b|\bdocker\s+compose\b|\bcontainer images?\b|\bcontaineri[sz]ed\b|\b(?:run|deploy|ship|support)\w*\s+(?:\w+\s+){0,2}containers?\b/i;
-
-export function observeFeatureClaims(context) {
-  const unknowns = [];
+export function verifyFeatureClaims(context) {
+  const issues = [];
   const text = context.readmeText;
   const readmePath = context.readmeFile.path;
 
   if (hasAffirmedMatch(text, /\bpdf\b|pdf export|export.*pdf/i)) {
     const matches = context.findTerm("pdf", { exclude: [readmePath] });
     if (!matches.length) {
-      unknowns.push(nonObservation(
-        context,
+      const evidence = context.evidence.add(
+        "file",
         readmePath,
-        "README declares PDF-related behavior.",
-        "Current bounded checks did not observe a non-README literal PDF reference. This is not evidence that PDF support is absent.",
+        "README mentions PDF support.",
         excerptAround(text, /pdf/i)
-      ));
+      );
+      issues.push({
+        type: "unsupported_feature_claim",
+        severity: "warning",
+        claim: "README mentions PDF support.",
+        observation: "No non-README file reference to PDF was found.",
+        evidence: [evidence],
+        suggestion: "Add code/tests/docs for PDF support or remove the README claim."
+      });
     }
   }
 
   if (
-    hasAffirmedMatch(text, CONTAINER_CLAIM) &&
+    hasAffirmedMatch(text, /\bdocker\b|docker compose|container/i) &&
     !context.deploy.files.some((file) => /docker|compose/i.test(file.path))
   ) {
-    unknowns.push(nonObservation(
-      context,
+    const evidence = context.evidence.add(
+      "file",
       readmePath,
-      "README declares Docker or container behavior.",
-      "Current checks did not find a conventional Dockerfile or compose path. This non-observation is not a contradiction.",
-      excerptAround(text, CONTAINER_CLAIM)
-    ));
+      "README mentions Docker/container support.",
+      excerptAround(text, /docker|container/i)
+    );
+    issues.push({
+      type: "unsupported_feature_claim",
+      severity: "warning",
+      claim: "README mentions Docker/container support.",
+      observation: "No Dockerfile or compose file was found.",
+      evidence: [evidence],
+      suggestion: "Add Docker configuration or update the README."
+    });
   }
 
   if (
     hasAffirmedMatch(text, /\bci\b|continuous integration/i) &&
     !context.ci.found
   ) {
-    unknowns.push(nonObservation(
-      context,
+    const evidence = context.evidence.add(
+      "file",
       readmePath,
-      "README declares CI behavior.",
-      "Current checks did not find a conventional CI configuration. This non-observation is not a contradiction.",
+      "README mentions CI.",
       excerptAround(text, /ci|continuous integration/i)
-    ));
+    );
+    issues.push({
+      type: "unsupported_process_claim",
+      severity: "warning",
+      claim: "README mentions CI.",
+      observation: "No CI configuration was found.",
+      evidence: [evidence],
+      suggestion: "Add CI config or update the README."
+    });
   }
 
   if (
@@ -53,49 +71,49 @@ export function observeFeatureClaims(context) {
       /production[-\s]ready|production ready|ready for production/i
     )
   ) {
-    unknowns.push(nonObservation(
-      context,
-      readmePath,
-      "README declares production readiness.",
-      "Kanon does not verify production readiness; conventional operational files are only observations.",
-      excerptAround(
-        text,
-        /production[-\s]ready|ready for production/i
-      )
-    ));
+    const gaps = [
+      !context.ci.found ? "CI" : null,
+      !context.deploy.found ? "deployment config" : null,
+      !context.release.found ? "release workflow/changelog" : null
+    ].filter(Boolean);
+
+    if (gaps.length) {
+      const evidence = context.evidence.add(
+        "file",
+        readmePath,
+        "README claims production readiness.",
+        excerptAround(
+          text,
+          /production[-\s]ready|ready for production/i
+        )
+      );
+      issues.push({
+        type: "unsupported_process_claim",
+        severity: "warning",
+        claim: "README claims production readiness.",
+        observation: `No evidence found for: ${gaps.join(", ")}.`,
+        evidence: [evidence],
+        suggestion: "Qualify the claim or add the missing operational evidence."
+      });
+    }
   }
 
-  if (
-    hasAffirmedMatch(text, /\breleases?\b/i) &&
-    !context.release.found
-  ) {
-    unknowns.push(nonObservation(
-      context,
+  if (hasAffirmedMatch(text, /\breleases?\b/i) && !context.release.found) {
+    const evidence = context.evidence.add(
+      "file",
       readmePath,
-      "README declares a release process.",
-      "Current checks did not find a conventional release workflow or changelog. This non-observation is not a contradiction.",
+      "README mentions releases.",
       excerptAround(text, /release/i)
-    ));
+    );
+    issues.push({
+      type: "unsupported_process_claim",
+      severity: "info",
+      claim: "README mentions releases.",
+      observation: "No release workflow, releaserc, or changelog was found.",
+      evidence: [evidence],
+      suggestion: "Add release evidence or clarify the release process."
+    });
   }
 
-  return unknowns;
-}
-
-function nonObservation(context, path, claim, observation, excerpt) {
-  const evidence = context.evidence.add(
-    "file",
-    path,
-    claim,
-    excerpt
-  );
-  return {
-    type: "non_observation",
-    severity: "info",
-    conclusion: "unknown",
-    claim,
-    observation: context.scan.complete
-      ? observation
-      : `${observation} The repository scan was incomplete.`,
-    evidence: [evidence]
-  };
+  return issues;
 }

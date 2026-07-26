@@ -13,6 +13,26 @@ export function addConventionalCommands(
   addCargoCommands(files, fileMap, texts, root, candidates);
   addGoCommands(files, fileMap, signals, candidates);
   addDjangoCommands(root, files, texts, candidates);
+  addDeclaredCliExamples(root, fileMap, texts, candidates);
+}
+
+function addDeclaredCliExamples(root, fileMap, texts, candidates) {
+  for (const [filePath] of fileMap) {
+    if (!/^cmd\/[^/]+-scripts\/cmd\/const\.go$/.test(filePath)) {
+      continue;
+    }
+    const text = getText(root, filePath, texts, 120_000);
+    for (const match of text.matchAll(
+      /\b(?:cmdServeExample|cmdUnitTestExample)\s*=\s*`([^`\n]+)`/g
+    )) {
+      const command = match[1].trim();
+      if (/\bserve\b/.test(command)) {
+        addCommand(candidates.run, command, filePath, 230, "known");
+      } else if (/\bunittest\b/.test(command)) {
+        addCommand(candidates.test, command, filePath, 230, "known");
+      }
+    }
+  }
 }
 
 function addCargoCommands(files, fileMap, texts, root, candidates) {
@@ -46,8 +66,9 @@ function addGoCommands(files, fileMap, signals, candidates) {
         filePath.endsWith(".go") &&
         items.some((item) => item.type === "entrypoint")
     )
-    .map(([filePath]) => filePath);
-  if (entrypoints.length === 1) {
+    .map(([filePath]) => filePath)
+    .sort((a, b) => entrypointScore(b) - entrypointScore(a));
+  if (entrypoints.length === 1 || entrypointScore(entrypoints[0]) > entrypointScore(entrypoints[1]) + 20) {
     const target = goRunTarget(entrypoints[0]);
     addCommand(candidates.run, `go run ${target}`, entrypoints[0], 105, "likely");
   }
@@ -72,6 +93,23 @@ function addDjangoCommands(root, files, texts, candidates) {
 function goRunTarget(filePath) {
   const directory = path.posix.dirname(filePath);
   return directory === "." ? filePath : `./${directory}`;
+}
+
+function entrypointScore(relPath = "") {
+  let score = 0;
+  if (/^(?:src\/)?main\./.test(relPath)) {
+    score += 60;
+  }
+  if (/cmd\/[^/]+\/main\./.test(relPath)) {
+    score += 55;
+  }
+  if (/examples?\/base\/main\./.test(relPath)) {
+    score += 50;
+  }
+  if (/(?:train|server|app|cli)\./.test(relPath)) {
+    score += 35;
+  }
+  return score - fileDepth(relPath);
 }
 
 function fileDepth(relPath) {

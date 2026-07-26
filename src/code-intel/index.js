@@ -11,16 +11,11 @@ import {
 } from "./entrypoints.js";
 import { detectRepoCommands } from "./commands.js";
 import { rankImportantFiles } from "./rank.js";
-import {
-  addInbound,
-  addSignal,
-  createTextCache,
-  getText
-} from "./shared.js";
+import { addInbound, addSignal, getText } from "./shared.js";
 
 export function inspectRepoCode(root, files, options = {}) {
   const fileMap = new Map(files.map((file) => [file.path, file]));
-  const texts = createTextCache(options.readOptions || {});
+  const texts = new Map();
   const importers = new Map();
   const references = new Map();
   const signals = new Map();
@@ -63,8 +58,7 @@ export function inspectRepoCode(root, files, options = {}) {
     references,
     signals
   }, {
-    packageJson: options.packageJson,
-    goModule: modulePath
+    packageJson: options.packageJson
   });
   return {
     importers,

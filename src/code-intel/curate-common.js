@@ -1,15 +1,13 @@
-import { selectRootReadme } from "../readme.js";
-import { depth } from "./shared.js";
+import path from "node:path";
 
-export function add(selected, item, reason, heuristic = null) {
+export function add(selected, item, reason) {
   if (!item || selected.some((candidate) => candidate.path === item.path)) {
     return;
   }
   selected.push({
     ...item,
     recommended: true,
-    selection_reason: reason,
-    selection_heuristic: heuristic
+    selection_reason: reason
   });
 }
 
@@ -32,7 +30,11 @@ export function allByPattern(ranked, pattern, options = {}) {
 }
 
 export function rootReadme(ranked) {
-  return selectRootReadme(ranked);
+  return ranked.find(
+    (item) =>
+      !item.path.includes("/") &&
+      /^readme(?:\.[^.]+)?$/i.test(item.path)
+  ) || null;
 }
 
 export function hasPath(ranked, relPath) {
@@ -71,40 +73,41 @@ export function primaryEntrypoints(ranked) {
     .filter((item) =>
       item.signals.some((signal) => signal.type === "entrypoint")
     )
-    .sort((a, b) => {
-      const aKnown = a.signals.some(
-        (signal) =>
-          signal.type === "entrypoint" &&
-          signal.confidence === "known"
-      );
-      const bKnown = b.signals.some(
-        (signal) =>
-          signal.type === "entrypoint" &&
-          signal.confidence === "known"
-      );
-      const aDeclared = a.signals.some((signal) =>
-        signal.reason.startsWith("declared ")
-      );
-      const bDeclared = b.signals.some((signal) =>
-        signal.reason.startsWith("declared ")
-      );
-      return (
-        Number(bDeclared) - Number(aDeclared) ||
-        Number(bKnown) - Number(aKnown) ||
-        b.score - a.score ||
-        shortestPath(a, b)
-      );
-    });
+    .filter((item) => entrypointPriority(item) > 0)
+    .sort((a, b) => entrypointPriority(b) - entrypointPriority(a));
 }
 
-export function directDeclarations(ranked) {
-  return ranked
-    .filter((item) =>
-      item.signals.some((signal) => signal.type === "declaration")
+function entrypointPriority(item) {
+  const relPath = item.path;
+  if (
+    item.signals.some((signal) =>
+      /declared (?:package|Cargo) binary/.test(signal.reason)
     )
-    .sort((a, b) =>
-      b.score - a.score ||
-      b.fan_in - a.fan_in ||
-      shortestPath(a, b)
-    );
+  ) {
+    return 200;
+  }
+  if (path.posix.basename(relPath) === "manage.py") {
+    return 190;
+  }
+  if (/^(?:src\/)?main\.(?:rs|go)$/.test(relPath)) {
+    return 180;
+  }
+  if (/^cmd\/[^/]+\/main\.go$/.test(relPath)) {
+    const command = path.posix.basename(path.posix.dirname(relPath));
+    return 170 - command.length;
+  }
+  if (/^src\/bin\/[^/]+\/main\.rs$/.test(relPath)) {
+    return 170;
+  }
+  if (/^crates\/(?:core|[^/]+)\/main\.rs$/.test(relPath)) {
+    return /\/core\//.test(relPath) ? 165 : 130;
+  }
+  if (/(^|\/)bin\.[cm]?[jt]s$/.test(relPath)) {
+    return 160;
+  }
+  return 0;
+}
+
+function depth(relPath) {
+  return relPath.split("/").length - 1;
 }

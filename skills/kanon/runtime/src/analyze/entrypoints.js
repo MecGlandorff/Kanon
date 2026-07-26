@@ -78,7 +78,7 @@ export function detectEntrypoints(
   return uniqueClaims(entrypoints).slice(0, 8);
 }
 
-export function detectTodos(root, files, readOptions = {}) {
+export function detectTodos(root, files) {
   const todos = [];
   for (const file of files) {
     if (!file.text || todos.length >= 40) {
@@ -91,11 +91,7 @@ export function detectTodos(root, files, readOptions = {}) {
     ) {
       continue;
     }
-    const lines = readText(root, file.path, {
-      ...readOptions,
-      limit: 120_000,
-      recordTruncation: false
-    })
+    const lines = readText(root, file.path, { limit: 120_000 })
       .split(/\r?\n/);
     lines.forEach((line, index) => {
       if (todos.length < 40 && isTodoLine(line)) {

@@ -13,7 +13,7 @@ export function addPackageCommands(
     return;
   }
   const source = "package.json";
-  for (const name of ["test"]) {
+  for (const name of ["test", "test:kit"]) {
     if (options.primaryGoProject) {
       break;
     }
@@ -32,7 +32,7 @@ export function addPackageCommands(
       break;
     }
   }
-  for (const name of ["start", "dev", "serve", "watch"]) {
+  for (const name of ["start", "dev", "serve", "watch", "turbo"]) {
     if (options.primaryGoProject) {
       break;
     }
@@ -44,7 +44,8 @@ export function addPackageCommands(
       name === "start" ? 205 :
       name === "dev" ? 202 :
       name === "serve" ? 198 :
-      194;
+      name === "watch" ? 194 :
+      188;
     addCommand(candidates.run, command, source, score, "known", scripts[name]);
     if (name === "dev" || name === "watch") {
       addCommand(candidates.dev, command, source, score, "known", scripts[name]);

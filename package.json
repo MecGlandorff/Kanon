@@ -1,7 +1,6 @@
 {
   "name": "@mecglandorff/kanon",
-  "version": "0.4.0-rc.1",
-  "private": true,
+  "version": "0.3.0",
   "description": "Evidence-backed repo continuity skill runtime for Codex and Claude Code.",
   "type": "module",
   "repository": {
@@ -12,18 +11,23 @@
     "url": "https://github.com/MecGlandorff/Kanon/issues"
   },
   "homepage": "https://github.com/MecGlandorff/Kanon#readme",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "scripts": {
     "build:skill": "node scripts/build-skill.js",
-    "build:package": "node scripts/build-package.js",
     "check:skill": "node scripts/build-skill.js --check",
-    "conform:artifact": "node scripts/conform-artifact.js",
     "eval:corpus": "node scripts/eval-corpus.js",
-    "eval:dev": "node scripts/eval-corpus.js --require-role development",
-    "eval:release": "node scripts/eval-corpus.js --corpus eval/release-corpus.json --require-role release",
-    "results:dev": "node scripts/render-results.js",
     "test": "node --test",
-    "validate": "npm run check:skill && node --test"
+    "validate": "npm run check:skill && node --test && npm pack --dry-run"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "repo",
     "continuity",
@@ -35,6 +39,6 @@
   "author": "mecglandorff",
   "license": "MIT",
   "engines": {
-    "node": "^20.0.0 || ^22.0.0 || ^24.0.0 || ^25.0.0"
+    "node": ">=20"
   }
 }

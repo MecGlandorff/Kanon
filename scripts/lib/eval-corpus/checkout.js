@@ -1,228 +1,108 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { runGit } from "../../../src/git-runner.js";
-import {
-  resolveContainedPath,
-  sanitizeFilenameComponent
-} from "../../../src/path-security.js";
+import { spawnSync } from "node:child_process";
 
 export function ensureCheckout(item, options) {
-  const cacheRoot = ensureCacheRoot(options.cacheRoot);
-  const cacheName = repositoryCacheName(
-    item.repository,
-    item.revision
-  );
-  const target = resolveContainedPath(cacheRoot, cacheName, {
-    type: "directory"
-  });
-  if (target.ok) {
-    const gitMetadata = resolveContainedPath(
-      cacheRoot,
-      `${cacheName}/.git`,
-      { type: "any" }
+  const cacheRoot = path.resolve(options.cacheRoot);
+  fs.mkdirSync(cacheRoot, { recursive: true });
+  const target = path.join(cacheRoot, repositoryCacheName(item.repository));
+  const gitDir = path.join(target, ".git");
+  if (fs.existsSync(target) && !fs.existsSync(gitDir)) {
+    throw new Error(
+      `${item.id}: corpus cache target exists but is not a Git checkout: ${target}`
     );
-    if (gitMetadata.ok) {
+  }
+  if (!fs.existsSync(target)) {
+    if (!options.fetch) {
       throw new Error(
-        `${item.id}: cached analysis trees must not retain Git metadata.`
+        `${item.id}: pinned checkout is not cached and --no-fetch was used.`
       );
     }
-    return target.path;
+    clonePinned(item, target);
   }
-  if (target.status !== "missing") {
+  const current = git(target, ["rev-parse", "HEAD"], { allowFailure: true });
+  if (current.status === 0 && current.stdout.trim() === item.revision) {
+    assertCleanCache(item, target);
+    return target;
+  }
+  if (!options.fetch && !hasCommit(target, item.revision)) {
     throw new Error(
-      `${item.id}: unsafe corpus cache target: ${target.reason}`
+      `${item.id}: pinned revision is not cached and --no-fetch was used.`
     );
   }
-  if (!options.fetch) {
-    throw new Error(
-      `${item.id}: pinned checkout is not cached and --no-fetch was used.`
-    );
+  if (!hasCommit(target, item.revision)) {
+    git(target, ["fetch", "--depth", "1", "origin", item.revision]);
   }
+  assertCleanCache(item, target);
+  git(target, ["checkout", "--detach", item.revision]);
+  return target;
+}
 
-  const temporaryName =
-    `.${cacheName}.tmp-${process.pid}-${crypto.randomUUID()}`;
-  const temporary = resolveContainedPath(cacheRoot, temporaryName, {
-    type: "directory"
-  });
-  if (temporary.status !== "missing") {
-    throw new Error(`${item.id}: temporary checkout path is not clean.`);
+function clonePinned(item, target) {
+  const temporary = `${target}.tmp-${process.pid}`;
+  if (fs.existsSync(temporary)) {
+    fs.rmSync(temporary, { recursive: true, force: true });
   }
-
   try {
-    checkedGit(
-      null,
+    runGit(
       [
-        "init",
-        "--quiet",
-        "--template=",
-        temporary.path
-      ],
-      {
-        cwd: cacheRoot,
-        timeoutMs: options.gitTimeoutMs ?? 60_000,
-        maxOutputBytes: options.gitMaxOutputBytes
-      },
-      `${item.id}: initialize isolated checkout`
-    );
-    rejectExecutableLocalConfig(item, temporary.path, options);
-    checkedGit(
-      temporary.path,
-      [
-        "fetch",
-        "--no-tags",
+        "clone",
         "--depth",
         "1",
+        "--filter=blob:none",
+        "--no-checkout",
         item.repository,
-        item.revision
+        temporary
       ],
-      gitOptions(options),
-      `${item.id}: fetch pinned revision`
+      process.cwd()
     );
-    rejectExecutableLocalConfig(item, temporary.path, options);
-    checkedGit(
-      temporary.path,
-      ["checkout", "--detach", "--force", item.revision],
-      {
-        ...gitOptions(options),
-        noLazyFetch: true
-      },
-      `${item.id}: checkout`
-    );
-    verifyMaterialization(item, temporary.path, options);
-
-    const gitDirectory = resolveContainedPath(
-      temporary.path,
-      ".git",
-      { type: "directory" }
-    );
-    if (!gitDirectory.ok) {
-      throw new Error(
-        `${item.id}: isolated checkout has unsafe Git metadata.`
-      );
+    if (!hasCommit(temporary, item.revision)) {
+      git(temporary, ["fetch", "--depth", "1", "origin", item.revision]);
     }
-    fs.rmSync(gitDirectory.path, { recursive: true, force: false });
-    fs.renameSync(temporary.path, target.path);
-    return target.path;
+    git(temporary, ["checkout", "--detach", item.revision]);
+    fs.renameSync(temporary, target);
   } catch (error) {
-    const cleanup = resolveContainedPath(cacheRoot, temporaryName, {
-      type: "directory"
-    });
-    if (cleanup.ok) {
-      fs.rmSync(cleanup.path, { recursive: true, force: false });
-    }
+    fs.rmSync(temporary, { recursive: true, force: true });
     throw error;
   }
 }
 
-function rejectExecutableLocalConfig(item, root, options) {
-  const result = runGit(
-    root,
-    [
-      "config",
-      "--local",
-      "--get-regexp",
-      "^(filter\\.|core\\.fsmonitor$|core\\.hooksPath$|include\\.|includeIf\\.)"
-    ],
-    gitOptions(options)
-  );
-  if (result.timeout || result.overflow || result.error) {
+function hasCommit(root, revision) {
+  return git(root, ["cat-file", "-e", `${revision}^{commit}`], {
+    allowFailure: true
+  }).status === 0;
+}
+
+function assertCleanCache(item, root) {
+  const status = git(root, ["status", "--porcelain"]).stdout.trim();
+  if (status) {
     throw new Error(
-      `${item.id}: local Git configuration inspection failed: ${result.diagnostic}`
-    );
-  }
-  if (result.status === 0 && result.stdout.trim()) {
-    throw new Error(
-      `${item.id}: checkout contains executable or included local Git configuration.`
-    );
-  }
-  if (result.status !== 0 && result.status !== 1) {
-    throw new Error(
-      `${item.id}: local Git configuration inspection exited ${result.status}.`
+      `${item.id}: refusing to replace a modified corpus cache checkout.`
     );
   }
 }
 
-function verifyMaterialization(item, root, options) {
-  const head = checkedGit(
-    root,
-    ["rev-parse", "HEAD"],
-    gitOptions(options),
-    `${item.id}: verify HEAD`
-  ).stdout.trim();
-  if (head !== item.revision) {
-    throw new Error(
-      `${item.id}: materialized ${head}, expected ${item.revision}.`
-    );
-  }
-  const status = checkedGit(
-    root,
-    ["status", "--porcelain=v1", "--untracked-files=all"],
-    gitOptions(options),
-    `${item.id}: verify cleanliness`
-  ).stdout;
-  if (status.trim()) {
-    throw new Error(`${item.id}: materialized checkout is not clean.`);
-  }
+function git(root, args, options = {}) {
+  return runGit(["-C", root, ...args], root, options);
 }
 
-function checkedGit(root, args, options, context) {
-  const result = runGit(root, args, options);
-  if (!result.ok) {
+function runGit(args, cwd, options = {}) {
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  if (!options.allowFailure && result.status !== 0) {
     throw new Error(
-      `${context} failed: ${result.diagnostic}${
-        result.stderr.trim() ? ` ${result.stderr.trim()}` : ""
+      `git ${args.join(" ")} failed (${result.status}): ${
+        result.stderr.trim() || result.error?.message || "unknown error"
       }`
     );
   }
   return result;
 }
 
-function gitOptions(options) {
-  return {
-    timeoutMs: options.gitTimeoutMs ?? 60_000,
-    maxOutputBytes: options.gitMaxOutputBytes
-  };
-}
-
-function ensureCacheRoot(value) {
-  const cacheRoot = path.resolve(value);
-  const parent = path.dirname(cacheRoot);
-  const parentRoot = resolveContainedPath(parent, ".", {
-    allowRoot: true,
-    type: "directory"
-  });
-  if (!parentRoot.ok) {
-    throw new Error(
-      `Corpus cache parent is unsafe: ${parentRoot.reason}`
-    );
-  }
-  const name = path.basename(cacheRoot);
-  let resolved = resolveContainedPath(parentRoot.root, name, {
-    type: "directory"
-  });
-  if (resolved.status === "missing") {
-    fs.mkdirSync(resolved.path, { recursive: false, mode: 0o700 });
-    resolved = resolveContainedPath(parentRoot.root, name, {
-      type: "directory"
-    });
-  }
-  if (!resolved.ok) {
-    throw new Error(`Corpus cache root is unsafe: ${resolved.reason}`);
-  }
-  return resolved.path;
-}
-
-export function repositoryCacheName(repository, revision) {
+function repositoryCacheName(repository) {
   const parsed = new URL(repository);
-  const repositoryName = sanitizeFilenameComponent(
-    parsed.pathname.replace(/^\/|\.git$/g, "").replaceAll("/", "__"),
-    "repository"
-  ).slice(0, 48);
-  const identity = crypto
-    .createHash("sha256")
-    .update(`${repository}\0${revision}`)
-    .digest("hex")
-    .slice(0, 16);
-  return `${repositoryName}__${revision.slice(0, 12)}__${identity}`;
+  return parsed.pathname.replace(/^\/|\.git$/g, "").replaceAll("/", "__");
 }

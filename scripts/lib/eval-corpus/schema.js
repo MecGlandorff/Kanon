@@ -1,85 +1,24 @@
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { validateLabels } from "./schema-labels.js";
 
-export const REQUIRED_CATEGORIES = Object.freeze([
+const REQUIRED_CATEGORIES = new Set([
   "python-ml",
   "go-service",
   "monorepo",
   "rust-cli",
-  "python-web"
-]);
-export const DIMENSIONS = Object.freeze([
-  "important_files",
-  "run_command",
-  "test_command"
-]);
-const EVALUATION_ROLES = new Set(["development", "release"]);
-const TOP_LEVEL_FIELDS = new Set([
-  "schema_version",
-  "evaluation_role",
-  "label_version",
-  "policy",
-  "cases",
-  "release"
-]);
-const CASE_FIELDS = new Set([
-  "id",
-  "category",
-  "repository",
-  "revision",
-  "labels",
-  "strata"
-]);
-const POLICY_FIELDS = new Set([
-  "false_positive_cost",
-  "false_negative_cost",
-  "important_file_limit",
-  "minimum_precision",
-  "minimum_recall",
-  "maximum_weighted_error_per_case",
-  "dimension_thresholds",
-  "minimum_cases_per_category",
-  "category_thresholds"
+  "django-app",
+  "no-readme"
 ]);
 
 export function loadCorpus(corpusPath) {
-  const resolved = path.resolve(corpusPath);
-  const bytes = fs.readFileSync(resolved);
-  if (bytes.length > 4 * 1024 * 1024) {
-    throw new Error("Corpus manifest exceeds its 4 MiB input limit.");
-  }
-  const corpus = JSON.parse(bytes.toString("utf8"));
+  const corpus = JSON.parse(fs.readFileSync(path.resolve(corpusPath), "utf8"));
   validateCorpus(corpus);
-  Object.defineProperty(corpus, "_manifest", {
-    enumerable: false,
-    value: {
-      path: resolved,
-      sha256: crypto.createHash("sha256").update(bytes).digest("hex")
-    }
-  });
   return corpus;
 }
 
 export function validateCorpus(corpus) {
-  if (!corpus || corpus.schema_version !== 2) {
-    throw new Error("Corpus schema_version must be 2.");
-  }
-  rejectUnknownFields(corpus, TOP_LEVEL_FIELDS, "corpus");
-  if (
-    typeof corpus.label_version !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(corpus.label_version)
-  ) {
-    throw new Error("Corpus label_version must be an ISO date.");
-  }
-  if (!EVALUATION_ROLES.has(corpus.evaluation_role)) {
-    throw new Error(
-      "Corpus evaluation_role must be development or release."
-    );
-  }
-  if (corpus.evaluation_role === "release") {
-    validateReleaseMetadata(corpus.release);
+  if (!corpus || corpus.schema_version !== 1) {
+    throw new Error("Corpus schema_version must be 1.");
   }
   if (
     !Array.isArray(corpus.cases) ||
@@ -90,197 +29,115 @@ export function validateCorpus(corpus) {
   }
   validatePolicy(corpus.policy);
   const ids = new Set();
-  const categoryCounts = Object.fromEntries(
-    REQUIRED_CATEGORIES.map((category) => [category, 0])
-  );
+  const categories = new Set();
 
   for (const item of corpus.cases) {
-    validateCase(item, ids, corpus.policy);
-    if (!Object.hasOwn(categoryCounts, item.category)) {
-      throw new Error(`${item.id}: unsupported category ${item.category}.`);
+    if (!item || typeof item.id !== "string" || !item.id.includes("/")) {
+      throw new Error("Every corpus case needs a stable owner/repository-style id.");
     }
-    categoryCounts[item.category] += 1;
+    if (ids.has(item.id)) {
+      throw new Error(`Duplicate corpus case id: ${item.id}`);
+    }
+    ids.add(item.id);
+    categories.add(item.category);
+    if (
+      typeof item.repository !== "string" ||
+      !/^https:\/\/github\.com\/.+\.git$/.test(item.repository)
+    ) {
+      throw new Error(`${item.id}: repository must be a public HTTPS GitHub clone URL.`);
+    }
+    if (
+      typeof item.revision !== "string" ||
+      !/^[0-9a-f]{40}$/.test(item.revision)
+    ) {
+      throw new Error(`${item.id}: revision must be a full 40-character Git commit.`);
+    }
+    validateLabels(item, corpus.policy);
   }
   for (const category of REQUIRED_CATEGORIES) {
-    if (
-      categoryCounts[category] <
-      corpus.policy.minimum_cases_per_category
-    ) {
-      throw new Error(
-        `Corpus category ${category} has ${categoryCounts[category]} cases; ` +
-        `${corpus.policy.minimum_cases_per_category} are required.`
-      );
+    if (!categories.has(category)) {
+      throw new Error(`Corpus is missing required category: ${category}`);
     }
   }
 }
 
-function validateCase(item, ids, policy) {
-  rejectUnknownFields(item, CASE_FIELDS, item?.id || "case");
-  if (!item || typeof item.id !== "string" || !item.id.includes("/")) {
+function validateLabels(item, policy) {
+  if (!item.labels || !Array.isArray(item.labels.important_files)) {
+    throw new Error(`${item.id}: labels.important_files is required.`);
+  }
+  if (item.labels.important_files.length !== policy.important_file_limit) {
     throw new Error(
-      "Every corpus case needs a stable owner/repository-style id."
+      `${item.id}: expected exactly ${policy.important_file_limit} important files.`
     );
   }
-  if (ids.has(item.id)) {
-    throw new Error(`Duplicate corpus case id: ${item.id}`);
+  if (new Set(item.labels.important_files).size !== item.labels.important_files.length) {
+    throw new Error(`${item.id}: important-file labels must be unique.`);
   }
-  ids.add(item.id);
-  if (
-    typeof item.repository !== "string" ||
-    !/^https:\/\/github\.com\/.+\.git$/.test(item.repository)
-  ) {
-    throw new Error(
-      `${item.id}: repository must be a public HTTPS GitHub clone URL.`
-    );
+  for (const relPath of item.labels.important_files) {
+    validateRelativePath(item.id, relPath, "important file");
   }
-  if (!/^[0-9a-f]{40}$/.test(item.revision || "")) {
-    throw new Error(
-      `${item.id}: revision must be a full 40-character Git commit.`
-    );
+  validateCommand(item.id, item.labels.run, "run");
+  validateCommand(item.id, item.labels.test, "test");
+  if (!Array.isArray(item.label_sources) || item.label_sources.length === 0) {
+    throw new Error(`${item.id}: at least one label source is required.`);
   }
-  if (
-    !Array.isArray(item.strata) ||
-    item.strata.length > 10 ||
-    item.strata.some((value) =>
-      typeof value !== "string" || !value || value.length > 100
-    ) ||
-    new Set(item.strata).size !== item.strata.length
-  ) {
-    throw new Error(`${item.id}: strata must be unique bounded strings.`);
-  }
-  validateLabels(item, policy);
-}
-
-function validateReleaseMetadata(release) {
-  if (!release || typeof release !== "object") {
-    throw new Error("Release corpora require release metadata.");
-  }
-  rejectUnknownFields(
-    release,
-    new Set([
-      "candidate_commit",
-      "candidate_version",
-      "frozen_at",
-      "implementation_author",
-      "labeler",
-      "independent_reviewer"
-    ]),
-    "release"
-  );
-  if (!/^[0-9a-f]{40}$/.test(release.candidate_commit || "")) {
-    throw new Error(
-      "Release candidate_commit must be a full Git commit."
-    );
-  }
-  if (
-    typeof release.candidate_version !== "string" ||
-    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(
-      release.candidate_version
-    )
-  ) {
-    throw new Error("Release candidate_version must be semantic.");
-  }
-  if (
-    typeof release.frozen_at !== "string" ||
-    !Number.isFinite(Date.parse(release.frozen_at))
-  ) {
-    throw new Error("Release frozen_at must be an ISO timestamp.");
-  }
-  for (const field of [
-    "implementation_author",
-    "labeler",
-    "independent_reviewer"
-  ]) {
-    if (
-      typeof release[field] !== "string" ||
-      release[field].trim().length === 0
-    ) {
-      throw new Error(`Release ${field} is required.`);
-    }
-  }
-  if (
-    new Set([
-      release.implementation_author,
-      release.labeler,
-      release.independent_reviewer
-    ]).size !== 3
-  ) {
-    throw new Error(
-      "Release implementation author, labeler, and independent reviewer must be distinct."
-    );
+  for (const relPath of item.label_sources) {
+    validateRelativePath(item.id, relPath, "label source");
   }
 }
 
 function validatePolicy(policy) {
-  if (!policy || typeof policy !== "object") {
-    throw new Error("Corpus policy must be a non-empty object.");
-  }
-  rejectUnknownFields(policy, POLICY_FIELDS, "policy");
   for (const key of [
     "false_positive_cost",
     "false_negative_cost",
     "important_file_limit",
-    "maximum_weighted_error_per_case",
-    "minimum_cases_per_category"
+    "minimum_precision",
+    "minimum_recall",
+    "maximum_weighted_error_per_case"
   ]) {
-    if (!Number.isFinite(policy[key]) || policy[key] <= 0) {
-      throw new Error(`Corpus policy.${key} must be positive.`);
+    if (!Number.isFinite(policy?.[key])) {
+      throw new Error(`Corpus policy.${key} must be numeric.`);
     }
   }
-  if (
-    policy.false_positive_cost !==
-    5 * policy.false_negative_cost
-  ) {
+  if (policy.false_positive_cost !== 5 * policy.false_negative_cost) {
     throw new Error(
       "Corpus policy must price a false positive at exactly 5x a false negative."
     );
   }
-  validateThresholds(policy, "policy");
-  rejectUnknownFields(
-    policy.dimension_thresholds,
-    new Set(DIMENSIONS),
-    "policy.dimension_thresholds"
-  );
-  for (const dimension of DIMENSIONS) {
-    validateThresholds(
-      policy.dimension_thresholds?.[dimension],
-      `dimension_thresholds.${dimension}`
-    );
-  }
-  rejectUnknownFields(
-    policy.category_thresholds,
-    new Set(REQUIRED_CATEGORIES),
-    "policy.category_thresholds"
-  );
-  for (const category of REQUIRED_CATEGORIES) {
-    validateThresholds(
-      policy.category_thresholds?.[category],
-      `category_thresholds.${category}`
-    );
-  }
-}
-
-function rejectUnknownFields(value, allowed, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be an object.`);
-  }
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) {
-      throw new Error(`${label} has unknown field: ${key}.`);
-    }
-  }
-}
-
-function validateThresholds(value, field) {
   for (const key of ["minimum_precision", "minimum_recall"]) {
-    if (
-      !Number.isFinite(value?.[key]) ||
-      value[key] <= 0 ||
-      value[key] > 1
-    ) {
-      throw new Error(
-        `Corpus ${field}.${key} must be greater than 0 and at most 1.`
-      );
+    if (policy[key] < 0 || policy[key] > 1) {
+      throw new Error(`Corpus policy.${key} must be between 0 and 1.`);
     }
   }
+}
+
+function validateRelativePath(id, relPath, label) {
+  if (
+    typeof relPath !== "string" ||
+    !relPath ||
+    path.posix.isAbsolute(relPath) ||
+    relPath.split("/").includes("..") ||
+    relPath.includes("\\")
+  ) {
+    throw new Error(`${id}: invalid ${label} path: ${String(relPath)}`);
+  }
+}
+
+function validateCommand(id, value, kind) {
+  if (value === null) {
+    return;
+  }
+  if (
+    !value ||
+    typeof value.command !== "string" ||
+    !value.command.trim() ||
+    typeof value.cwd !== "string"
+  ) {
+    throw new Error(`${id}: ${kind} command must be null or { cwd, command }.`);
+  }
+  validateRelativePath(
+    id,
+    value.cwd === "." ? "placeholder" : value.cwd,
+    `${kind} cwd`
+  );
 }

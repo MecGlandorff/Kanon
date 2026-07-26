@@ -1,5 +1,3 @@
-import { readText } from "../scanner.js";
-
 export function detectLanguages(files, packageInfo, pyprojectInfo) {
   const languages = new Set();
   if (
@@ -56,42 +54,18 @@ export function detectDeployment(files, evidence) {
   );
 }
 
-export function detectRelease(root, files, evidence, readOptions = {}) {
-  const matches = files.filter((file) => {
-    if (
+export function detectRelease(files, evidence) {
+  const matches = files.filter(
+    (file) =>
       /^\.github\/workflows\/.*release.*\.(ya?ml)$/.test(file.path) ||
       /^CHANGELOG\.md$/i.test(file.path) ||
       /^\.releaserc/.test(file.path)
-    ) {
-      return true;
-    }
-    if (!/^\.github\/workflows\/[^/]+\.(ya?ml)$/.test(file.path)) {
-      return false;
-    }
-    return hasReleaseWorkflowSignal(
-      readText(root, file.path, {
-        ...readOptions,
-        limit: 180_000
-      })
-    );
-  });
+  );
   return evidenceFiles(
     matches,
     evidence,
     "file",
     "Release/changelog evidence found."
-  );
-}
-
-function hasReleaseWorkflowSignal(text) {
-  return (
-    /\brefs\/tags\//.test(text) ||
-    (
-      /(?:^|\n)\s*push:\s*(?:\n|$)/m.test(text) &&
-      /(?:^|\n)\s*tags:\s*(?:\n|$)/m.test(text)
-    ) ||
-    /\b(?:npm publish|gh release)\b/.test(text) ||
-    /\b(?:action-gh-release|release-drafter)\b/i.test(text)
   );
 }
 

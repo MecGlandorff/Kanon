@@ -1,94 +1,46 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
-import { DEFAULT_CONFIG, readKanonConfig } from "./config.js";
-import { renderBrief, renderResume } from "./render.js";
-import {
-  sanitizeFilenameComponent
-} from "./path-security.js";
-import {
-  appendContained,
-  atomicWriteContained,
-  containedFileStat,
-  ensureContainedDirectory,
-  listContainedDirectory,
-  readContainedText
-} from "./persistence/safe-fs.js";
-import {
-  inspectPreviousState,
-  validatePersistedState
-} from "./persistence/state.js";
-import {
-  safeJsonStringify,
-  safeTerminalText
-} from "./trust.js";
+import { DEFAULT_CONFIG } from "./config.js";
+import { renderBrief, renderImprove, renderRefactor, renderResume } from "./render.js";
+import { STATE_SCHEMA_VERSION } from "./version.js";
 
-const KANON_GITIGNORE =
-  "*\n!.gitignore\n!KANON.md\n!TODO.md\n";
+const KANON_GITIGNORE = "*\n!.gitignore\n!KANON.md\n!TODO.md\n!IMPROVEMENTS.md\n!REFACTOR_PLAN.md\n";
 const TODO_HEADER = "# Kanon TODO\n\n";
 
 export function writeKanonOutputs(analysis, options = {}) {
-  const root = analysis.root;
-  const config = readKanonConfig(root);
-  ensureContainedDirectory(root, ".kanon");
-  ensureContainedDirectory(root, ".kanon/snapshots");
-  const previousInspection = inspectPreviousState(root, {
-    maxBytes: config.inputs.max_state_bytes
-  });
-  const todoInspection = inspectKanonTodos(root, {
-    maxBytes: config.inputs.max_todo_bytes
-  });
-  const snapshotId = sanitizeFilenameComponent(
-    analysis.state.run_id ||
-      analysis.state.generated_at.replace(/[:.]/g, "-")
+  const kanonDir = path.join(analysis.root, ".kanon");
+  const snapshotsDir = path.join(kanonDir, "snapshots");
+  fs.mkdirSync(snapshotsDir, { recursive: true });
+
+  const previous = readPreviousState(analysis.root);
+  const todos = readKanonTodos(analysis.root);
+  const snapshotId = analysis.state.run_id || analysis.state.generated_at.replace(/[:.]/g, "-");
+
+  writeKanonGitignore(kanonDir);
+  atomicWriteFile(path.join(kanonDir, "KANON.md"), renderBrief(analysis, options));
+  atomicWriteFile(path.join(kanonDir, "STATE.json"), `${JSON.stringify(analysis.state, null, 2)}\n`);
+  atomicWriteFile(path.join(kanonDir, "HANDOFF.md"), renderResume(analysis, previous, { todos }));
+  ensureKanonConfig(kanonDir);
+  atomicWriteFile(
+    path.join(snapshotsDir, `${snapshotId}.json`),
+    `${JSON.stringify(analysis.state, null, 2)}\n`
   );
-  const validation = validatePersistedState(analysis.state);
-  if (!validation.valid) {
-    throw new Error(
-      `Refusing to persist invalid state at ${validation.field}: ${validation.reason}`
+
+  const evidencePath = path.join(kanonDir, "EVIDENCE.jsonl");
+  if (!fs.existsSync(evidencePath)) {
+    atomicWriteFile(evidencePath, "");
+  }
+  if (analysis.evidence.length) {
+    fs.appendFileSync(
+      evidencePath,
+      `${analysis.evidence.map((record) => JSON.stringify(record)).join("\n")}\n`,
+      "utf8"
     );
   }
 
-  writeKanonGitignore(root);
-  atomicWriteContained(
-    root,
-    ".kanon/KANON.md",
-    renderBrief(analysis, options)
-  );
-  atomicWriteContained(
-    root,
-    ".kanon/STATE.json",
-    `${safeJsonStringify(analysis.state)}\n`
-  );
-  atomicWriteContained(
-    root,
-    ".kanon/HANDOFF.md",
-    renderResume(analysis, previousInspection.state, {
-      todos: todoInspection.todos,
-      stateWarning: previousInspection.warning,
-      todoWarning: todoInspection.warning
-    })
-  );
-  ensureKanonConfig(root);
-
-  const warnings = [
-    previousInspection.warning,
-    todoInspection.warning
-  ].filter(Boolean);
-  const snapshotPath = writeSnapshot(
-    root,
-    snapshotId,
-    analysis.state,
-    config.persistence,
-    warnings
-  );
-  appendEvidence(
-    root,
-    analysis.evidence,
-    config.persistence,
-    warnings
-  );
-
   return {
-    kanonDir: path.join(root, ".kanon"),
+    kanonDir,
     written: [
       ".kanon/.gitignore",
       ".kanon/KANON.md",
@@ -96,47 +48,83 @@ export function writeKanonOutputs(analysis, options = {}) {
       ".kanon/EVIDENCE.jsonl",
       ".kanon/HANDOFF.md",
       ".kanon/config.json",
-      ...(snapshotPath ? [snapshotPath] : [])
-    ],
-    warnings
+      `.kanon/snapshots/${snapshotId}.json`
+    ]
   };
 }
 
-export function readPreviousState(root, options = {}) {
-  return inspectPreviousState(root, options).state;
+export function readPreviousState(root) {
+  const statePath = path.join(root, ".kanon", "STATE.json");
+  try {
+    const parsed = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const schemaVersion = parsed.schema_version ?? 1;
+    if (
+      !Number.isInteger(schemaVersion) ||
+      schemaVersion < 1 ||
+      schemaVersion > STATE_SCHEMA_VERSION
+    ) {
+      return null;
+    }
+    return { ...parsed, schema_version: schemaVersion };
+  } catch {
+    return null;
+  }
 }
 
-export { inspectPreviousState, validatePersistedState };
+export function writeKanonImproveOutput(analysis, improvements, options = {}) {
+  const kanonDir = path.join(analysis.root, ".kanon");
+  fs.mkdirSync(kanonDir, { recursive: true });
+  writeKanonGitignore(kanonDir);
 
-export function inspectKanonTodos(root, options = {}) {
-  const read = readContainedText(
-    root,
-    ".kanon/TODO.md",
-    options.maxBytes ?? DEFAULT_CONFIG.inputs.max_todo_bytes,
-    { optional: true }
+  analysis.state.improvements = improvements;
+  atomicWriteFile(
+    path.join(kanonDir, "IMPROVEMENTS.md"),
+    renderImprove(improvements, { mode: options.mode || "top" })
   );
-  if (!read.ok && read.status === "missing") {
-    return { todos: [], found: false, valid: true, warning: null };
-  }
-  if (!read.ok) {
-    return {
-      todos: [],
-      found: true,
-      valid: false,
-      warning:
-        `TODO.md was ignored because it was ${read.status}: ${read.reason}`
-    };
-  }
+  atomicWriteFile(path.join(kanonDir, "STATE.json"), `${JSON.stringify(analysis.state, null, 2)}\n`);
+
   return {
-    todos: parseKanonTodoMarkdown(read.text),
-    found: true,
-    valid: true,
-    warning: null
+    kanonDir,
+    written: [
+      ".kanon/.gitignore",
+      ".kanon/IMPROVEMENTS.md",
+      ".kanon/STATE.json"
+    ]
   };
 }
 
-export function readKanonTodos(root, options = {}) {
-  return inspectKanonTodos(root, options).todos;
+export function writeKanonRefactorOutput(analysis, refactor, options = {}) {
+  const kanonDir = path.join(analysis.root, ".kanon");
+  fs.mkdirSync(kanonDir, { recursive: true });
+  writeKanonGitignore(kanonDir);
+
+  analysis.state.refactor = refactor;
+  atomicWriteFile(
+    path.join(kanonDir, "REFACTOR_PLAN.md"),
+    renderRefactor(refactor, { mode: options.mode || "plan" })
+  );
+  atomicWriteFile(path.join(kanonDir, "STATE.json"), `${JSON.stringify(analysis.state, null, 2)}\n`);
+
+  return {
+    kanonDir,
+    written: [
+      ".kanon/.gitignore",
+      ".kanon/REFACTOR_PLAN.md",
+      ".kanon/STATE.json"
+    ]
+  };
+}
+
+export function readKanonTodos(root) {
+  const todoPath = path.join(root, ".kanon", "TODO.md");
+  try {
+    return parseKanonTodoMarkdown(fs.readFileSync(todoPath, "utf8"));
+  } catch {
+    return [];
+  }
 }
 
 export function addKanonTodo(root, text) {
@@ -144,25 +132,17 @@ export function addKanonTodo(root, text) {
   if (!item) {
     throw new Error('Usage: kanon todo add "describe the work"');
   }
-  const config = readKanonConfig(root);
-  ensureContainedDirectory(root, ".kanon");
-  writeKanonGitignore(root);
-  const inspection = inspectKanonTodos(root, {
-    maxBytes: config.inputs.max_todo_bytes
-  });
-  if (!inspection.valid) {
-    throw new Error(inspection.warning);
-  }
-  const existing = readTodoSource(root, config.inputs.max_todo_bytes);
+
+  const kanonDir = path.join(root, ".kanon");
+  const todoPath = path.join(kanonDir, "TODO.md");
+  fs.mkdirSync(kanonDir, { recursive: true });
+  writeKanonGitignore(kanonDir);
+
+  const existing = readTextFile(todoPath);
   const prefix = existing ? ensureTrailingNewline(existing) : TODO_HEADER;
-  const next = `${prefix}${item}\n`;
-  if (Buffer.byteLength(next) > config.inputs.max_todo_bytes) {
-    throw new Error("TODO.md would exceed its configured input limit.");
-  }
-  atomicWriteContained(root, ".kanon/TODO.md", next);
-  const todos = readKanonTodos(root, {
-    maxBytes: config.inputs.max_todo_bytes
-  });
+  atomicWriteFile(todoPath, `${prefix}${item}\n`);
+
+  const todos = readKanonTodos(root);
   return {
     path: ".kanon/TODO.md",
     todo: todos[todos.length - 1]
@@ -170,47 +150,40 @@ export function addKanonTodo(root, text) {
 }
 
 export function completeKanonTodo(root, number) {
-  const config = readKanonConfig(root);
-  const text = readTodoSource(root, config.inputs.max_todo_bytes);
+  const todoPath = path.join(root, ".kanon", "TODO.md");
+  const text = readTextFile(todoPath);
   if (!text) {
-    throw new Error("No safe Kanon TODO.md found.");
+    throw new Error("No Kanon TODO.md found.");
   }
+
   const todoNumber = Number.parseInt(String(number), 10);
   if (!Number.isInteger(todoNumber) || todoNumber < 1) {
     throw new Error("Usage: kanon todo done <number>");
   }
+
   const todos = parseKanonTodoMarkdown(text);
   const target = todos.find((todo) => todo.number === todoNumber);
   if (!target) {
     throw new Error(`No Kanon todo found for number ${todoNumber}.`);
   }
+
   if (target.done) {
     return { path: ".kanon/TODO.md", todo: target, changed: false };
   }
+
   const lines = text.split(/\r?\n/);
-  lines[target.line - 1] = lines[target.line - 1].replace(
-    /^(\s*-\s+\[)[ xX](\]\s+)/,
-    "$1x$2"
-  );
-  atomicWriteContained(
-    root,
-    ".kanon/TODO.md",
-    ensureTrailingNewline(lines.join("\n"))
-  );
-  const completed = readKanonTodos(root, {
-    maxBytes: config.inputs.max_todo_bytes
-  }).find((todo) => todo.number === todoNumber);
-  return {
-    path: ".kanon/TODO.md",
-    todo: completed,
-    changed: true
-  };
+  lines[target.line - 1] = lines[target.line - 1].replace(/^(\s*-\s+\[)[ xX](\]\s+)/, "$1x$2");
+  atomicWriteFile(todoPath, ensureTrailingNewline(lines.join("\n")));
+
+  const completed = readKanonTodos(root).find((todo) => todo.number === todoNumber);
+  return { path: ".kanon/TODO.md", todo: completed, changed: true };
 }
 
 export function parseKanonTodoMarkdown(markdown) {
   const todos = [];
   let current = null;
   const lines = String(markdown || "").split(/\r?\n/);
+
   lines.forEach((line, index) => {
     const match = line.match(/^\s*-\s+\[([ xX])\]\s+(.*)$/);
     if (match) {
@@ -219,128 +192,48 @@ export function parseKanonTodoMarkdown(markdown) {
         done: match[1].toLowerCase() === "x",
         text: match[2].trim(),
         details: [],
-        line: index + 1,
-        trust: "repository-untrusted"
+        line: index + 1
       };
       todos.push(current);
-    } else if (current && /^\s{2,}\S/.test(line)) {
+      return;
+    }
+
+    if (current && /^\s{2,}\S/.test(line)) {
       current.details.push(line.trimEnd().trim());
     }
   });
+
   return todos;
 }
 
-function writeKanonGitignore(root) {
-  const read = readContainedText(
-    root,
-    ".kanon/.gitignore",
-    128 * 1024,
-    { optional: true }
-  );
-  if (!read.ok && read.status !== "missing") {
-    throw new Error(`Unsafe .kanon/.gitignore: ${read.reason}`);
-  }
-  const existing = read.ok ? read.text : "";
+function writeKanonGitignore(kanonDir) {
+  const ignorePath = path.join(kanonDir, ".gitignore");
+  const existing = readTextFile(ignorePath);
   if (!existing) {
-    atomicWriteContained(root, ".kanon/.gitignore", KANON_GITIGNORE);
+    atomicWriteFile(ignorePath, KANON_GITIGNORE);
     return;
   }
+
   const lines = new Set(existing.split(/\r?\n/));
   const missing = KANON_GITIGNORE.trimEnd()
     .split("\n")
     .filter((line) => !lines.has(line));
-  if (missing.length) {
-    atomicWriteContained(
-      root,
-      ".kanon/.gitignore",
-      `${ensureTrailingNewline(existing)}# Kanon-managed continuity files\n${missing.join("\n")}\n`
-    );
+  if (!missing.length) {
+    return;
   }
+
+  atomicWriteFile(
+    ignorePath,
+    `${ensureTrailingNewline(existing)}# Kanon-managed continuity files\n${missing.join("\n")}\n`
+  );
 }
 
-function ensureKanonConfig(root) {
-  const target = containedFileStat(
-    root,
-    ".kanon/config.json",
-    { optional: true }
-  );
-  if (target.status === "missing") {
-    atomicWriteContained(
-      root,
-      ".kanon/config.json",
-      `${safeJsonStringify(DEFAULT_CONFIG)}\n`
-    );
-  }
-}
-
-function writeSnapshot(root, id, state, limits, warnings) {
-  const entries = listContainedDirectory(root, ".kanon/snapshots")
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"));
-  if (entries.length >= limits.max_snapshots) {
-    warnings.push(
-      `Snapshot retention limit ${limits.max_snapshots} was reached; no snapshot was written.`
-    );
-    return null;
-  }
-  const relative = `.kanon/snapshots/${id}.json`;
-  atomicWriteContained(root, relative, `${safeJsonStringify(state)}\n`);
-  return relative;
-}
-
-function appendEvidence(root, records, limits, warnings) {
-  const relative = ".kanon/EVIDENCE.jsonl";
-  const target = containedFileStat(root, relative, { optional: true });
-  const existingBytes = target.ok ? target.stat.size : 0;
-  const existing = target.ok
-    ? readContainedText(root, relative, limits.max_evidence_bytes)
-    : { ok: true, text: "" };
-  if (!existing.ok) {
-    throw new Error(`Unsafe evidence ledger: ${existing.reason}`);
-  }
-  const currentRecords = existing.text
-    ? existing.text.split(/\r?\n/).filter(Boolean).length
-    : 0;
-  const remaining = Math.max(
-    0,
-    limits.max_evidence_records - currentRecords
-  );
-  const accepted = records.slice(0, remaining);
-  let payload = accepted.length
-    ? `${accepted.map((record) => safeJsonStringify(record, 0)).join("\n")}\n`
-    : "";
-  const availableBytes = Math.max(
-    0,
-    limits.max_evidence_bytes - existingBytes
-  );
-  if (Buffer.byteLength(payload) > availableBytes) {
-    payload = "";
-  }
-  if (payload) {
-    appendContained(root, relative, payload);
-  } else if (!target.ok) {
-    atomicWriteContained(root, relative, "");
-  }
-  if (accepted.length < records.length || (!payload && records.length)) {
-    warnings.push(
-      "Evidence retention limit was reached; additional records were not appended."
-    );
-  }
-}
-
-function readTodoSource(root, maximumBytes) {
-  const read = readContainedText(
-    root,
-    ".kanon/TODO.md",
-    maximumBytes,
-    { optional: true }
-  );
-  if (!read.ok && read.status === "missing") {
+function readTextFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
     return "";
   }
-  if (!read.ok) {
-    throw new Error(`Unsafe TODO.md: ${read.reason}`);
-  }
-  return read.text;
 }
 
 function ensureTrailingNewline(text) {
@@ -348,21 +241,52 @@ function ensureTrailingNewline(text) {
 }
 
 function formatTodoItem(text) {
-  const lines = safeTerminalText(text, { multiline: true })
+  const lines = String(text || "")
+    .replace(/\r\n/g, "\n")
     .split("\n")
     .map((line) => line.trimEnd());
+
   while (lines.length && !lines[0].trim()) {
     lines.shift();
   }
-  while (lines.length && !lines.at(-1).trim()) {
+  while (lines.length && !lines[lines.length - 1].trim()) {
     lines.pop();
   }
+
   if (!lines.length) {
     return null;
   }
+
   const [title, ...details] = lines;
-  return [
-    `- [ ] ${title.trim()}`,
-    ...details.map((detail) => detail.trim() ? `  ${detail}` : "  ")
-  ].join("\n");
+  const item = [`- [ ] ${title.trim()}`];
+  for (const detail of details) {
+    item.push(detail.trim() ? `  ${detail}` : "  ");
+  }
+
+  return item.join("\n");
+}
+
+function ensureKanonConfig(kanonDir) {
+  const configPath = path.join(kanonDir, "config.json");
+  if (!fs.existsSync(configPath)) {
+    atomicWriteFile(configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`);
+  }
+}
+
+function atomicWriteFile(filePath, contents) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${crypto.randomUUID()}.tmp`
+  );
+  try {
+    fs.writeFileSync(tempPath, contents, { encoding: "utf8", flag: "wx" });
+    fs.renameSync(tempPath, filePath);
+  } finally {
+    try {
+      fs.unlinkSync(tempPath);
+    } catch {
+      // The rename succeeded or the temporary file was never created.
+    }
+  }
 }

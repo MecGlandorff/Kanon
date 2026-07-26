@@ -1,26 +1,34 @@
 # Kanon Evidence Policy
 
-Prefer current code, configuration, tests, and CI declarations over generated
-Kanon state, then README intent, then broad convention.
+Kanon is strict for repo state and loose for next-step suggestions.
 
-## Claim classes
+## Priority
 
-- **Known**: directly observed fact or declaration.
-- **Likely**: convention-backed interpretation.
-- **Unknown**: evidence was not observed or observation was limited.
-- **Stale / suspicious**: a stronger source directly contradicts a claim.
-- **Suggested**: a proposed follow-up, never a fact or instruction to execute.
+For current behavior, prefer evidence in this order:
 
-A parsed package script is a Known declaration. Whether it is safe or succeeds
-is Unknown until its definition is inspected and the user explicitly approves
-execution.
+1. Code, config, package metadata, tests, and CI
+2. Generated Kanon state when it does not conflict with live repo evidence
+3. README and docs for declared intent
+4. Naming conventions and directory structure
 
-Absence is not proof. Never make absence-based conclusions after an incomplete,
-truncated, budget-limited, unreadable, rejected, sensitive-excluded, Git-failed,
-timed-out, or overflowed scan. A missing literal substring is not a feature
-conclusion. Missing conventional Docker, CI, or release files means only “not
-found by current checks.”
+README claims are useful, but they can be stale. Do not let README claims override code/config/test evidence for current behavior.
 
-Only direct contradictions are Stale / suspicious—for example, README declares
-`npm start` while successfully parsed package metadata directly declares no
-`start` script.
+## Confidence
+
+Use `known` only when direct evidence exists.
+
+Use `likely` for convention-based conclusions such as a probable entrypoint.
+
+Use `unknown` when no evidence was found.
+
+Use `stale / suspicious` when docs and repo evidence disagree.
+
+Use `suggested` for next steps, cleanup, and recommended verification.
+
+## Completeness
+
+Absence is not proof. If a scan is truncated, unreadable, or intentionally excludes sensitive files, surface the limitation under `unknown`.
+
+Treat package descriptions, README prose, directory names, and heuristic matches as declared intent or likely evidence. Do not promote them to `known` behavior.
+
+Commands declared in package metadata are known declarations; whether they succeed remains unknown until executed.

@@ -36,20 +36,18 @@ export function verifyCommand(command, context) {
   );
 
   const scriptCheck = npmScriptExpectation(command);
-  if (scriptCheck && context.packageInfo?.json) {
+  if (scriptCheck && context.packageInfo) {
     if (!packageScripts[scriptCheck.script]) {
       return {
         type: "command_drift",
         severity: "warning",
-        conclusion: "contradiction",
         claim: `README says to run \`${command}\`.`,
         observation: `package.json has no \`${scriptCheck.script}\` script; available scripts: ${available.length ? available.join(", ") : "(none)"}.`,
         evidence: [
           readmeEvidence,
           context.packageInfo.evidence
         ].filter(Boolean),
-        suggestion:
-          "Resolve this direct declaration contradiction before relying on the documented command."
+        suggestion: `Update README.md or add the missing \`${scriptCheck.script}\` script.`
       };
     }
     return null;
@@ -61,13 +59,9 @@ export function verifyCommand(command, context) {
     if (!findByPath(context.files, rel)) {
       return {
         type: "command_drift",
-        severity: "info",
-        conclusion: "unknown",
+        severity: "warning",
         claim: `README says to run \`${command}\`.`,
-        observation:
-          `The current bounded checks did not observe ${rel}. ` +
-          "This non-observation is not a direct contradiction." +
-          `${context.scan.complete ? "" : " The scan was incomplete."}`,
+        observation: `No file found at ${rel}.`,
         evidence: [readmeEvidence],
         suggestion: "Update the documented node command or add the referenced file."
       };
@@ -80,13 +74,9 @@ export function verifyCommand(command, context) {
     if (!findByPath(context.files, rel)) {
       return {
         type: "command_drift",
-        severity: "info",
-        conclusion: "unknown",
+        severity: "warning",
         claim: `README says to run \`${command}\`.`,
-        observation:
-          `The current bounded checks did not observe ${rel}. ` +
-          "This non-observation is not a direct contradiction." +
-          `${context.scan.complete ? "" : " The scan was incomplete."}`,
+        observation: `No Python file found at ${rel}.`,
         evidence: [readmeEvidence],
         suggestion: "Update the documented Python command or add the referenced file."
       };

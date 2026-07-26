@@ -39,24 +39,11 @@ export function uniqueClaims(items) {
 
 export function scanLimitationReason(scan) {
   const reasons = [];
-  for (const budget of scan.budgets_reached || []) {
-    reasons.push(`the ${budget} budget was reached`);
+  if (scan.truncated) {
+    reasons.push(`the ${scan.max_files}-file scan limit was reached`);
   }
   if (scan.unreadable_entries) {
     reasons.push(`${scan.unreadable_entries} entry or directory read(s) failed`);
-  }
-  if (scan.rejected_paths) {
-    reasons.push(`${scan.rejected_paths} unsafe path(s) were rejected`);
-  }
-  if (scan.outside_root_paths) {
-    reasons.push(
-      `${scan.outside_root_paths} path(s) resolved outside the repository root`
-    );
-  }
-  if (scan.git_observation_failed) {
-    reasons.push(
-      `Git scanning failed (${scan.git_diagnostic || "no diagnostic"})`
-    );
   }
   return reasons.length ? `${reasons.join("; ")}.` : "The scan did not complete.";
 }

@@ -68,7 +68,14 @@ function baseImportance(relPath, reasons) {
     ["cargo.toml", 145],
     ["go.mod", 145],
     ["makefile", 132],
-    ["justfile", 132]
+    ["justfile", 132],
+    ["pnpm-workspace.yaml", 125],
+    ["pnpm-workspace.yml", 125],
+    ["turbo.json", 112],
+    ["nx.json", 112],
+    ["manage.py", 150],
+    ["setup.py", 108],
+    ["requirements.txt", 104]
   ]);
   if (!relPath.includes("/") && exact.has(lower)) {
     score += exact.get(lower);
@@ -77,6 +84,30 @@ function baseImportance(relPath, reasons) {
   if (/^readme(?:\.[^.]+)?$/i.test(basename)) {
     score += relPath.includes("/") ? 12 : 136;
     reasons.push(relPath.includes("/") ? "component README" : "root README");
+  }
+  if (/^packages\/[^/]+\/package\.json$/.test(lower)) {
+    score += 72;
+    reasons.push("workspace package metadata");
+  }
+  if (/^packages\/[^/]+\/src\/index\.[^.]+$/.test(lower)) {
+    score += 78;
+    reasons.push("workspace public entry module");
+  }
+  if (/^(?:src\/)?(?:main|index|cli|app|server|run)\.[^.]+$/.test(lower)) {
+    score += 48;
+    reasons.push("conventional entry file");
+  }
+  if (
+    /(^|\/)(model|engine|tensor|ops|core|settings|urls|router|commands?|trainer|backend|search|controller|lib)\.[^.]+$/.test(
+      lower
+    )
+  ) {
+    score += 44;
+    reasons.push("central implementation filename");
+  }
+  if (/(^|\/)(test[^/]*|[^/]+\.(?:test|spec))\.[^.]+$/.test(lower)) {
+    score += 30;
+    reasons.push("test-suite anchor");
   }
   return score;
 }
