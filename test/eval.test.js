@@ -565,6 +565,10 @@ test("publication requires an explicit workflow choice", () => {
     /publish:\n\s+description: Publish the validated tarball and create its tag\n\s+required: true\n\s+default: validate-only\n\s+type: choice\n\s+options:\n\s+- validate-only\n\s+- publish/
   );
   assert.match(workflow, /inputs\.publish == 'publish'/);
+  assert.match(
+    workflow,
+    /always\(\) &&\n\s+github\.event_name == 'workflow_dispatch' &&\n\s+inputs\.publish == 'publish' &&\n\s+needs\.release-gate\.result == 'success'/
+  );
   assert.doesNotMatch(
     workflow,
     /github\.event_name == 'workflow_dispatch' &&\n\s+inputs\.publish\s*(?:\n|$)/
