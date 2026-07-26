@@ -421,9 +421,13 @@ jobs:
 
   publish:
     name: Protected trusted publication
+    # A prerelease intentionally skips release-eval. Override GitHub's
+    # implicit success() propagation, then require the direct gate explicitly.
     if: >-
+      always() &&
       github.event_name == 'workflow_dispatch' &&
-      inputs.publish == 'publish'
+      inputs.publish == 'publish' &&
+      needs.release-gate.result == 'success'
     needs: release-gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
