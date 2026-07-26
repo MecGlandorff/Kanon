@@ -1,93 +1,90 @@
 # Kanon
 
-> **If you only read one line:** Kanon gives coding agents a grounded read of a
-> repo before they touch it.
+Kanon is a static, read-only repository orientation skill for coding agents.
+It targets conventional JavaScript/TypeScript, Python, Go, and Rust layouts.
 
-**Kanon — deep repo ingestion before agent action & more.**
+Today it can:
 
-Kanon is **ambient repo intelligence** for coding agents. Install it once; Codex
-and Claude Code invoke it automatically whenever repository context matters—before
-they answer, plan, edit, resume, audit, improve, or refactor.
+- read local imports and rank files by fan-in;
+- find content-backed entrypoints such as Python `__main__`, Go/Rust `main`,
+  package binaries, and JavaScript executables;
+- extract commands from package metadata, build targets, selected contributor
+  documentation, and conventional Cargo, Go, and Django layouts;
+- detect stale npm, Node, and Python commands in a README;
+- report whether conventional CI and deployment configuration was found.
 
-## Why
+Kanon does not execute repository code or prove that a detected command will
+succeed in the user's environment. Explicit configuration is **Known**;
+documented or conventional inference is **Likely**; absence remains
+**Unknown**. The 30-repository corpus is the release gate for these claims, and
+its current measured limitations are published in
+[`eval/RESULTS.md`](eval/RESULTS.md).
 
-Kanon changes the agent's default behavior from *act, then discover* to *ingest,
-then act*. It reconstructs the current repo state from code, config, tests, docs,
-git, and local memory, then turns that evidence into orientation, verification,
-continuity, improvement direction, and refactor plans.
-
-## Install Once
+## Use
 
 Copy the complete `skills/kanon/` directory into your agent's skills directory.
 Use Kanon inside an agent session. Node.js 20+ is required.
 
-The agent selects Kanon at the right moment from its skill triggers. No separate
-CLI step or repeated setup prompt is required. Explicit invocation remains
-available:
+The agent can select the skill from its trigger, or you can invoke it explicitly:
 
 ```text
 $kanon
-Brief this repo and tell me the safest first contribution.
+Brief this repo and tell me which evidence supports the first edit.
 ```
 
-Kanon selects the smallest workflow that fits the request:
+The supported core workflows are:
 
 | Intent | Workflow |
 | --- | --- |
-| Understand a repo | `brief` |
-| Answer a repo question | `ask` |
-| Check README drift | `verify` |
-| Resume previous work | `resume` |
-| Find the highest-value improvements | `improve` |
-| Plan a bounded cleanup | `refactor` |
+| Orient to a repository | `brief` |
+| Answer an evidence-backed repo question | `ask` |
+| Check conventional README drift | `verify` |
+| Resume from persisted repo state | `resume` |
+| Refresh continuity state | `refresh` |
 | Track human follow-up | `todo` |
-| Refresh continuity memory | `refresh` |
 
-`brief`, `ask`, `verify`, `resume`, `improve`, and `refactor` are read-only by
-default. Writes are explicit through `refresh`, `todo`, or supported `--write`
-flags.
+Read workflows do not modify the inspected repository. Writes are explicit
+through `refresh` and `todo`.
 
-## Evidence Contract
+## Evidence contract
 
-Every repo claim is classified as:
+Every claim is classified as:
 
-- **Known** — backed by files, config, tests, git, or Kanon evidence
-- **Likely** — supported by structure or convention, but not proven
-- **Unknown** — missing direct evidence
-- **Stale / suspicious** — contradicted by stronger repo evidence
-- **Suggested** — a useful next step inferred from evidence
+- **Known** — directly backed by files, config, tests, or Git evidence
+- **Likely** — supported by content or convention, but not proven
+- **Unknown** — direct evidence was not found
+- **Stale / suspicious** — contradicted by stronger repository evidence
+- **Suggested** — a proposed next step, not a fact
 
-Code, config, and tests outrank documentation for current behavior. Incomplete
-scans remain unknown.
+Incomplete scans remain unknown. Commands include the working directory from
+which they were detected.
 
-## Output
+## Local state
 
 Explicit write workflows use `.kanon/`:
 
 ```text
-KANON.md          repo brief
-HANDOFF.md        resume brief
-TODO.md           human follow-up
-IMPROVEMENTS.md   project direction
-REFACTOR_PLAN.md  bounded cleanup plan
-STATE.json        machine state
-EVIDENCE.jsonl    evidence trail
-snapshots/        historical state
+KANON.md        repository brief
+HANDOFF.md      resume brief
+TODO.md         human follow-up
+STATE.json      machine state
+EVIDENCE.jsonl  evidence ledger
+snapshots/      historical state
 ```
 
-Human-readable briefs and plans are shareable. Volatile machine state stays local.
-
-## Runtime Contract
-
 `skills/kanon/` is the supported integration artifact. Its Bash and PowerShell
-wrappers call the bundled runtime from the repository being inspected. They are
-agent hooks—not a standalone CLI or global package.
+wrappers call the bundled runtime from the repository being inspected; they are
+agent hooks, not a global terminal package.
 
 ## Development
 
 ```bash
 npm run build:skill
 npm run validate
+npm run eval:corpus
 ```
+
+Release tags run the pinned corpus with a 5:1 false-positive penalty. A release
+fails when its precision, recall, or weighted-error budget is missed.
 
 MIT

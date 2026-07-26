@@ -8,6 +8,8 @@ on:
     branches:
       - main
       - master
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
 
@@ -35,3 +37,24 @@ jobs:
 
       - run: npm run validate
       - run: node ./bin/kanon.js brief --json
+
+  corpus:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/kanon-corpus-v1
+          key: kanon-corpus-v1-${{ hashFiles('eval/corpus.json') }}
+
+      - run: npm run eval:corpus
+        env:
+          KANON_CORPUS_CACHE: ${{ runner.temp }}/kanon-corpus-v1

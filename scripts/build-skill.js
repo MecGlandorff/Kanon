@@ -11,10 +11,13 @@ const commands = ["ask", "brief", "improve", "refactor", "refresh", "resume", "t
 const artifacts = [];
 
 artifacts.push(copyArtifact("bin/kanon.js", "skills/kanon/runtime/bin/kanon.js", 0o755));
-for (const entry of fs.readdirSync(path.join(root, "src"), { withFileTypes: true })) {
-  if (entry.isFile() && entry.name.endsWith(".js")) {
-    artifacts.push(copyArtifact(`src/${entry.name}`, `skills/kanon/runtime/src/${entry.name}`));
-  }
+for (const sourceRelative of listJavaScriptFiles("src")) {
+  artifacts.push(
+    copyArtifact(
+      sourceRelative,
+      `skills/kanon/runtime/${sourceRelative}`
+    )
+  );
 }
 
 for (const command of commands) {
@@ -63,6 +66,20 @@ function copyArtifact(sourceRelative, targetRelative, mode = 0o644) {
     contents: fs.readFileSync(path.join(root, sourceRelative), "utf8"),
     mode
   };
+}
+
+function listJavaScriptFiles(relativeDirectory) {
+  const files = [];
+  const directory = path.join(root, relativeDirectory);
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const relative = `${relativeDirectory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      files.push(...listJavaScriptFiles(relative));
+    } else if (entry.isFile() && entry.name.endsWith(".js")) {
+      files.push(relative);
+    }
+  }
+  return files.sort();
 }
 
 function readFile(filePath) {

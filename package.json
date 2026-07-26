@@ -1,6 +1,6 @@
 {
   "name": "@mecglandorff/kanon",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Evidence-backed repo continuity skill runtime for Codex and Claude Code.",
   "type": "module",
   "repository": {
@@ -17,6 +17,7 @@
   "scripts": {
     "build:skill": "node scripts/build-skill.js",
     "check:skill": "node scripts/build-skill.js --check",
+    "eval:corpus": "node scripts/eval-corpus.js",
     "test": "node --test",
     "validate": "npm run check:skill && node --test && npm pack --dry-run"
   },
