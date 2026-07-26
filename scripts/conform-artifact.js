@@ -9,6 +9,7 @@ import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import { PUBLIC_COMMANDS } from "./lib/artifact-files.js";
+import { npmInvocation } from "./lib/npm-runner.js";
 
 const options = parseArgs(process.argv.slice(2));
 const tarball = selectedFile(options.tarball);
@@ -227,8 +228,8 @@ function runOptions(cwd) {
 }
 
 function runNpm(args) {
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  return spawnSync(npm, args, {
+  const invocation = npmInvocation(args);
+  return spawnSync(invocation.command, invocation.args, {
     encoding: "utf8",
     env: {
       ...process.env,

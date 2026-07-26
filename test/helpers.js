@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { Writable } from "node:stream";
+import { hardenedGitEnvironment } from "../src/git-runner.js";
 
 export function makeFixture(files = {}, prefix = "kanon-test-") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -21,18 +22,14 @@ export function writeFixtureFile(root, relative, contents) {
 }
 
 export function runGitFixture(root, args, options = {}) {
+  const { env: extraEnv = {}, ...spawnOptions } = options;
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
-    env: {
-      ...process.env,
-      GIT_CONFIG_GLOBAL: os.devNull,
-      GIT_CONFIG_NOSYSTEM: "1",
-      GIT_TERMINAL_PROMPT: "0"
-    },
+    env: hardenedGitEnvironment(extraEnv),
     maxBuffer: 16 * 1024 * 1024,
     timeout: 20_000,
     windowsHide: true,
-    ...options
+    ...spawnOptions
   });
   return result;
 }

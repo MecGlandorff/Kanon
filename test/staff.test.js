@@ -315,23 +315,19 @@ test("poisoned global Git config is disabled even when injected", (t) => {
 test("nonzero, timeout, and overflowed status are all Unknown", () => {
   const failures = [
     runProgramAsGit({
-      unix: "#!/bin/sh\nexit 7\n",
-      windows: "@echo off\r\nexit /b 7\r\n"
+      javascript: "process.exit(7);\n"
     }, {
       timeoutMs: 5_000,
       maxOutputBytes: 8 * 1024 * 1024
     }),
     runProgramAsGit({
-      unix: "#!/bin/sh\nsleep 10\n",
-      windows: "@echo off\r\nping -n 11 127.0.0.1 >nul\r\n"
+      javascript: "setTimeout(() => {}, 10_000);\n"
     }, {
       timeoutMs: 100,
       maxOutputBytes: 8 * 1024 * 1024
     }),
     runProgramAsGit({
-      unix: "#!/bin/sh\nyes x | head -c 9437184\n",
-      windows:
-        "@echo off\r\npowershell -NoProfile -Command \"[Console]::Out.Write('x' * 9437184)\"\r\n"
+      javascript: "process.stdout.write('x'.repeat(9_437_184));\n"
     }, {
         timeoutMs: 5_000,
         maxOutputBytes: 8 * 1024 * 1024
@@ -545,9 +541,14 @@ test("huge config, state, and TODO inputs are bounded with diagnostics", () => {
 
 function runProgramAsGit(source, options) {
   const root = makeFixture({}, "kanon-fake-git-");
-  const binary = executableScript(root, "fake-git", source);
+  const program = writeFixtureFile(
+    root,
+    "fake-git.cjs",
+    source.javascript
+  );
   return runGit(null, [], {
-    gitBinary: binary,
+    gitBinary: process.execPath,
+    prefixArgs: [program],
     ...options
   });
 }

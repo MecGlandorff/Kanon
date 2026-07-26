@@ -8,6 +8,7 @@ export const DEFAULT_GIT_TIMEOUT_MS = 2_000;
 export const DEFAULT_GIT_OUTPUT_BYTES = 8 * 1024 * 1024;
 
 let emptyHooksPath;
+let emptyGitConfigPath;
 
 export function runGit(root, args, options = {}) {
   const timeoutMs = boundedInteger(
@@ -131,9 +132,9 @@ export function hardenedGitEnvironment(extra = {}, noLazyFetch = false) {
   }
   Object.assign(env, {
     GIT_ATTR_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: os.devNull,
+    GIT_CONFIG_GLOBAL: getEmptyGitConfigPath(),
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_SYSTEM: os.devNull,
+    GIT_CONFIG_SYSTEM: getEmptyGitConfigPath(),
     GIT_EDITOR: "true",
     GIT_OPTIONAL_LOCKS: "0",
     GIT_PAGER: "cat",
@@ -157,6 +158,18 @@ function getEmptyHooksPath() {
   emptyHooksPath = path.join(os.tmpdir(), name);
   fs.mkdirSync(emptyHooksPath, { mode: 0o700 });
   return emptyHooksPath;
+}
+
+function getEmptyGitConfigPath() {
+  if (emptyGitConfigPath) {
+    return emptyGitConfigPath;
+  }
+  const name = `kanon-empty-git-config-${process.pid}-${crypto
+    .randomBytes(8)
+    .toString("hex")}`;
+  emptyGitConfigPath = path.join(os.tmpdir(), name);
+  fs.writeFileSync(emptyGitConfigPath, "", { mode: 0o600, flag: "wx" });
+  return emptyGitConfigPath;
 }
 
 function resolveGitBinary(explicit, rejectedRoots) {

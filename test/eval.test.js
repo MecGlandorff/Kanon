@@ -20,6 +20,7 @@ import {
 } from "../scripts/lib/eval-corpus.js";
 import { HEURISTIC_REGISTRY } from "../src/code-intel/heuristics.js";
 import { validateDevelopmentReport } from "../scripts/lib/development-report.js";
+import { npmInvocation } from "../scripts/lib/npm-runner.js";
 import { makeFixture, readJson, sha256File } from "./helpers.js";
 
 const repoRoot = path.resolve(
@@ -569,9 +570,15 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
   );
   assert.equal(build.status, 0, build.stderr || build.stdout);
 
+  const packInvocation = npmInvocation([
+    "pack",
+    stage,
+    "--pack-destination",
+    packed
+  ]);
   const pack = spawnSync(
-    npmBinary(),
-    ["pack", stage, "--pack-destination", packed],
+    packInvocation.command,
+    packInvocation.args,
     commandOptions()
   );
   assert.equal(pack.status, 0, pack.stderr || pack.stdout);
@@ -580,9 +587,15 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
     .filter((file) => file.endsWith(".tgz"))
     .map((file) => path.join(packed, file))[0];
   assert.ok(tarball);
+  const secondPackInvocation = npmInvocation([
+    "pack",
+    stage,
+    "--pack-destination",
+    repacked
+  ]);
   const secondPack = spawnSync(
-    npmBinary(),
-    ["pack", stage, "--pack-destination", repacked],
+    secondPackInvocation.command,
+    secondPackInvocation.args,
     commandOptions()
   );
   assert.equal(
@@ -794,10 +807,6 @@ function commandOptions(timeout = 60_000) {
     },
     windowsHide: true
   };
-}
-
-function npmBinary() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
 function javascriptFiles(directory) {
