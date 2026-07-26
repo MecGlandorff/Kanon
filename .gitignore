@@ -4,11 +4,11 @@ coverage/
 .nyc_output/
 npm-debug.log*
 improvements/
+dist/
+*.tgz
 
 .kanon/*
 !.kanon/
 !.kanon/.gitignore
 !.kanon/KANON.md
 !.kanon/TODO.md
-!.kanon/IMPROVEMENTS.md
-!.kanon/REFACTOR_PLAN.md

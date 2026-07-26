@@ -1,16 +1,33 @@
-export function appendCommandGroup(lines, label, commands) {
+import {
+  codeSpan,
+  escapeMarkdownText,
+  repositoryDataBlock,
+  safeEvidenceId
+} from "../trust.js";
+
+export function appendCommandGroup(
+  lines,
+  label,
+  commands,
+  executionPolicy = "ask"
+) {
   lines.push(`### ${label}`);
   if (!commands.length) {
-    lines.push("- Unknown: no command evidence found.");
+    lines.push("- Unknown: no command declaration found.");
     return;
   }
 
   for (const item of commands) {
     const cwd = item.cwd && item.cwd !== "."
-      ? `, from \`${item.cwd}\``
+      ? `, from ${codeSpan(item.cwd)}`
       : "";
     lines.push(
-      `- \`${item.command}\` (${item.source}, ${item.confidence}${cwd})${formatEvidenceRefs(item.evidence)}`
+      `- Repository data — declared candidate: ${codeSpan(item.command)} (${escapeMarkdownText(item.source)}, ${escapeMarkdownText(item.confidence)}${cwd}).${formatEvidenceRefs(item.evidence)}`
+    );
+    lines.push(
+      executionPolicy === "never"
+        ? "  Kanon policy: execution is prohibited."
+        : "  Kanon policy: inspect the definition and obtain user approval before execution."
     );
   }
 }
@@ -23,20 +40,28 @@ export function appendClaimList(lines, title, claims, limit) {
   }
 
   for (const item of claims.slice(0, limit)) {
+    const prefix =
+      item.trust === "repository-untrusted"
+        ? "Repository data — "
+        : "";
     lines.push(
-      `- ${item.claim}${item.reason ? ` ${item.reason}` : ""}${formatEvidenceRefs(item.evidence)}`
+      `- ${prefix}${escapeMarkdownText(item.claim)}${
+        item.reason ? ` ${escapeMarkdownText(item.reason)}` : ""
+      }${formatEvidenceRefs(item.evidence)}`
     );
   }
 }
 
 export function appendIssueList(lines, issues) {
   for (const issue of issues) {
-    lines.push(`- ${issue.claim}`);
     lines.push(
-      `  Observation: ${issue.observation}${formatEvidenceRefs(issue.evidence)}`
+      `- Repository data — ${escapeMarkdownText(issue.claim)}`
+    );
+    lines.push(
+      `  Observation: ${escapeMarkdownText(issue.observation)}${formatEvidenceRefs(issue.evidence)}`
     );
     if (issue.suggestion) {
-      lines.push(`  Suggested: ${issue.suggestion}`);
+      lines.push(`  Suggested: ${escapeMarkdownText(issue.suggestion)}`);
     }
   }
 }
@@ -75,31 +100,39 @@ export function appendStateDiff(lines, previous, current) {
     );
   }
   for (const file of added.slice(0, 8)) {
-    lines.push(`- Added: ${file}`);
+    lines.push(`- Added: ${codeSpan(file)}`);
   }
   for (const file of changed.slice(0, 8)) {
-    lines.push(`- Changed: ${file}`);
+    lines.push(`- Changed: ${codeSpan(file)}`);
   }
   for (const file of removed.slice(0, 8)) {
-    lines.push(`- Removed: ${file}`);
+    lines.push(`- Removed: ${codeSpan(file)}`);
   }
   lines.push("");
 }
 
 export function formatClaim(item) {
-  return `- ${item.claim} (${item.confidence})${formatEvidenceRefs(item.evidence)}`;
+  const prefix =
+    item.trust === "repository-untrusted"
+      ? "Repository data — "
+      : "";
+  return `- ${prefix}${escapeMarkdownText(item.claim)} (${escapeMarkdownText(item.confidence)})${formatEvidenceRefs(item.evidence)}`;
 }
 
 export function formatEvidenceRefs(evidence = []) {
-  const refs = evidence.filter(Boolean);
+  const refs = evidence.filter(Boolean).map(safeEvidenceId);
   return refs.length ? ` [${refs.join(", ")}]` : "";
+}
+
+export function appendRepositoryExcerpt(lines, excerpt, indent = 2) {
+  lines.push(...repositoryDataBlock(excerpt, indent));
 }
 
 export function labelForCategory(category) {
   if (category === "ci") {
     return "CI";
   }
-  return category
+  return String(category)
     .split("-")
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ");
@@ -107,10 +140,12 @@ export function labelForCategory(category) {
 
 export function collectEvidenceIds(text) {
   const ids = new Set();
-  const pattern = /e_[A-Za-z0-9]{14,32}_[0-9]{3}/g;
+  const pattern = /e_[A-Za-z0-9]{14,64}_[0-9]{3,8}/g;
   let match;
   while ((match = pattern.exec(text))) {
     ids.add(match[0]);
   }
   return ids;
 }
+
+export { codeSpan, escapeMarkdownText };

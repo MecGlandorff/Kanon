@@ -1,17 +1,20 @@
 import path from "node:path";
 import { inspectRepoCode } from "./code-intel.js";
-import { readKanonConfig, scanOptionsFromConfig } from "./config.js";
+import { inspectKanonConfig, scanOptionsFromConfig } from "./config.js";
 import { EvidenceBook } from "./evidence.js";
 import { inspectGit } from "./git.js";
 import {
+  createReadBudget,
   findByPath,
-  findFirst,
   findTextReferences,
   readText,
+  readTextResult,
   scanRepo
 } from "./scanner.js";
+import { selectRootReadme } from "./readme.js";
 import { verifyReadme } from "./verify.js";
 import { STATE_SCHEMA_VERSION, VERSION } from "./version.js";
+import { sanitizeRepositoryData } from "./trust.js";
 import { buildCurrentState } from "./analyze/current-state.js";
 import { detectEntrypoints, detectTodos } from "./analyze/entrypoints.js";
 import { detectCommands, detectImportantFiles } from "./analyze/findings.js";
@@ -35,32 +38,88 @@ import {
 } from "./analyze/utils.js";
 
 export function analyzeRepo(root = process.cwd(), options = {}) {
-  const resolvedRoot = path.resolve(root);
-  const config = readKanonConfig(resolvedRoot);
-  const scanned = scanRepo(
-    resolvedRoot,
-    scanOptionsFromConfig(config, options.scan)
-  );
+  const requestedRoot = path.resolve(root);
   const evidence = new EvidenceBook(options.runId);
+  const configInspection = inspectKanonConfig(requestedRoot);
+  const configEvidence = configInspection.warning
+    ? evidence.add(
+        "config",
+        ".kanon/config.json",
+        configInspection.warning
+      )
+    : null;
+  const configuration = {
+    found: configInspection.found,
+    valid: configInspection.valid,
+    warning: configInspection.warning,
+    invalid_field: configInspection.invalid_field,
+    command_execution: configInspection.config.command_execution,
+    evidence: configEvidence ? [configEvidence] : []
+  };
+  const effectiveScanOptions = scanOptionsFromConfig(
+    configInspection.config,
+    options.scan
+  );
+  const scanned = scanRepo(requestedRoot, effectiveScanOptions);
+  const resolvedRoot = scanned.root;
+  const readBudget = createReadBudget(
+    effectiveScanOptions.maxTotalTextBytes
+  );
+  const readOptions = {
+    budget: readBudget,
+    diagnostics: scanned.diagnostics,
+    limit: effectiveScanOptions.maxFileBytes
+  };
   const files = scanned.files;
   const readme = readReadme(
     resolvedRoot,
     files,
     options.readmePath,
-    evidence
+    evidence,
+    readOptions
   );
-  const packageInfo = readPackageJson(resolvedRoot, files, evidence);
-  const pyprojectInfo = readPyproject(resolvedRoot, files, evidence);
-  const pythonInfo = readPythonHints(resolvedRoot, files, evidence);
-  const skillInfo = readSkillInfo(resolvedRoot, files, evidence);
+  const packageInfo = readPackageJson(
+    resolvedRoot,
+    files,
+    evidence,
+    readOptions
+  );
+  const pyprojectInfo = readPyproject(
+    resolvedRoot,
+    files,
+    evidence,
+    readOptions
+  );
+  const pythonInfo = readPythonHints(
+    resolvedRoot,
+    files,
+    evidence,
+    readOptions
+  );
+  const skillInfo = readSkillInfo(
+    resolvedRoot,
+    files,
+    evidence,
+    readOptions
+  );
   const codeIntel = inspectRepoCode(resolvedRoot, files, {
-    packageJson: packageInfo?.json
+    packageJson: packageInfo?.json,
+    readOptions
   });
-  const git = inspectGit(resolvedRoot, evidence);
+  const git = inspectGit(resolvedRoot, evidence, {
+    enabled: options.inspectGit !== false,
+    timeoutMs: configInspection.config.git.timeout_ms,
+    maxOutputBytes: configInspection.config.git.max_output_bytes
+  });
   const languages = detectLanguages(files, packageInfo, pyprojectInfo);
   const ci = detectCi(files, evidence);
   const deploy = detectDeployment(files, evidence);
-  const release = detectRelease(files, evidence);
+  const release = detectRelease(
+    resolvedRoot,
+    files,
+    evidence,
+    readOptions
+  );
   const tests = detectTests(
     files,
     evidence,
@@ -77,7 +136,7 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
     evidence
   );
   const importantFiles = detectImportantFiles(evidence, codeIntel);
-  const todos = detectTodos(resolvedRoot, files);
+  const todos = detectTodos(resolvedRoot, files, readOptions);
   const purpose = detectPurpose(
     {
       ...readme,
@@ -110,8 +169,12 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
     commands,
     evidence,
     scan: scanned.diagnostics,
+    readOptions,
     findTerm: (term, opts = {}) =>
-      findTextReferences(resolvedRoot, files, term, opts)
+      findTextReferences(resolvedRoot, files, term, {
+        ...opts,
+        ...readOptions
+      })
   };
   const verification = verifyReadme(context);
   const currentState = buildCurrentState({
@@ -125,15 +188,17 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
     git,
     scan: scanned.diagnostics,
     todos,
-    verification
+    verification,
+    configuration
   });
+  scanned.diagnostics.total_text_bytes_read = readBudget.bytesRead;
   const repoName =
     packageInfo?.json?.name ||
     pyprojectInfo?.name ||
     path.basename(resolvedRoot);
   return {
     root: resolvedRoot,
-    state: buildState({
+    state: sanitizeRepositoryData(buildState({
       resolvedRoot,
       repoName,
       languages,
@@ -150,35 +215,36 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
       release,
       todos,
       currentState,
-      verification
-    }),
-    evidence: evidence.records
+      verification,
+      configuration
+    })),
+    evidence: evidence.records,
+    inspection: {
+      files,
+      scan: scanned.diagnostics
+    }
   };
 }
 
-function readReadme(root, files, requestedPath, evidence) {
+function readReadme(root, files, requestedPath, evidence, readOptions) {
   const readmeTarget = normalizeRequestedPath(requestedPath);
   let readmeFile = readmeTarget
     ? findByPath(files, readmeTarget)
-    : findFirst(files, [
-        "README.md",
-        "README.mdx",
-        "README.rst",
-        "README.adoc",
-        "README.txt",
-        "README"
-      ]);
-  let readmeText = readmeFile ? readText(root, readmeFile.path) : "";
+    : selectRootReadme(files);
+  let readmeResult = readmeFile
+    ? readTextResult(root, readmeFile.path, readOptions)
+    : null;
+  let readmeText = readmeResult?.ok ? readmeResult.text : "";
   if (readmeTarget && !readmeFile) {
-    const explicitText = readText(root, readmeTarget);
-    if (explicitText) {
+    readmeResult = readTextResult(root, readmeTarget, readOptions);
+    if (readmeResult.ok) {
       readmeFile = {
         path: readmeTarget,
         basename: path.posix.basename(readmeTarget),
         extension: path.posix.extname(readmeTarget).toLowerCase(),
         text: true
       };
-      readmeText = explicitText;
+      readmeText = readmeResult.text;
     }
   }
   const readmeEvidence = readmeFile
@@ -189,7 +255,15 @@ function readReadme(root, files, requestedPath, evidence) {
         firstHeadingOrLine(readmeText)
       )
     : null;
-  return { readmeTarget, readmeFile, readmeText, readmeEvidence };
+  return {
+    readmeTarget,
+    readmeFile,
+    readmeText,
+    readmeEvidence,
+    readmeFailure: readmeResult && !readmeResult.ok
+      ? readmeResult
+      : null
+  };
 }
 
 function buildState(input) {
@@ -223,6 +297,14 @@ function buildState(input) {
     todos: input.todos,
     current_state: input.currentState,
     verification: input.verification,
+    configuration: input.configuration,
+    command_execution: {
+      policy: input.configuration.command_execution,
+      approval_required: true,
+      execution_allowed:
+        input.configuration.command_execution !== "never",
+      trust: "kanon-generated"
+    },
     files: { fingerprints: input.scanned.fingerprints },
     evidence_count: input.evidence.records.length,
     schema_version: STATE_SCHEMA_VERSION

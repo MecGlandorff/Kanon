@@ -1,49 +1,296 @@
 import {
   add,
+  byPattern,
   byPath,
+  directDeclarations,
   finish,
   primaryEntrypoints,
   rootReadme
 } from "./curate-common.js";
-import { curateDjango } from "./curate-django.js";
-import { curateGo } from "./curate-go.js";
-import { curatePython } from "./curate-python.js";
-import { curateRust } from "./curate-rust.js";
-import { curateWorkspace } from "./curate-workspace.js";
+import { registeredHeuristic } from "./heuristics.js";
+
+const ROOT_CONTRACTS = [
+  ["package.json", "root-manifest", "root package manifest"],
+  ["pyproject.toml", "root-manifest", "root Python manifest"],
+  ["setup.py", "root-manifest", "root Python package manifest"],
+  ["setup.cfg", "root-manifest", "root Python package configuration"],
+  ["requirements.txt", "root-manifest", "root dependency manifest"],
+  ["Cargo.toml", "root-manifest", "root Cargo manifest"],
+  ["go.mod", "root-manifest", "root Go module manifest"],
+  ["pnpm-workspace.yaml", "workspace-contract", "root workspace manifest"],
+  ["lerna.json", "workspace-contract", "root workspace manifest"]
+];
+const WORKSPACE_TASKS = [
+  ["nx.json", "workspace-contract", "root workspace task contract"],
+  ["turbo.json", "workspace-contract", "root workspace task contract"]
+];
+const ROOT_TASKS = ["Makefile", "makefile", "GNUmakefile", "Justfile", "justfile"];
+const WORKSPACE_MARKERS = new Set([
+  "pnpm-workspace.yaml",
+  "lerna.json",
+  "nx.json",
+  "turbo.json"
+]);
 
 export function curateRankedFiles(ranked, context = {}) {
-  if (isWorkspace(ranked)) {
-    return curateWorkspace(ranked, context);
-  }
-  if (ranked.some((item) => /(^|\/)manage\.py$/.test(item.path))) {
-    return curateDjango(ranked);
-  }
-  if (byPath(ranked, "go.mod")) {
-    return curateGo(ranked);
-  }
-  if (
-    byPath(ranked, "Cargo.toml") &&
-    ranked.some((item) => item.path.endsWith(".rs"))
-  ) {
-    return curateRust(ranked);
-  }
-  if (ranked.some((item) => item.path.endsWith(".py"))) {
-    return curatePython(ranked);
-  }
-  return curateGeneral(ranked);
-}
-
-function curateGeneral(ranked) {
   const selected = [];
-  add(selected, rootReadme(ranked), "root usage contract");
-  add(selected, byPath(ranked, "package.json"), "package contract");
-  add(selected, primaryEntrypoints(ranked)[0], "primary executable");
-  add(selected, byPath(ranked, "Makefile"), "root build contract");
+  const workspace = [...ROOT_CONTRACTS, ...WORKSPACE_TASKS].some(
+    ([contract]) =>
+      WORKSPACE_MARKERS.has(contract) && byPath(ranked, contract)
+  );
+  const nonJavaScriptPrimary = [
+    "pyproject.toml",
+    "setup.py",
+    "requirements.txt",
+    "Cargo.toml",
+    "go.mod"
+  ].some((contract) => byPath(ranked, contract));
+  const rootContracts = ROOT_CONTRACTS.filter(
+    ([contract]) =>
+      !(
+        contract === "package.json" &&
+        nonJavaScriptPrimary &&
+        !workspace
+      ) &&
+      !(
+        contract === "setup.py" &&
+        byPath(ranked, "pyproject.toml")
+      ) &&
+      !(
+        contract === "setup.cfg" &&
+        (
+          byPath(ranked, "pyproject.toml") ||
+          byPath(ranked, "setup.py")
+        )
+      ) &&
+      !(
+        contract === "requirements.txt" &&
+        byPath(ranked, "pyproject.toml")
+      )
+  );
+  const manifestEntrypoints = primaryEntrypoints(ranked).filter(
+    (item) =>
+      item.signals.some((signal) =>
+        signal.reason.startsWith("declared ")
+      )
+  );
+  const declarations = directDeclarations(ranked);
+  const hasGoRoot = Boolean(byPath(ranked, "go.mod"));
+  const primaryGoSelection = hasGoRoot
+    ? preferredGoEntrypoint(ranked, context.goModule)
+    : null;
+  const primaryGoEntrypoint = primaryGoSelection?.item || null;
+
+  if (!workspace) {
+    addRegistered(
+      selected,
+      rootReadme(ranked),
+      "root-readme",
+      "root usage contract"
+    );
+  }
+  for (const [contract, heuristic, reason] of rootContracts) {
+    addRegistered(
+      selected,
+      byPath(ranked, contract),
+      heuristic,
+      reason
+    );
+  }
+
+  if (workspace && !byPath(ranked, "Cargo.toml")) {
+    addWorkspaceTasks(selected, ranked);
+  }
+  if (!workspace) {
+    for (const task of ROOT_TASKS) {
+      addRegistered(
+        selected,
+        byPath(ranked, task),
+        "root-task-contract",
+        "root task/build contract"
+      );
+    }
+  }
+
+  for (const declaration of declarations.filter((item) =>
+    item.signals.some((signal) => signal.source === "framework")
+  )) {
+    addRegistered(
+      selected,
+      declaration,
+      "framework-declaration",
+      "framework-declared repository file"
+    );
+  }
+  for (const entrypoint of manifestEntrypoints.slice(
+    0,
+    workspace ? 2 : 1
+  )) {
+    addRegistered(
+      selected,
+      entrypoint,
+      "manifest-entrypoint",
+      "manifest-declared executable"
+    );
+  }
+  if (primaryGoEntrypoint) {
+    addRegistered(
+      selected,
+      primaryGoEntrypoint,
+      primaryGoSelection.moduleNamed
+        ? "module-named-entrypoint"
+        : "executable-syntax",
+      primaryGoSelection.moduleNamed
+        ? "Go module-named executable"
+        : "primary Go executable syntax"
+    );
+  }
+
+  const testAnchor = conventionalTestAnchor(ranked);
+  if (testAnchor) {
+    addRegistered(
+      selected,
+      testAnchor,
+      "ecosystem-test-anchor",
+      "ecosystem-conventional test entry"
+    );
+  }
+  for (const declaration of declarations.filter((item) =>
+    !item.signals.some((signal) => signal.source === "framework")
+  )) {
+    const framework = declaration.signals.some(
+      (signal) => signal.source === "framework"
+    );
+    addRegistered(
+      selected,
+      declaration,
+      framework ? "framework-declaration" : "manifest-entrypoint",
+      framework
+        ? "framework-declared repository file"
+        : "manifest-declared package target"
+    );
+  }
+  if (workspace && byPath(ranked, "Cargo.toml")) {
+    addWorkspaceTasks(selected, ranked);
+  }
+  if (workspace) {
+    addRegistered(
+      selected,
+      rootReadme(ranked),
+      "root-readme",
+      "root usage contract"
+    );
+  }
+  const fanInCandidates = ranked
+    .filter((candidate) => candidate.fan_in > 0)
+    .filter(
+      (candidate) =>
+        !hasGoRoot || candidate.path.endsWith(".go")
+    );
+  if (hasGoRoot) {
+    registeredHeuristic("polyglot-root-precedence");
+  }
+  for (const item of fanInCandidates
+    .sort((a, b) =>
+      b.fan_in - a.fan_in ||
+      b.score - a.score ||
+      a.path.localeCompare(b.path)
+    )) {
+    addRegistered(
+      selected,
+      item,
+      "local-import-fan-in",
+      `imported by ${item.fan_in} local file(s)`
+    );
+  }
+  for (const item of ranked
+    .filter((candidate) => candidate.referenced_by > 0)
+    .sort((a, b) =>
+      b.referenced_by - a.referenced_by ||
+      b.score - a.score ||
+      a.path.localeCompare(b.path)
+    )) {
+    addRegistered(
+      selected,
+      item,
+      "literal-local-reference",
+      `referenced by ${item.referenced_by} local file(s)`
+    );
+  }
+  const executable = primaryEntrypoints(ranked).find(
+    (item) =>
+      item.path !== primaryGoEntrypoint?.path &&
+      !item.signals.some((signal) =>
+        signal.reason.startsWith("declared ")
+      )
+  );
+  if (executable) {
+    addRegistered(
+      selected,
+      executable,
+      "executable-syntax",
+      "language-level executable syntax"
+    );
+  }
   return finish(selected, ranked);
 }
 
-function isWorkspace(ranked) {
-  return ranked.some((item) =>
-    /^(?:pnpm-workspace\.ya?ml|nx\.json|turbo\.json)$/.test(item.path)
+function addRegistered(selected, item, heuristicId, reason) {
+  registeredHeuristic(heuristicId);
+  add(selected, item, reason, heuristicId);
+}
+
+function conventionalTestAnchor(ranked) {
+  if (byPath(ranked, "Cargo.toml")) {
+    return byPattern(
+      ranked,
+      /^tests\/(?:[^/]+\/)*(?:tests?|integration_tests|cli_tests)\.rs$/
+    ) || byPattern(ranked, /^tests\/[^/]+\.rs$/);
+  }
+  if (
+    byPath(ranked, "pyproject.toml") ||
+    byPath(ranked, "setup.py") ||
+    byPath(ranked, "requirements.txt")
+  ) {
+    return byPattern(
+      ranked,
+      /^(?:tests?|test)\/(?:[^/]+\/)*test[^/]*\.py$/
+    );
+  }
+  return null;
+}
+
+function addWorkspaceTasks(selected, ranked) {
+  for (const [contract, heuristic, reason] of WORKSPACE_TASKS) {
+    addRegistered(
+      selected,
+      byPath(ranked, contract),
+      heuristic,
+      reason
+    );
+  }
+}
+
+function preferredGoEntrypoint(ranked, modulePath) {
+  const entrypoints = primaryEntrypoints(ranked).filter((item) =>
+    item.path.endsWith(".go")
   );
+  const parts = String(modulePath || "").split("/").filter(Boolean);
+  if (/^v\d+$/.test(parts.at(-1) || "")) {
+    parts.pop();
+  }
+  const moduleName = parts.at(-1)?.toLowerCase();
+  const preferred = moduleName
+    ? entrypoints.find((item) =>
+        item.path.toLowerCase() === `cmd/${moduleName}/main.go`
+      )
+    : null;
+  if (preferred) {
+    return { item: preferred, moduleNamed: true };
+  }
+  const item =
+    entrypoints.find((candidate) => candidate.path === "main.go") ||
+    entrypoints[0] ||
+    null;
+  return item ? { item, moduleNamed: false } : null;
 }

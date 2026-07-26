@@ -1,8 +1,15 @@
+import { normalizeExcerpt } from "./scanner/shared.js";
+import {
+  REPOSITORY_UNTRUSTED,
+  safeTerminalText
+} from "./trust.js";
+
 let runSequence = 0;
 
-export function createRunId(date = new Date()) {
+export function createRunId(options = {}) {
+  const date = options.date || new Date();
   const timestamp = date.toISOString().replace(/[-:TZ.]/g, "").slice(0, 17);
-  if (arguments.length > 0) {
+  if (options.unique === false) {
     return timestamp;
   }
   runSequence = (runSequence + 1) % 1_679_616;
@@ -16,18 +23,21 @@ export class EvidenceBook {
     this.records = [];
   }
 
-  add(kind, path, claim, excerpt = "") {
+  add(kind, path, claim, excerpt = "", options = {}) {
     const id = `e_${this.runId}_${String(this.next).padStart(3, "0")}`;
     this.next += 1;
 
     const record = {
       id,
-      kind,
-      path,
-      claim
+      kind: safeTerminalText(kind),
+      path: safeTerminalText(path),
+      claim: safeTerminalText(claim),
+      trust: options.trust || REPOSITORY_UNTRUSTED
     };
 
-    const cleanExcerpt = normalizeExcerpt(excerpt);
+    const cleanExcerpt = safeTerminalText(
+      normalizeExcerpt(excerpt)
+    );
     if (cleanExcerpt) {
       record.excerpt = cleanExcerpt;
     }
@@ -35,11 +45,4 @@ export class EvidenceBook {
     this.records.push(record);
     return id;
   }
-}
-
-export function normalizeExcerpt(value, limit = 240) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, limit);
 }

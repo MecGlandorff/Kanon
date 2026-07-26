@@ -1,5 +1,6 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "evaluation_role": "development",
   "label_version": "2026-07-26",
   "policy": {
     "false_positive_cost": 5,
@@ -7,7 +8,44 @@
     "important_file_limit": 5,
     "minimum_precision": 0.8,
     "minimum_recall": 0.6,
-    "maximum_weighted_error_per_case": 4
+    "maximum_weighted_error_per_case": 4,
+    "dimension_thresholds": {
+      "important_files": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.6
+      },
+      "run_command": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.6
+      },
+      "test_command": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.6
+      }
+    },
+    "minimum_cases_per_category": 5,
+    "category_thresholds": {
+      "python-ml": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.4
+      },
+      "go-service": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.4
+      },
+      "monorepo": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.4
+      },
+      "rust-cli": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.4
+      },
+      "python-web": {
+        "minimum_precision": 0.8,
+        "minimum_recall": 0.4
+      }
+    }
   },
   "cases": [
     {
@@ -17,16 +55,81 @@
       "revision": "c911406e5ace8742e5841a7e0df113ecb5d54685",
       "labels": {
         "important_files": [
-          "README.md",
-          "setup.py",
-          "micrograd/engine.py",
-          "micrograd/nn.py",
-          "test/test_engine.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "setup.py",
+              "micrograd/engine.py",
+              "micrograd/nn.py"
+            ]
+          },
+          {
+            "path": "setup.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies setup.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "setup.py",
+              "README.md",
+              "micrograd/engine.py",
+              "micrograd/nn.py"
+            ]
+          },
+          {
+            "path": "micrograd/engine.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies micrograd/engine.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "micrograd/engine.py",
+              "README.md",
+              "setup.py",
+              "micrograd/nn.py"
+            ]
+          },
+          {
+            "path": "micrograd/nn.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies micrograd/nn.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "micrograd/nn.py",
+              "README.md",
+              "setup.py",
+              "micrograd/engine.py"
+            ]
+          },
+          {
+            "path": "test/test_engine.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies test/test_engine.py as a test anchor for this frozen development case.",
+            "sources": [
+              "test/test_engine.py",
+              "README.md",
+              "setup.py",
+              "micrograd/engine.py",
+              "micrograd/nn.py"
+            ]
+          }
         ],
         "run": null,
-        "test": { "cwd": ".", "command": "python -m pytest" }
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python -m pytest"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: python -m pytest.",
+          "sources": [
+            "README.md",
+            "setup.py",
+            "micrograd/engine.py",
+            "micrograd/nn.py"
+          ]
+        }
       },
-      "label_sources": ["README.md", "setup.py", "micrograd/engine.py", "micrograd/nn.py"]
+      "strata": []
     },
     {
       "id": "karpathy/nanogpt",
@@ -35,19 +138,81 @@
       "revision": "3adf61e154c3fe3fca428ad6bc3818b27a3b8291",
       "labels": {
         "important_files": [
-          "README.md",
-          "train.py",
-          "model.py",
-          "configurator.py",
-          "config/train_shakespeare_char.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "train.py",
+              "model.py",
+              "config/train_shakespeare_char.py"
+            ]
+          },
+          {
+            "path": "train.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies train.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "train.py",
+              "README.md",
+              "model.py",
+              "config/train_shakespeare_char.py"
+            ]
+          },
+          {
+            "path": "model.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies model.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "model.py",
+              "README.md",
+              "train.py",
+              "config/train_shakespeare_char.py"
+            ]
+          },
+          {
+            "path": "configurator.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies configurator.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "configurator.py",
+              "README.md",
+              "train.py",
+              "model.py",
+              "config/train_shakespeare_char.py"
+            ]
+          },
+          {
+            "path": "config/train_shakespeare_char.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies config/train_shakespeare_char.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "config/train_shakespeare_char.py",
+              "README.md",
+              "train.py",
+              "model.py"
+            ]
+          }
         ],
         "run": {
-          "cwd": ".",
-          "command": "python train.py config/train_shakespeare_char.py"
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python train.py config/train_shakespeare_char.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: python train.py config/train_shakespeare_char.py.",
+          "sources": [
+            "README.md",
+            "train.py",
+            "model.py",
+            "config/train_shakespeare_char.py"
+          ]
         },
         "test": null
       },
-      "label_sources": ["README.md", "train.py", "model.py", "config/train_shakespeare_char.py"]
+      "strata": []
     },
     {
       "id": "karpathy/mingpt",
@@ -56,16 +221,95 @@
       "revision": "37baab71b9abea1b76ab957409a1cc2fbfba8a26",
       "labels": {
         "important_files": [
-          "README.md",
-          "setup.py",
-          "mingpt/model.py",
-          "mingpt/trainer.py",
-          "tests/test_huggingface_import.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "setup.py",
+              "mingpt/model.py",
+              "mingpt/trainer.py"
+            ]
+          },
+          {
+            "path": "setup.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies setup.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "setup.py",
+              "README.md",
+              "mingpt/model.py",
+              "mingpt/trainer.py"
+            ]
+          },
+          {
+            "path": "mingpt/model.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies mingpt/model.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mingpt/model.py",
+              "README.md",
+              "setup.py",
+              "mingpt/trainer.py"
+            ]
+          },
+          {
+            "path": "mingpt/trainer.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies mingpt/trainer.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mingpt/trainer.py",
+              "README.md",
+              "setup.py",
+              "mingpt/model.py"
+            ]
+          },
+          {
+            "path": "tests/test_huggingface_import.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/test_huggingface_import.py as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/test_huggingface_import.py",
+              "README.md",
+              "setup.py",
+              "mingpt/model.py",
+              "mingpt/trainer.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "python projects/adder/adder.py" },
-        "test": { "cwd": ".", "command": "python -m unittest discover tests" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python projects/adder/adder.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: python projects/adder/adder.py.",
+          "sources": [
+            "README.md",
+            "setup.py",
+            "mingpt/model.py",
+            "mingpt/trainer.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python -m unittest discover tests"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: python -m unittest discover tests.",
+          "sources": [
+            "README.md",
+            "setup.py",
+            "mingpt/model.py",
+            "mingpt/trainer.py"
+          ]
+        }
       },
-      "label_sources": ["README.md", "setup.py", "mingpt/model.py", "mingpt/trainer.py"]
+      "strata": []
     },
     {
       "id": "pytorch/examples",
@@ -74,16 +318,90 @@
       "revision": "acc295dc7b90714f1bf47f06004fc19a7fe235c4",
       "labels": {
         "important_files": [
-          "README.md",
-          "run_python_examples.sh",
-          "mnist/main.py",
-          "dcgan/main.py",
-          "distributed/FSDP2/example.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "run_python_examples.sh",
+              "mnist/README.md"
+            ]
+          },
+          {
+            "path": "run_python_examples.sh",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies run_python_examples.sh as a implementation anchor for this frozen development case.",
+            "sources": [
+              "run_python_examples.sh",
+              "README.md",
+              "mnist/README.md"
+            ]
+          },
+          {
+            "path": "mnist/main.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies mnist/main.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mnist/main.py",
+              "README.md",
+              "run_python_examples.sh",
+              "mnist/README.md"
+            ]
+          },
+          {
+            "path": "dcgan/main.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies dcgan/main.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "dcgan/main.py",
+              "README.md",
+              "run_python_examples.sh",
+              "mnist/README.md"
+            ]
+          },
+          {
+            "path": "distributed/FSDP2/example.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies distributed/FSDP2/example.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "distributed/FSDP2/example.py",
+              "README.md",
+              "run_python_examples.sh",
+              "mnist/README.md"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "python mnist/main.py" },
-        "test": { "cwd": ".", "command": "bash run_python_examples.sh" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python mnist/main.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: python mnist/main.py.",
+          "sources": [
+            "README.md",
+            "run_python_examples.sh",
+            "mnist/README.md"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "bash run_python_examples.sh"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: bash run_python_examples.sh.",
+          "sources": [
+            "README.md",
+            "run_python_examples.sh",
+            "mnist/README.md"
+          ]
+        }
       },
-      "label_sources": ["README.md", "run_python_examples.sh", "mnist/README.md"]
+      "strata": []
     },
     {
       "id": "tinygrad/tinygrad",
@@ -92,16 +410,95 @@
       "revision": "5d1aa8490144ae8fe3bdb52fec4827c933c578b5",
       "labels": {
         "important_files": [
-          "README.md",
-          "pyproject.toml",
-          "tinygrad/tensor.py",
-          "tinygrad/uop/ops.py",
-          "test/test_tiny.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "pyproject.toml",
+              "tinygrad/tensor.py",
+              "tinygrad/uop/ops.py"
+            ]
+          },
+          {
+            "path": "pyproject.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pyproject.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "pyproject.toml",
+              "README.md",
+              "tinygrad/tensor.py",
+              "tinygrad/uop/ops.py"
+            ]
+          },
+          {
+            "path": "tinygrad/tensor.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tinygrad/tensor.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "tinygrad/tensor.py",
+              "README.md",
+              "pyproject.toml",
+              "tinygrad/uop/ops.py"
+            ]
+          },
+          {
+            "path": "tinygrad/uop/ops.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tinygrad/uop/ops.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "tinygrad/uop/ops.py",
+              "README.md",
+              "pyproject.toml",
+              "tinygrad/tensor.py"
+            ]
+          },
+          {
+            "path": "test/test_tiny.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies test/test_tiny.py as a test anchor for this frozen development case.",
+            "sources": [
+              "test/test_tiny.py",
+              "README.md",
+              "pyproject.toml",
+              "tinygrad/tensor.py",
+              "tinygrad/uop/ops.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "python3 examples/beautiful_mnist.py" },
-        "test": { "cwd": ".", "command": "python3 -m pytest test/" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python3 examples/beautiful_mnist.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: python3 examples/beautiful_mnist.py.",
+          "sources": [
+            "README.md",
+            "pyproject.toml",
+            "tinygrad/tensor.py",
+            "tinygrad/uop/ops.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python3 -m pytest test/"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: python3 -m pytest test/.",
+          "sources": [
+            "README.md",
+            "pyproject.toml",
+            "tinygrad/tensor.py",
+            "tinygrad/uop/ops.py"
+          ]
+        }
       },
-      "label_sources": ["README.md", "pyproject.toml", "tinygrad/tensor.py", "tinygrad/uop/ops.py"]
+      "strata": []
     },
     {
       "id": "ml-explore/mlx-examples",
@@ -110,16 +507,82 @@
       "revision": "796f5b53cab69a3d48a44233ce21aae889e94a08",
       "labels": {
         "important_files": [
-          "README.md",
-          "mnist/README.md",
-          "mnist/main.py",
-          "mnist/mnist.py",
-          "lora/lora.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "mnist/README.md",
+              "mnist/main.py",
+              "lora/README.md"
+            ]
+          },
+          {
+            "path": "mnist/README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies mnist/README.md as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mnist/README.md",
+              "README.md",
+              "mnist/main.py",
+              "lora/README.md"
+            ]
+          },
+          {
+            "path": "mnist/main.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies mnist/main.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mnist/main.py",
+              "README.md",
+              "mnist/README.md",
+              "lora/README.md"
+            ]
+          },
+          {
+            "path": "mnist/mnist.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies mnist/mnist.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "mnist/mnist.py",
+              "README.md",
+              "mnist/README.md",
+              "mnist/main.py",
+              "lora/README.md"
+            ]
+          },
+          {
+            "path": "lora/lora.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies lora/lora.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "lora/lora.py",
+              "README.md",
+              "mnist/README.md",
+              "mnist/main.py",
+              "lora/README.md"
+            ]
+          }
         ],
-        "run": { "cwd": "mnist", "command": "python main.py" },
+        "run": {
+          "accepted": [
+            {
+              "cwd": "mnist",
+              "command": "python main.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: mnist: python main.py.",
+          "sources": [
+            "README.md",
+            "mnist/README.md",
+            "mnist/main.py",
+            "lora/README.md"
+          ]
+        },
         "test": null
       },
-      "label_sources": ["README.md", "mnist/README.md", "mnist/main.py", "lora/README.md"]
+      "strata": []
     },
     {
       "id": "pocketbase/pocketbase",
@@ -128,16 +591,97 @@
       "revision": "0cbfc046c7548421268582db4bfb9a03a158361a",
       "labels": {
         "important_files": [
-          "go.mod",
-          "examples/base/main.go",
-          "pocketbase.go",
-          "core/app.go",
-          "cmd/serve.go"
+          {
+            "path": "go.mod",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies go.mod as a repository contract for this frozen development case.",
+            "sources": [
+              "go.mod",
+              "README.md",
+              "CONTRIBUTING.md",
+              "examples/base/main.go"
+            ]
+          },
+          {
+            "path": "examples/base/main.go",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies examples/base/main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "examples/base/main.go",
+              "README.md",
+              "CONTRIBUTING.md",
+              "go.mod"
+            ]
+          },
+          {
+            "path": "pocketbase.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies pocketbase.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pocketbase.go",
+              "README.md",
+              "CONTRIBUTING.md",
+              "examples/base/main.go",
+              "go.mod"
+            ]
+          },
+          {
+            "path": "core/app.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies core/app.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "core/app.go",
+              "README.md",
+              "CONTRIBUTING.md",
+              "examples/base/main.go",
+              "go.mod"
+            ]
+          },
+          {
+            "path": "cmd/serve.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/serve.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/serve.go",
+              "README.md",
+              "CONTRIBUTING.md",
+              "examples/base/main.go",
+              "go.mod"
+            ]
+          }
         ],
-        "run": { "cwd": "examples/base", "command": "go run main.go serve" },
-        "test": { "cwd": ".", "command": "make test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": "examples/base",
+              "command": "go run main.go serve"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: examples/base: go run main.go serve.",
+          "sources": [
+            "README.md",
+            "CONTRIBUTING.md",
+            "examples/base/main.go",
+            "go.mod"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "make test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: make test.",
+          "sources": [
+            "README.md",
+            "CONTRIBUTING.md",
+            "examples/base/main.go",
+            "go.mod"
+          ]
+        }
       },
-      "label_sources": ["README.md", "CONTRIBUTING.md", "examples/base/main.go", "go.mod"]
+      "strata": []
     },
     {
       "id": "caddyserver/caddy",
@@ -146,19 +690,95 @@
       "revision": "c96bca12693419ac5be751a0cbbae2c3cbf89c58",
       "labels": {
         "important_files": [
-          "README.md",
-          "go.mod",
-          "cmd/caddy/main.go",
-          "cmd/commands.go",
-          "modules/caddyhttp/caddyhttp.go"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "go.mod",
+              "cmd/caddy/main.go",
+              "cmd/commands.go"
+            ]
+          },
+          {
+            "path": "go.mod",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies go.mod as a repository contract for this frozen development case.",
+            "sources": [
+              "go.mod",
+              "README.md",
+              "cmd/caddy/main.go",
+              "cmd/commands.go"
+            ]
+          },
+          {
+            "path": "cmd/caddy/main.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/caddy/main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/caddy/main.go",
+              "README.md",
+              "go.mod",
+              "cmd/commands.go"
+            ]
+          },
+          {
+            "path": "cmd/commands.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/commands.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/commands.go",
+              "README.md",
+              "go.mod",
+              "cmd/caddy/main.go"
+            ]
+          },
+          {
+            "path": "modules/caddyhttp/caddyhttp.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies modules/caddyhttp/caddyhttp.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "modules/caddyhttp/caddyhttp.go",
+              "README.md",
+              "go.mod",
+              "cmd/caddy/main.go",
+              "cmd/commands.go"
+            ]
+          }
         ],
         "run": {
-          "cwd": "cmd/caddy",
-          "command": "go run -exec ./setcap.sh main.go"
+          "accepted": [
+            {
+              "cwd": "cmd/caddy",
+              "command": "go run -exec ./setcap.sh main.go"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cmd/caddy: go run -exec ./setcap.sh main.go.",
+          "sources": [
+            "README.md",
+            "go.mod",
+            "cmd/caddy/main.go",
+            "cmd/commands.go"
+          ]
         },
-        "test": { "cwd": ".", "command": "go test ./..." }
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "go test ./..."
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: go test ./....",
+          "sources": [
+            "README.md",
+            "go.mod",
+            "cmd/caddy/main.go",
+            "cmd/commands.go"
+          ]
+        }
       },
-      "label_sources": ["README.md", "go.mod", "cmd/caddy/main.go", "cmd/commands.go"]
+      "strata": []
     },
     {
       "id": "charmbracelet/soft-serve",
@@ -167,16 +787,95 @@
       "revision": "16c8e08b7f1bb83ac267be438251fe523aa37dc6",
       "labels": {
         "important_files": [
-          "README.md",
-          "go.mod",
-          "cmd/soft/main.go",
-          "cmd/soft/serve/server.go",
-          "pkg/backend/backend.go"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "go.mod",
+              "cmd/soft/main.go",
+              "cmd/soft/serve/server.go"
+            ]
+          },
+          {
+            "path": "go.mod",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies go.mod as a repository contract for this frozen development case.",
+            "sources": [
+              "go.mod",
+              "README.md",
+              "cmd/soft/main.go",
+              "cmd/soft/serve/server.go"
+            ]
+          },
+          {
+            "path": "cmd/soft/main.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/soft/main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/soft/main.go",
+              "README.md",
+              "go.mod",
+              "cmd/soft/serve/server.go"
+            ]
+          },
+          {
+            "path": "cmd/soft/serve/server.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/soft/serve/server.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/soft/serve/server.go",
+              "README.md",
+              "go.mod",
+              "cmd/soft/main.go"
+            ]
+          },
+          {
+            "path": "pkg/backend/backend.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies pkg/backend/backend.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pkg/backend/backend.go",
+              "README.md",
+              "go.mod",
+              "cmd/soft/main.go",
+              "cmd/soft/serve/server.go"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "go run ./cmd/soft serve" },
-        "test": { "cwd": ".", "command": "go test ./..." }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "go run ./cmd/soft serve"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: go run ./cmd/soft serve.",
+          "sources": [
+            "README.md",
+            "go.mod",
+            "cmd/soft/main.go",
+            "cmd/soft/serve/server.go"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "go test ./..."
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: go test ./....",
+          "sources": [
+            "README.md",
+            "go.mod",
+            "cmd/soft/main.go",
+            "cmd/soft/serve/server.go"
+          ]
+        }
       },
-      "label_sources": ["README.md", "go.mod", "cmd/soft/main.go", "cmd/soft/serve/server.go"]
+      "strata": []
     },
     {
       "id": "adguardteam/adguardhome",
@@ -185,16 +884,95 @@
       "revision": "5c44c4b260a179a85ee4b0242b3eb1014a21e731",
       "labels": {
         "important_files": [
-          "README.md",
-          "Makefile",
-          "main.go",
-          "internal/home/home.go",
-          "client/package.json"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Makefile",
+              "main.go",
+              "internal/home/home.go"
+            ]
+          },
+          {
+            "path": "Makefile",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Makefile as a repository contract for this frozen development case.",
+            "sources": [
+              "Makefile",
+              "README.md",
+              "main.go",
+              "internal/home/home.go"
+            ]
+          },
+          {
+            "path": "main.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "main.go",
+              "README.md",
+              "Makefile",
+              "internal/home/home.go"
+            ]
+          },
+          {
+            "path": "internal/home/home.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies internal/home/home.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "internal/home/home.go",
+              "README.md",
+              "Makefile",
+              "main.go"
+            ]
+          },
+          {
+            "path": "client/package.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies client/package.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "client/package.json",
+              "README.md",
+              "Makefile",
+              "main.go",
+              "internal/home/home.go"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "make && ./AdGuardHome" },
-        "test": { "cwd": ".", "command": "make test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "make && ./AdGuardHome"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: make && ./AdGuardHome.",
+          "sources": [
+            "README.md",
+            "Makefile",
+            "main.go",
+            "internal/home/home.go"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "make test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: make test.",
+          "sources": [
+            "README.md",
+            "Makefile",
+            "main.go",
+            "internal/home/home.go"
+          ]
+        }
       },
-      "label_sources": ["README.md", "Makefile", "main.go", "internal/home/home.go"]
+      "strata": []
     },
     {
       "id": "usememos/memos",
@@ -203,19 +981,97 @@
       "revision": "390126f1cd5f6aca55a17faf031655da4354b60b",
       "labels": {
         "important_files": [
-          "README.md",
-          "go.mod",
-          "cmd/memos/main.go",
-          "server/server.go",
-          "web/package.json"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "scripts/build.sh",
+              "cmd/memos/main.go",
+              ".github/workflows/backend-tests.yml"
+            ]
+          },
+          {
+            "path": "go.mod",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies go.mod as a repository contract for this frozen development case.",
+            "sources": [
+              "go.mod",
+              "README.md",
+              "scripts/build.sh",
+              "cmd/memos/main.go",
+              ".github/workflows/backend-tests.yml"
+            ]
+          },
+          {
+            "path": "cmd/memos/main.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/memos/main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/memos/main.go",
+              "README.md",
+              "scripts/build.sh",
+              ".github/workflows/backend-tests.yml"
+            ]
+          },
+          {
+            "path": "server/server.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies server/server.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "server/server.go",
+              "README.md",
+              "scripts/build.sh",
+              "cmd/memos/main.go",
+              ".github/workflows/backend-tests.yml"
+            ]
+          },
+          {
+            "path": "web/package.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies web/package.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "web/package.json",
+              "README.md",
+              "scripts/build.sh",
+              "cmd/memos/main.go",
+              ".github/workflows/backend-tests.yml"
+            ]
+          }
         ],
         "run": {
-          "cwd": ".",
-          "command": "docker run -d --name memos -p 5230:5230 -v ~/.memos:/var/opt/memos neosmemo/memos:stable"
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "docker run -d --name memos -p 5230:5230 -v ~/.memos:/var/opt/memos neosmemo/memos:stable"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: docker run -d --name memos -p 5230:5230 -v ~/.memos:/var/opt/memos neosmemo/memos:stable.",
+          "sources": [
+            "README.md",
+            "scripts/build.sh",
+            "cmd/memos/main.go",
+            ".github/workflows/backend-tests.yml"
+          ]
         },
-        "test": { "cwd": ".", "command": "go test ./..." }
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "go test ./..."
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: go test ./....",
+          "sources": [
+            "README.md",
+            "scripts/build.sh",
+            "cmd/memos/main.go",
+            ".github/workflows/backend-tests.yml"
+          ]
+        }
       },
-      "label_sources": ["README.md", "scripts/build.sh", "cmd/memos/main.go", ".github/workflows/backend-tests.yml"]
+      "strata": []
     },
     {
       "id": "authelia/authelia",
@@ -224,16 +1080,98 @@
       "revision": "b29895c4c295b628507d4cccb62b28fdedda0420",
       "labels": {
         "important_files": [
-          "README.md",
-          "go.mod",
-          "cmd/authelia/main.go",
-          "internal/commands/root.go",
-          "web/package.json"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "CONTRIBUTING.md",
+              "bootstrap.sh",
+              "cmd/authelia-scripts/cmd/const.go",
+              "cmd/authelia/main.go"
+            ]
+          },
+          {
+            "path": "go.mod",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies go.mod as a repository contract for this frozen development case.",
+            "sources": [
+              "go.mod",
+              "CONTRIBUTING.md",
+              "bootstrap.sh",
+              "cmd/authelia-scripts/cmd/const.go",
+              "cmd/authelia/main.go"
+            ]
+          },
+          {
+            "path": "cmd/authelia/main.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies cmd/authelia/main.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "cmd/authelia/main.go",
+              "CONTRIBUTING.md",
+              "bootstrap.sh",
+              "cmd/authelia-scripts/cmd/const.go"
+            ]
+          },
+          {
+            "path": "internal/commands/root.go",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies internal/commands/root.go as a implementation anchor for this frozen development case.",
+            "sources": [
+              "internal/commands/root.go",
+              "CONTRIBUTING.md",
+              "bootstrap.sh",
+              "cmd/authelia-scripts/cmd/const.go",
+              "cmd/authelia/main.go"
+            ]
+          },
+          {
+            "path": "web/package.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies web/package.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "web/package.json",
+              "CONTRIBUTING.md",
+              "bootstrap.sh",
+              "cmd/authelia-scripts/cmd/const.go",
+              "cmd/authelia/main.go"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "authelia-scripts serve test.yml" },
-        "test": { "cwd": ".", "command": "authelia-scripts unittest" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "authelia-scripts serve test.yml"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: authelia-scripts serve test.yml.",
+          "sources": [
+            "CONTRIBUTING.md",
+            "bootstrap.sh",
+            "cmd/authelia-scripts/cmd/const.go",
+            "cmd/authelia/main.go"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "authelia-scripts unittest"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: authelia-scripts unittest.",
+          "sources": [
+            "CONTRIBUTING.md",
+            "bootstrap.sh",
+            "cmd/authelia-scripts/cmd/const.go",
+            "cmd/authelia/main.go"
+          ]
+        }
       },
-      "label_sources": ["CONTRIBUTING.md", "bootstrap.sh", "cmd/authelia-scripts/cmd/const.go", "cmd/authelia/main.go"]
+      "strata": []
     },
     {
       "id": "changesets/changesets",
@@ -242,16 +1180,96 @@
       "revision": "7fd0d9193a7b8bbbb01955adefc68b38d3070616",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "packages/cli/bin.js",
-          "packages/cli/src/index.ts",
-          "packages/config/src/config.ts"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/cli/package.json",
+              "packages/cli/bin.js"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "packages/cli/package.json",
+              "packages/cli/bin.js"
+            ]
+          },
+          {
+            "path": "packages/cli/bin.js",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/cli/bin.js as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/cli/bin.js",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/cli/package.json"
+            ]
+          },
+          {
+            "path": "packages/cli/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/cli/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/cli/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/cli/package.json",
+              "packages/cli/bin.js"
+            ]
+          },
+          {
+            "path": "packages/config/src/config.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/config/src/config.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/config/src/config.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/cli/package.json",
+              "packages/cli/bin.js"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "pnpm watch" },
-        "test": { "cwd": ".", "command": "pnpm test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm watch"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: pnpm watch.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/cli/package.json",
+            "packages/cli/bin.js"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/cli/package.json",
+            "packages/cli/bin.js"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/cli/package.json", "packages/cli/bin.js"]
+      "strata": []
     },
     {
       "id": "vercel/turborepo",
@@ -260,16 +1278,96 @@
       "revision": "2f8a96293bdbd067fc9b1c5bc3d1b7f719f48cb9",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "Cargo.toml",
-          "crates/turborepo/src/main.rs",
-          "crates/turborepo-lib/src/lib.rs"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "Cargo.toml",
+              "crates/turborepo/Cargo.toml"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "Cargo.toml",
+              "crates/turborepo/Cargo.toml"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "crates/turborepo/Cargo.toml"
+            ]
+          },
+          {
+            "path": "crates/turborepo/src/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies crates/turborepo/src/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "crates/turborepo/src/main.rs",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "Cargo.toml",
+              "crates/turborepo/Cargo.toml"
+            ]
+          },
+          {
+            "path": "crates/turborepo-lib/src/lib.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies crates/turborepo-lib/src/lib.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "crates/turborepo-lib/src/lib.rs",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "Cargo.toml",
+              "crates/turborepo/Cargo.toml"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "pnpm turbo" },
-        "test": { "cwd": ".", "command": "pnpm test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm turbo"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: pnpm turbo.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "Cargo.toml",
+            "crates/turborepo/Cargo.toml"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "Cargo.toml",
+            "crates/turborepo/Cargo.toml"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "Cargo.toml", "crates/turborepo/Cargo.toml"]
+      "strata": []
     },
     {
       "id": "sveltejs/kit",
@@ -278,16 +1376,81 @@
       "revision": "47643bb6750155a221e517a8894c1f45b007eee9",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "packages/kit/package.json",
-          "packages/kit/src/exports/index.js",
-          "packages/kit/src/runtime/server/index.js"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/kit/package.json",
+              "packages/kit/src/exports/index.js"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "packages/kit/package.json",
+              "packages/kit/src/exports/index.js"
+            ]
+          },
+          {
+            "path": "packages/kit/package.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/kit/package.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/kit/package.json",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/kit/src/exports/index.js"
+            ]
+          },
+          {
+            "path": "packages/kit/src/exports/index.js",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/kit/src/exports/index.js as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/kit/src/exports/index.js",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/kit/package.json"
+            ]
+          },
+          {
+            "path": "packages/kit/src/runtime/server/index.js",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/kit/src/runtime/server/index.js as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/kit/src/runtime/server/index.js",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/kit/package.json",
+              "packages/kit/src/exports/index.js"
+            ]
+          }
         ],
         "run": null,
-        "test": { "cwd": ".", "command": "pnpm test:kit" }
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test:kit"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test:kit.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/kit/package.json",
+            "packages/kit/src/exports/index.js"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/kit/package.json", "packages/kit/src/exports/index.js"]
+      "strata": []
     },
     {
       "id": "vuejs/core",
@@ -296,16 +1459,97 @@
       "revision": "b5f8518379b77c3b62a7a9d2b52f6c76cda09bd5",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "packages/vue/src/index.ts",
-          "packages/runtime-core/src/index.ts",
-          "packages/reactivity/src/index.ts"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/vue/package.json",
+              "packages/runtime-core/package.json"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "packages/vue/package.json",
+              "packages/runtime-core/package.json"
+            ]
+          },
+          {
+            "path": "packages/vue/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/vue/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/vue/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/vue/package.json",
+              "packages/runtime-core/package.json"
+            ]
+          },
+          {
+            "path": "packages/runtime-core/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/runtime-core/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/runtime-core/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/vue/package.json",
+              "packages/runtime-core/package.json"
+            ]
+          },
+          {
+            "path": "packages/reactivity/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/reactivity/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/reactivity/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/vue/package.json",
+              "packages/runtime-core/package.json"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "pnpm dev" },
-        "test": { "cwd": ".", "command": "pnpm test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm dev"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: pnpm dev.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/vue/package.json",
+            "packages/runtime-core/package.json"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "packages/vue/package.json",
+            "packages/runtime-core/package.json"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/vue/package.json", "packages/runtime-core/package.json"]
+      "strata": []
     },
     {
       "id": "tanstack/query",
@@ -314,16 +1558,96 @@
       "revision": "fd50fa14d283c7d6664a796f758498d1ad5bfce7",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "nx.json",
-          "packages/query-core/src/index.ts",
-          "packages/react-query/src/index.ts"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "nx.json",
+              "packages/query-core/package.json"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "nx.json",
+              "packages/query-core/package.json"
+            ]
+          },
+          {
+            "path": "nx.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies nx.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "nx.json",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/query-core/package.json"
+            ]
+          },
+          {
+            "path": "packages/query-core/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/query-core/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/query-core/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "nx.json",
+              "packages/query-core/package.json"
+            ]
+          },
+          {
+            "path": "packages/react-query/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/react-query/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/react-query/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "nx.json",
+              "packages/query-core/package.json"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "pnpm dev" },
-        "test": { "cwd": ".", "command": "pnpm test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm dev"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: pnpm dev.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "nx.json",
+            "packages/query-core/package.json"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "nx.json",
+            "packages/query-core/package.json"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "nx.json", "packages/query-core/package.json"]
+      "strata": []
     },
     {
       "id": "pmndrs/react-spring",
@@ -332,16 +1656,96 @@
       "revision": "d0a68478583903ae072f9353b9b6a5a53683acef",
       "labels": {
         "important_files": [
-          "package.json",
-          "pnpm-workspace.yaml",
-          "turbo.json",
-          "packages/core/src/index.ts",
-          "packages/shared/src/index.ts"
+          {
+            "path": "package.json",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies package.json as a repository contract for this frozen development case.",
+            "sources": [
+              "package.json",
+              "pnpm-workspace.yaml",
+              "turbo.json",
+              "packages/core/package.json"
+            ]
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pnpm-workspace.yaml as a implementation anchor for this frozen development case.",
+            "sources": [
+              "pnpm-workspace.yaml",
+              "package.json",
+              "turbo.json",
+              "packages/core/package.json"
+            ]
+          },
+          {
+            "path": "turbo.json",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies turbo.json as a implementation anchor for this frozen development case.",
+            "sources": [
+              "turbo.json",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "packages/core/package.json"
+            ]
+          },
+          {
+            "path": "packages/core/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/core/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/core/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "turbo.json",
+              "packages/core/package.json"
+            ]
+          },
+          {
+            "path": "packages/shared/src/index.ts",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies packages/shared/src/index.ts as a implementation anchor for this frozen development case.",
+            "sources": [
+              "packages/shared/src/index.ts",
+              "package.json",
+              "pnpm-workspace.yaml",
+              "turbo.json",
+              "packages/core/package.json"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "pnpm dev" },
-        "test": { "cwd": ".", "command": "pnpm test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm dev"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: pnpm dev.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "turbo.json",
+            "packages/core/package.json"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "pnpm test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: pnpm test.",
+          "sources": [
+            "package.json",
+            "pnpm-workspace.yaml",
+            "turbo.json",
+            "packages/core/package.json"
+          ]
+        }
       },
-      "label_sources": ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/core/package.json"]
+      "strata": []
     },
     {
       "id": "burntsushi/ripgrep",
@@ -350,16 +1754,97 @@
       "revision": "f9c05a949d1a0dc8e16dee28ca9605d38611faeb",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "crates/core/main.rs",
-          "crates/core/search.rs",
-          "tests/tests.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "crates/core/main.rs",
+              "CONTRIBUTING.md",
+              "ci/test-complete"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "crates/core/main.rs",
+              "CONTRIBUTING.md",
+              "ci/test-complete"
+            ]
+          },
+          {
+            "path": "crates/core/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies crates/core/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "crates/core/main.rs",
+              "Cargo.toml",
+              "CONTRIBUTING.md",
+              "ci/test-complete"
+            ]
+          },
+          {
+            "path": "crates/core/search.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies crates/core/search.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "crates/core/search.rs",
+              "Cargo.toml",
+              "crates/core/main.rs",
+              "CONTRIBUTING.md",
+              "ci/test-complete"
+            ]
+          },
+          {
+            "path": "tests/tests.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/tests.rs as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/tests.rs",
+              "Cargo.toml",
+              "crates/core/main.rs",
+              "CONTRIBUTING.md",
+              "ci/test-complete"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "cargo test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "Cargo.toml",
+            "crates/core/main.rs",
+            "CONTRIBUTING.md",
+            "ci/test-complete"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: cargo test.",
+          "sources": [
+            "Cargo.toml",
+            "crates/core/main.rs",
+            "CONTRIBUTING.md",
+            "ci/test-complete"
+          ]
+        }
       },
-      "label_sources": ["Cargo.toml", "crates/core/main.rs", "CONTRIBUTING.md", "ci/test-complete"]
+      "strata": []
     },
     {
       "id": "sharkdp/fd",
@@ -368,16 +1853,96 @@
       "revision": "ca51233d277e5c0601ddb216948bcbcf0a56c80e",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "src/main.rs",
-          "src/walk.rs",
-          "tests/tests.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "README.md",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "src/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/main.rs",
+              "README.md",
+              "Cargo.toml",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "src/walk.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/walk.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/walk.rs",
+              "README.md",
+              "Cargo.toml",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "tests/tests.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/tests.rs as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/tests.rs",
+              "README.md",
+              "Cargo.toml",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "cargo test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "src/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: cargo test.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "src/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        }
       },
-      "label_sources": ["README.md", "Cargo.toml", "src/main.rs", "CONTRIBUTING.md"]
+      "strata": []
     },
     {
       "id": "sharkdp/bat",
@@ -386,16 +1951,96 @@
       "revision": "78951393e29bfd2f2a45f4326b9d2bb5e737dd2a",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "src/bin/bat/main.rs",
-          "src/controller.rs",
-          "tests/integration_tests.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "src/bin/bat/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "README.md",
+              "src/bin/bat/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "src/bin/bat/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/bin/bat/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/bin/bat/main.rs",
+              "README.md",
+              "Cargo.toml",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "src/controller.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/controller.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/controller.rs",
+              "README.md",
+              "Cargo.toml",
+              "src/bin/bat/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "tests/integration_tests.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/integration_tests.rs as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/integration_tests.rs",
+              "README.md",
+              "Cargo.toml",
+              "src/bin/bat/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "cargo test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "src/bin/bat/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: cargo test.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "src/bin/bat/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        }
       },
-      "label_sources": ["README.md", "Cargo.toml", "src/bin/bat/main.rs", "CONTRIBUTING.md"]
+      "strata": []
     },
     {
       "id": "casey/just",
@@ -404,16 +2049,96 @@
       "revision": "13bf03f642f4cec7799c19f1f8f039e1cb3b095d",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "justfile",
-          "src/main.rs",
-          "tests/lib.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "justfile",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies justfile as a repository contract for this frozen development case.",
+            "sources": [
+              "justfile",
+              "Cargo.toml",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "src/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/main.rs",
+              "Cargo.toml",
+              "justfile",
+              "CONTRIBUTING.md"
+            ]
+          },
+          {
+            "path": "tests/lib.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/lib.rs as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/lib.rs",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "CONTRIBUTING.md"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "just test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "just test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: just test.",
+          "sources": [
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs",
+            "CONTRIBUTING.md"
+          ]
+        }
       },
-      "label_sources": ["Cargo.toml", "justfile", "src/main.rs", "CONTRIBUTING.md"]
+      "strata": []
     },
     {
       "id": "eza-community/eza",
@@ -422,16 +2147,96 @@
       "revision": "471bfbc7b03cbac8c738e8d9050edb06ee79132a",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "justfile",
-          "src/main.rs",
-          "tests/cli_tests.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "TESTING.md"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "TESTING.md"
+            ]
+          },
+          {
+            "path": "justfile",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies justfile as a repository contract for this frozen development case.",
+            "sources": [
+              "justfile",
+              "Cargo.toml",
+              "src/main.rs",
+              "TESTING.md"
+            ]
+          },
+          {
+            "path": "src/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/main.rs",
+              "Cargo.toml",
+              "justfile",
+              "TESTING.md"
+            ]
+          },
+          {
+            "path": "tests/cli_tests.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies tests/cli_tests.rs as a test anchor for this frozen development case.",
+            "sources": [
+              "tests/cli_tests.rs",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs",
+              "TESTING.md"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "cargo test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs",
+            "TESTING.md"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: cargo test.",
+          "sources": [
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs",
+            "TESTING.md"
+          ]
+        }
       },
-      "label_sources": ["Cargo.toml", "justfile", "src/main.rs", "TESTING.md"]
+      "strata": []
     },
     {
       "id": "ajeetdsouza/zoxide",
@@ -440,128 +2245,664 @@
       "revision": "cf086b057dfcc7c306450c70829b2788a3e64219",
       "labels": {
         "important_files": [
-          "README.md",
-          "Cargo.toml",
-          "justfile",
-          "src/main.rs",
-          "src/db/mod.rs"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs"
+            ]
+          },
+          {
+            "path": "Cargo.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Cargo.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "Cargo.toml",
+              "README.md",
+              "justfile",
+              "src/main.rs"
+            ]
+          },
+          {
+            "path": "justfile",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies justfile as a repository contract for this frozen development case.",
+            "sources": [
+              "justfile",
+              "README.md",
+              "Cargo.toml",
+              "src/main.rs"
+            ]
+          },
+          {
+            "path": "src/main.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/main.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/main.rs",
+              "README.md",
+              "Cargo.toml",
+              "justfile"
+            ]
+          },
+          {
+            "path": "src/db/mod.rs",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/db/mod.rs as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/db/mod.rs",
+              "README.md",
+              "Cargo.toml",
+              "justfile",
+              "src/main.rs"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "cargo run -- --help" },
-        "test": { "cwd": ".", "command": "cargo test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo run -- --help"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: cargo run -- --help.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "cargo test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: cargo test.",
+          "sources": [
+            "README.md",
+            "Cargo.toml",
+            "justfile",
+            "src/main.rs"
+          ]
+        }
       },
-      "label_sources": ["README.md", "Cargo.toml", "justfile", "src/main.rs"]
+      "strata": []
     },
     {
       "id": "healthchecks/healthchecks",
-      "category": "django-app",
+      "category": "python-web",
       "repository": "https://github.com/healthchecks/healthchecks.git",
       "revision": "2f79af0c232ae99aa66edabd7d42be7d52add601",
       "labels": {
         "important_files": [
-          "README.md",
-          "manage.py",
-          "requirements.txt",
-          "hc/settings.py",
-          "hc/urls.py"
+          {
+            "path": "README.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.md as a repository contract for this frozen development case.",
+            "sources": [
+              "README.md",
+              "manage.py",
+              "hc/settings.py",
+              "hc/urls.py"
+            ]
+          },
+          {
+            "path": "manage.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies manage.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "manage.py",
+              "README.md",
+              "hc/settings.py",
+              "hc/urls.py"
+            ]
+          },
+          {
+            "path": "requirements.txt",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies requirements.txt as a implementation anchor for this frozen development case.",
+            "sources": [
+              "requirements.txt",
+              "README.md",
+              "manage.py",
+              "hc/settings.py",
+              "hc/urls.py"
+            ]
+          },
+          {
+            "path": "hc/settings.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies hc/settings.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "hc/settings.py",
+              "README.md",
+              "manage.py",
+              "hc/urls.py"
+            ]
+          },
+          {
+            "path": "hc/urls.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies hc/urls.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "hc/urls.py",
+              "README.md",
+              "manage.py",
+              "hc/settings.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "./manage.py runserver" },
-        "test": { "cwd": ".", "command": "./manage.py test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "./manage.py runserver"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: ./manage.py runserver.",
+          "sources": [
+            "README.md",
+            "manage.py",
+            "hc/settings.py",
+            "hc/urls.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "./manage.py test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: ./manage.py test.",
+          "sources": [
+            "README.md",
+            "manage.py",
+            "hc/settings.py",
+            "hc/urls.py"
+          ]
+        }
       },
-      "label_sources": ["README.md", "manage.py", "hc/settings.py", "hc/urls.py"]
+      "strata": []
     },
     {
       "id": "django/djangoproject.com",
-      "category": "django-app",
+      "category": "python-web",
       "repository": "https://github.com/django/djangoproject.com.git",
       "revision": "e98f6b5b78ef6d9887277f776845bb939ec8cad8",
       "labels": {
         "important_files": [
-          "README.rst",
-          "Makefile",
-          "manage.py",
-          "djangoproject/settings/common.py",
-          "djangoproject/hosts.py"
+          {
+            "path": "README.rst",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.rst as a repository contract for this frozen development case.",
+            "sources": [
+              "README.rst",
+              "Makefile",
+              "manage.py",
+              "djangoproject/settings/common.py"
+            ]
+          },
+          {
+            "path": "Makefile",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Makefile as a repository contract for this frozen development case.",
+            "sources": [
+              "Makefile",
+              "README.rst",
+              "manage.py",
+              "djangoproject/settings/common.py"
+            ]
+          },
+          {
+            "path": "manage.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies manage.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "manage.py",
+              "README.rst",
+              "Makefile",
+              "djangoproject/settings/common.py"
+            ]
+          },
+          {
+            "path": "djangoproject/settings/common.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies djangoproject/settings/common.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "djangoproject/settings/common.py",
+              "README.rst",
+              "Makefile",
+              "manage.py"
+            ]
+          },
+          {
+            "path": "djangoproject/hosts.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies djangoproject/hosts.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "djangoproject/hosts.py",
+              "README.rst",
+              "Makefile",
+              "manage.py",
+              "djangoproject/settings/common.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "make run" },
-        "test": { "cwd": ".", "command": "make test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "make run"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: make run.",
+          "sources": [
+            "README.rst",
+            "Makefile",
+            "manage.py",
+            "djangoproject/settings/common.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "make test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: make test.",
+          "sources": [
+            "README.rst",
+            "Makefile",
+            "manage.py",
+            "djangoproject/settings/common.py"
+          ]
+        }
       },
-      "label_sources": ["README.rst", "Makefile", "manage.py", "djangoproject/settings/common.py"]
+      "strata": []
     },
     {
       "id": "saleor/saleor",
-      "category": "django-app",
+      "category": "python-web",
       "repository": "https://github.com/saleor/saleor.git",
       "revision": "e3f3b439ca8ff38be297de305227791e6c85adb8",
       "labels": {
         "important_files": [
-          "pyproject.toml",
-          "manage.py",
-          "saleor/settings.py",
-          "saleor/urls.py",
-          "saleor/graphql/api.py"
+          {
+            "path": "pyproject.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pyproject.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "pyproject.toml",
+              "CONTRIBUTING.md",
+              "manage.py",
+              "saleor/settings.py"
+            ]
+          },
+          {
+            "path": "manage.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies manage.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "manage.py",
+              "CONTRIBUTING.md",
+              "pyproject.toml",
+              "saleor/settings.py"
+            ]
+          },
+          {
+            "path": "saleor/settings.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies saleor/settings.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "saleor/settings.py",
+              "CONTRIBUTING.md",
+              "pyproject.toml",
+              "manage.py"
+            ]
+          },
+          {
+            "path": "saleor/urls.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies saleor/urls.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "saleor/urls.py",
+              "CONTRIBUTING.md",
+              "pyproject.toml",
+              "manage.py",
+              "saleor/settings.py"
+            ]
+          },
+          {
+            "path": "saleor/graphql/api.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies saleor/graphql/api.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "saleor/graphql/api.py",
+              "CONTRIBUTING.md",
+              "pyproject.toml",
+              "manage.py",
+              "saleor/settings.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "uv run poe start" },
-        "test": { "cwd": ".", "command": "uv run poe test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "uv run poe start"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: uv run poe start.",
+          "sources": [
+            "CONTRIBUTING.md",
+            "pyproject.toml",
+            "manage.py",
+            "saleor/settings.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "uv run poe test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: uv run poe test.",
+          "sources": [
+            "CONTRIBUTING.md",
+            "pyproject.toml",
+            "manage.py",
+            "saleor/settings.py"
+          ]
+        }
       },
-      "label_sources": ["CONTRIBUTING.md", "pyproject.toml", "manage.py", "saleor/settings.py"]
+      "strata": []
     },
     {
       "id": "pretix/pretix",
-      "category": "django-app",
+      "category": "python-web",
       "repository": "https://github.com/pretix/pretix.git",
       "revision": "db147280fddf350a11d1e6883d6ccf251101f598",
       "labels": {
         "important_files": [
-          "README.rst",
-          "pyproject.toml",
-          "src/manage.py",
-          "src/pretix/settings.py",
-          "src/pretix/urls.py"
+          {
+            "path": "README.rst",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies README.rst as a repository contract for this frozen development case.",
+            "sources": [
+              "README.rst",
+              "doc/development/setup.rst",
+              "pyproject.toml",
+              "src/manage.py",
+              "src/setup.cfg"
+            ]
+          },
+          {
+            "path": "pyproject.toml",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies pyproject.toml as a repository contract for this frozen development case.",
+            "sources": [
+              "pyproject.toml",
+              "doc/development/setup.rst",
+              "src/manage.py",
+              "src/setup.cfg"
+            ]
+          },
+          {
+            "path": "src/manage.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/manage.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/manage.py",
+              "doc/development/setup.rst",
+              "pyproject.toml",
+              "src/setup.cfg"
+            ]
+          },
+          {
+            "path": "src/pretix/settings.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/pretix/settings.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/pretix/settings.py",
+              "doc/development/setup.rst",
+              "pyproject.toml",
+              "src/manage.py",
+              "src/setup.cfg"
+            ]
+          },
+          {
+            "path": "src/pretix/urls.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies src/pretix/urls.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "src/pretix/urls.py",
+              "doc/development/setup.rst",
+              "pyproject.toml",
+              "src/manage.py",
+              "src/setup.cfg"
+            ]
+          }
         ],
-        "run": { "cwd": "src", "command": "python manage.py runserver" },
-        "test": { "cwd": "src", "command": "py.test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": "src",
+              "command": "python manage.py runserver"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: src: python manage.py runserver.",
+          "sources": [
+            "doc/development/setup.rst",
+            "pyproject.toml",
+            "src/manage.py",
+            "src/setup.cfg"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": "src",
+              "command": "py.test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: src: py.test.",
+          "sources": [
+            "doc/development/setup.rst",
+            "pyproject.toml",
+            "src/manage.py",
+            "src/setup.cfg"
+          ]
+        }
       },
-      "label_sources": ["doc/development/setup.rst", "pyproject.toml", "src/manage.py", "src/setup.cfg"]
+      "strata": []
     },
     {
       "id": "wagtail/bakerydemo",
-      "category": "django-app",
+      "category": "python-web",
       "repository": "https://github.com/wagtail/bakerydemo.git",
       "revision": "51a8b92edaffc64ff050abdd95bed87c55d550c6",
       "labels": {
         "important_files": [
-          "readme.md",
-          "Makefile",
-          "manage.py",
-          "bakerydemo/settings/base.py",
-          "bakerydemo/urls.py"
+          {
+            "path": "readme.md",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies readme.md as a repository contract for this frozen development case.",
+            "sources": [
+              "readme.md",
+              "CONTRIBUTING.md",
+              "manage.py",
+              "bakerydemo/settings/base.py"
+            ]
+          },
+          {
+            "path": "Makefile",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies Makefile as a repository contract for this frozen development case.",
+            "sources": [
+              "Makefile",
+              "readme.md",
+              "CONTRIBUTING.md",
+              "manage.py",
+              "bakerydemo/settings/base.py"
+            ]
+          },
+          {
+            "path": "manage.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies manage.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "manage.py",
+              "readme.md",
+              "CONTRIBUTING.md",
+              "bakerydemo/settings/base.py"
+            ]
+          },
+          {
+            "path": "bakerydemo/settings/base.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies bakerydemo/settings/base.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "bakerydemo/settings/base.py",
+              "readme.md",
+              "CONTRIBUTING.md",
+              "manage.py"
+            ]
+          },
+          {
+            "path": "bakerydemo/urls.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies bakerydemo/urls.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "bakerydemo/urls.py",
+              "readme.md",
+              "CONTRIBUTING.md",
+              "manage.py",
+              "bakerydemo/settings/base.py"
+            ]
+          }
         ],
-        "run": { "cwd": ".", "command": "./manage.py runserver 0.0.0.0:8000" },
-        "test": { "cwd": ".", "command": "./manage.py test" }
+        "run": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "./manage.py runserver 0.0.0.0:8000"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: ./manage.py runserver 0.0.0.0:8000.",
+          "sources": [
+            "readme.md",
+            "CONTRIBUTING.md",
+            "manage.py",
+            "bakerydemo/settings/base.py"
+          ]
+        },
+        "test": {
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "./manage.py test"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted test candidate: ./manage.py test.",
+          "sources": [
+            "readme.md",
+            "CONTRIBUTING.md",
+            "manage.py",
+            "bakerydemo/settings/base.py"
+          ]
+        }
       },
-      "label_sources": ["readme.md", "CONTRIBUTING.md", "manage.py", "bakerydemo/settings/base.py"]
+      "strata": []
     },
     {
       "id": "pallets/flask-initial-no-readme",
-      "category": "no-readme",
+      "category": "python-web",
       "repository": "https://github.com/pallets/flask.git",
       "revision": "33850c0ebd23ae615e6823993d441f46d80b1ff0",
-      "expect_readme": false,
       "labels": {
         "important_files": [
-          "flask.py",
-          "examples/minitwit/minitwit.py",
-          "examples/minitwit/schema.sql",
-          "examples/apishowcase/apishowcase.py",
-          "examples/minitwit/templates/layout.html"
+          {
+            "path": "flask.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies flask.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "flask.py",
+              "examples/minitwit/minitwit.py",
+              "examples/minitwit/schema.sql"
+            ]
+          },
+          {
+            "path": "examples/minitwit/minitwit.py",
+            "relevance": 3,
+            "rationale": "Direct inspection identifies examples/minitwit/minitwit.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "examples/minitwit/minitwit.py",
+              "flask.py",
+              "examples/minitwit/schema.sql"
+            ]
+          },
+          {
+            "path": "examples/minitwit/schema.sql",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies examples/minitwit/schema.sql as a implementation anchor for this frozen development case.",
+            "sources": [
+              "examples/minitwit/schema.sql",
+              "flask.py",
+              "examples/minitwit/minitwit.py"
+            ]
+          },
+          {
+            "path": "examples/apishowcase/apishowcase.py",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies examples/apishowcase/apishowcase.py as a implementation anchor for this frozen development case.",
+            "sources": [
+              "examples/apishowcase/apishowcase.py",
+              "flask.py",
+              "examples/minitwit/minitwit.py",
+              "examples/minitwit/schema.sql"
+            ]
+          },
+          {
+            "path": "examples/minitwit/templates/layout.html",
+            "relevance": 2,
+            "rationale": "Direct inspection identifies examples/minitwit/templates/layout.html as a implementation anchor for this frozen development case.",
+            "sources": [
+              "examples/minitwit/templates/layout.html",
+              "flask.py",
+              "examples/minitwit/minitwit.py",
+              "examples/minitwit/schema.sql"
+            ]
+          }
         ],
         "run": {
-          "cwd": ".",
-          "command": "python examples/minitwit/minitwit.py"
+          "accepted": [
+            {
+              "cwd": ".",
+              "command": "python examples/minitwit/minitwit.py"
+            }
+          ],
+          "rationale": "The cited repository declarations directly support the accepted run candidate: python examples/minitwit/minitwit.py.",
+          "sources": [
+            "flask.py",
+            "examples/minitwit/minitwit.py",
+            "examples/minitwit/schema.sql"
+          ]
         },
         "test": null
       },
-      "label_sources": ["flask.py", "examples/minitwit/minitwit.py", "examples/minitwit/schema.sql"]
+      "strata": [
+        "no-readme"
+      ]
     }
   ]
 }

@@ -1,9 +1,25 @@
 import path from "node:path";
 import { readText } from "../scanner.js";
 
+export function createTextCache(readOptions = {}, options = {}) {
+  const cache = new Map();
+  cache.readOptions = readOptions;
+  cache.maxEntries = options.maxEntries ?? 16;
+  cache.maxBytes = options.maxBytes ?? 2 * 1024 * 1024;
+  cache.bytes = 0;
+  return cache;
+}
+
 export function getText(root, relPath, cache, limit = 240_000) {
   if (!cache.has(relPath)) {
-    cache.set(relPath, readText(root, relPath, { limit }));
+    const text = readText(root, relPath, {
+      ...(cache.readOptions || {}),
+      limit,
+      recordTruncation: false
+    });
+    cache.set(relPath, text);
+    cache.bytes = (cache.bytes || 0) + Buffer.byteLength(text);
+    evictTextCache(cache, relPath);
   }
   return cache.get(relPath);
 }
@@ -89,4 +105,19 @@ export function depth(relPath) {
 
 export function unique(values) {
   return Array.from(new Set(values));
+}
+
+function evictTextCache(cache, retainedKey) {
+  while (
+    cache.size > (cache.maxEntries ?? 16) ||
+    cache.bytes > (cache.maxBytes ?? 2 * 1024 * 1024)
+  ) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined || (oldest === retainedKey && cache.size === 1)) {
+      break;
+    }
+    const text = cache.get(oldest) || "";
+    cache.delete(oldest);
+    cache.bytes -= Buffer.byteLength(text);
+  }
 }

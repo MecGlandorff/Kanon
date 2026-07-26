@@ -1,44 +1,56 @@
-import fs from "node:fs";
-import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { runGit } from "../git-runner.js";
 import { IGNORED_DIRS } from "./policy.js";
+import { readTextResult } from "./read.js";
 import { normalizeRelPath } from "./shared.js";
 
-export function listGitVisibleFiles(root) {
-  const result = spawnSync(
-    "git",
-    ["-C", root, "ls-files", "-co", "--exclude-standard", "-z"],
+export function listGitVisibleFiles(root, options = {}) {
+  const result = runGit(
+    root,
+    ["ls-files", "-co", "--exclude-standard", "-z"],
     {
-      encoding: "utf8",
-      maxBuffer: 16 * 1024 * 1024,
-      windowsHide: true
+      timeoutMs: options.timeoutMs,
+      maxOutputBytes: options.maxOutputBytes
     }
   );
-  if (result.status !== 0) {
-    return null;
+  if (!result.ok) {
+    return {
+      ok: false,
+      files: [],
+      diagnostic: result.diagnostic,
+      git: result
+    };
   }
-  return Array.from(
-    new Set(
-      result.stdout
-        .split("\0")
-        .map(normalizeRelPath)
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b));
+  return {
+    ok: true,
+    files: Array.from(
+      new Set(
+        result.stdout
+          .split("\0")
+          .map(normalizeRelPath)
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b)),
+    diagnostic: null,
+    git: result
+  };
 }
 
-export function loadKanonIgnore(root) {
-  try {
-    return fs
-      .readFileSync(path.join(root, ".kanonignore"), "utf8")
+export function loadKanonIgnore(root, options = {}) {
+  const result = readTextResult(root, ".kanonignore", {
+    limit: options.maxBytes ?? 128 * 1024,
+    budgetName: "max_ignore_bytes",
+    diagnostics: options.diagnostics,
+    optional: true
+  });
+  if (!result.ok) {
+    return [];
+  }
+  return result.text
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith("#"))
       .map(compileIgnoreRule)
       .filter(Boolean);
-  } catch {
-    return [];
-  }
 }
 
 export function isKanonIgnored(relPath, directory, rules) {

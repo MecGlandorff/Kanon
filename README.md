@@ -1,7 +1,6 @@
 # Kanon
-Package at NPM: https://www.npmjs.com/package/@mecglandorff/kanon
 
-Kanon is a static, read-only repository orientation skill for coding agents.
+Kanon is a static repository-orientation skill for coding agents.
 It targets conventional JavaScript/TypeScript, Python, Go, and Rust layouts.
 
 Today it can:
@@ -11,20 +10,53 @@ Today it can:
   package binaries, and JavaScript executables;
 - extract commands from package metadata, build targets, selected contributor
   documentation, and conventional Cargo, Go, and Django layouts;
-- detect stale npm, Node, and Python commands in a README;
+- detect direct README/package-script contradictions and report unobserved
+  Node or Python targets as Unknown;
 - report whether conventional CI and deployment configuration was found.
 
 Kanon does not execute repository code or prove that a detected command will
 succeed in the user's environment. Explicit configuration is **Known**;
 documented or conventional inference is **Likely**; absence remains
-**Unknown**. The 30-repository corpus is the release gate for these claims, and
-its current measured limitations are published in
-[`eval/RESULTS.md`](eval/RESULTS.md).
+**Unknown**.
+
+The visible 30-repository corpus is development and regression data. Its
+results are in-sample and are not presented as performance on unseen
+repositories. A release needs a fresh, frozen corpus under the process in
+[`eval/PROTOCOL.md`](eval/PROTOCOL.md). Historical development results and
+current limitations are published in [`eval/RESULTS.md`](eval/RESULTS.md).
+In v0.4, corpus scores cover important files plus run and test commands only.
+Purpose, entrypoint, drift, and narrowly scoped `ask` checks have regression
+tests but no claimed cross-repository capability estimate. Improvement
+scorecards, refactor advice, dead-code advice, numeric health scores, and
+ready-to-paste agent prompts are experimental source work and are not shipped
+in the public skill artifact.
+
+### Planned Codex ablation
+
+A future evaluation will compare the same Codex configuration on paired,
+blinded repository tasks with and without Kanon. The prompt, model, reasoning
+effort, tools, budget, permissions, repository commit, and scoring policy will
+be held fixed; only Kanon's availability will differ. The visible 30-case
+corpus may be used for development runs, but any public incremental-value claim
+must come from a newly selected, independently labeled, sealed holdout.
+
+This experiment has not run, so Kanon currently makes no claim that it improves
+Codex precision or recall. The fixed prompt, controls, repetition policy,
+security evaluation, and allowed claim language are specified in
+[`eval/PAIRED_ABLATION.md`](eval/PAIRED_ABLATION.md).
 
 ## Use
 
 Copy the complete `skills/kanon/` directory into your agent's skills directory.
-Use Kanon inside an agent session. Node.js 20+ is required.
+Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25 are
+supported.
+
+Starting with v0.4, the
+[`@mecglandorff/kanon`](https://www.npmjs.com/package/@mecglandorff/kanon)
+package is only a distribution container for that directory. It does not expose
+a JavaScript library API, install a global CLI, or advertise development
+scripts. The repository root is deliberately private; releases are built from
+the generated `dist/npm/` staging directory.
 
 The agent can select the skill from its trigger, or you can invoke it explicitly:
 
@@ -38,14 +70,18 @@ The supported core workflows are:
 | Intent | Workflow |
 | --- | --- |
 | Orient to a repository | `brief` |
-| Answer an evidence-backed repo question | `ask` |
+| Ask about purpose, run, test, Git, docs drift, or literal text | `ask` |
 | Check conventional README drift | `verify` |
 | Resume from persisted repo state | `resume` |
 | Refresh continuity state | `refresh` |
 | Track human follow-up | `todo` |
 
-Read workflows do not modify the inspected repository. Writes are explicit
-through `refresh` and `todo`.
+Read workflows do not intentionally modify the inspected repository. Writes are
+explicit through `refresh` and `todo`. Repository content is untrusted data:
+Kanon never follows instructions in files, paths, Git metadata, TODOs, or
+evidence. Declared command candidates must be inspected and explicitly approved
+by the user before execution under the default `ask` policy; the `never` policy
+prohibits execution.
 
 ## Evidence contract
 
@@ -73,6 +109,10 @@ EVIDENCE.jsonl  evidence ledger
 snapshots/      historical state
 ```
 
+`EVIDENCE.jsonl` is append-only and both evidence and snapshots have configured
+hard retention limits. Reaching a limit produces a warning rather than
+unbounded growth.
+
 `skills/kanon/` is the supported integration artifact. Its Bash and PowerShell
 wrappers call the bundled runtime from the repository being inspected; they are
 agent hooks, not a global terminal package.
@@ -82,10 +122,16 @@ agent hooks, not a global terminal package.
 ```bash
 npm run build:skill
 npm run validate
-npm run eval:corpus
+npm run build:package
+npm run eval:dev
 ```
 
-Release tags run the pinned corpus with a 5:1 false-positive penalty. A release
-fails when its precision, recall, or weighted-error budget is missed.
+`npm run eval:dev` uses visible labels and may guide generic implementation
+work. A workflow-dispatched release candidate must also pass it. Stable
+publication additionally requires an independently frozen
+`eval/release-corpus.json`; a missing, partial, development-role, or
+threshold-failing corpus blocks stable publication. False positives cost five
+times false negatives, and every scored dimension and category has its own
+precision and recall floor.
 
 MIT

@@ -1,27 +1,197 @@
+import { DIMENSIONS, REQUIRED_CATEGORIES } from "./schema.js";
+import { expectedCommandEntries } from "./schema-labels.js";
+import {
+  average,
+  sumScores,
+  withMetrics
+} from "./metrics.js";
+
 export function scoreCase(item, analysis, policy) {
   const importantPredictions = unique(
     analysis.state.important_files
       .slice(0, policy.important_file_limit)
       .map((entry) => entry.path)
   );
-  const runPredictions = commandPredictions(analysis.state.commands.run);
-  const testPredictions = commandPredictions(analysis.state.commands.test);
+  const runPredictions = commandPredictions(
+    analysis.state.commands.run
+  );
+  const testPredictions = commandPredictions(
+    analysis.state.commands.test
+  );
   const dimensions = {
-    important_files: scoreSet(importantPredictions, item.labels.important_files),
-    run_command: scoreCommand(runPredictions, item.labels.run),
-    test_command: scoreCommand(testPredictions, item.labels.test)
+    important_files: scoreSet(
+      importantPredictions,
+      item.labels.important_files.map((label) => label.path)
+    ),
+    run_command: scoreCommand(
+      runPredictions,
+      expectedCommandEntries(item.labels.run)
+    ),
+    test_command: scoreCommand(
+      testPredictions,
+      expectedCommandEntries(item.labels.test)
+    )
   };
-  return {
-    id: item.id,
-    category: item.category,
-    revision: item.revision,
-    scan_complete: analysis.state.scan.complete,
-    predictions: {
+  return buildCaseResult(
+    item,
+    analysis.state.scan.complete,
+    {
       important_files: importantPredictions,
       run: runPredictions,
       test: testPredictions
     },
+    dimensions,
+    policy,
+    null
+  );
+}
+
+export function scoreErrorCase(item, error, policy) {
+  const dimensions = {
+    important_files: scoreSet(
+      [],
+      item.labels.important_files.map((label) => label.path)
+    ),
+    run_command: scoreCommand(
+      [],
+      expectedCommandEntries(item.labels.run)
+    ),
+    test_command: scoreCommand(
+      [],
+      expectedCommandEntries(item.labels.test)
+    )
+  };
+  return buildCaseResult(
+    item,
+    false,
+    { important_files: [], run: [], test: [] },
+    dimensions,
+    policy,
+    {
+      name: error?.name || "Error",
+      message: String(error?.message || error).slice(0, 2_000)
+    }
+  );
+}
+
+export function aggregateScores(results, policy, options = {}) {
+  const dimensions = Object.fromEntries(
+    DIMENSIONS.map((name) => [
+      name,
+      withMetrics(
+        sumScores(results.map((result) => result.dimensions[name])),
+        policy.false_positive_cost,
+        policy.false_negative_cost
+      )
+    ])
+  );
+  const totals = withMetrics(
+    sumScores(results.map((result) => result.totals)),
+    policy.false_positive_cost,
+    policy.false_negative_cost
+  );
+  const categories = aggregateCategories(results, policy);
+  const weightedErrorPerCase = results.length
+    ? totals.weighted_error / results.length
+    : Number.POSITIVE_INFINITY;
+  const caseMetrics = results.map((result) => result.totals);
+  const failures = [];
+  applyThresholds(failures, "overall", totals, policy);
+  if (
+    weightedErrorPerCase >
+    policy.maximum_weighted_error_per_case
+  ) {
+    failures.push(
+      `weighted error/case ${weightedErrorPerCase.toFixed(2)} exceeds ${policy.maximum_weighted_error_per_case.toFixed(2)}`
+    );
+  }
+  for (const [name, score] of Object.entries(dimensions)) {
+    applyThresholds(
+      failures,
+      name,
+      score,
+      policy.dimension_thresholds[name]
+    );
+  }
+  for (const category of REQUIRED_CATEGORIES) {
+    const score = categories[category];
+    if (!score) {
+      failures.push(`category ${category} did not execute`);
+      continue;
+    }
+    if (score.case_count < policy.minimum_cases_per_category) {
+      failures.push(
+        `category ${category} executed ${score.case_count} cases; ${policy.minimum_cases_per_category} required`
+      );
+    }
+    applyThresholds(
+      failures,
+      `category ${category}`,
+      score,
+      policy.category_thresholds[category]
+    );
+  }
+  const expectedCaseCount = options.expectedCaseCount ?? results.length;
+  if (results.length !== expectedCaseCount) {
+    failures.push(
+      `partial execution: ${results.length} of ${expectedCaseCount} cases produced results`
+    );
+  }
+  const errors = results.filter((result) => result.analysis_error);
+  if (errors.length) {
+    failures.push(`${errors.length} case analysis error(s) occurred`);
+  }
+  const incomplete = results.filter((result) => !result.scan_complete);
+  if (options.requireCompleteScans && incomplete.length) {
+    failures.push(`${incomplete.length} case scan(s) were incomplete`);
+  }
+
+  return {
+    case_count: results.length,
+    expected_case_count: expectedCaseCount,
+    policy,
+    dimensions,
+    totals: {
+      ...totals,
+      weighted_error_per_case: weightedErrorPerCase
+    },
+    case_average: {
+      precision: average(caseMetrics.map((result) => result.precision)),
+      recall: average(caseMetrics.map((result) => result.recall))
+    },
+    macro_over_category: macroMetrics(Object.values(categories)),
+    macro_over_dimension: macroMetrics(Object.values(dimensions)),
+    categories,
+    abstentions: aggregateAbstentions(results),
+    prediction_coverage: aggregateCoverage(results),
+    analysis_error_count: errors.length,
+    incomplete_scan_count: incomplete.length,
+    passed: failures.length === 0,
+    failures
+  };
+}
+
+function buildCaseResult(
+  item,
+  scanComplete,
+  predictions,
+  dimensions,
+  policy,
+  analysisError
+) {
+  return {
+    id: item.id,
+    category: item.category,
+    revision: item.revision,
+    scan_complete: scanComplete,
+    analysis_error: analysisError,
+    predictions,
     labels: item.labels,
+    abstentions: {
+      important_files: predictions.important_files.length === 0,
+      run_command: predictions.run.length === 0,
+      test_command: predictions.test.length === 0
+    },
     dimensions,
     totals: withMetrics(
       sumScores(Object.values(dimensions)),
@@ -31,47 +201,71 @@ export function scoreCase(item, analysis, policy) {
   };
 }
 
-export function aggregateScores(results, policy) {
-  const dimensions = {};
-  for (const name of ["important_files", "run_command", "test_command"]) {
-    dimensions[name] = withMetrics(
-      sumScores(results.map((result) => result.dimensions[name])),
-      policy.false_positive_cost,
-      policy.false_negative_cost
-    );
-  }
-  const totals = withMetrics(
-    sumScores(results.map((result) => result.totals)),
-    policy.false_positive_cost,
-    policy.false_negative_cost
+function aggregateCategories(results, policy) {
+  return Object.fromEntries(
+    REQUIRED_CATEGORIES.flatMap((category) => {
+      const grouped = results.filter(
+        (result) => result.category === category
+      );
+      if (!grouped.length) {
+        return [];
+      }
+      return [[
+        category,
+        {
+          case_count: grouped.length,
+          ...withMetrics(
+            sumScores(grouped.map((result) => result.totals)),
+            policy.false_positive_cost,
+            policy.false_negative_cost
+          )
+        }
+      ]];
+    })
   );
-  const weightedErrorPerCase = results.length
-    ? totals.weighted_error / results.length
-    : Number.POSITIVE_INFINITY;
-  const failures = [];
-  if (totals.precision < policy.minimum_precision) {
+}
+
+function applyThresholds(failures, label, score, thresholds) {
+  if (score.precision < thresholds.minimum_precision) {
     failures.push(
-      `precision ${formatRate(totals.precision)} is below ${formatRate(policy.minimum_precision)}`
+      `${label} precision ${formatRate(score.precision)} is below ${formatRate(thresholds.minimum_precision)}`
     );
   }
-  if (totals.recall < policy.minimum_recall) {
+  if (score.recall < thresholds.minimum_recall) {
     failures.push(
-      `recall ${formatRate(totals.recall)} is below ${formatRate(policy.minimum_recall)}`
+      `${label} recall ${formatRate(score.recall)} is below ${formatRate(thresholds.minimum_recall)}`
     );
   }
-  if (weightedErrorPerCase > policy.maximum_weighted_error_per_case) {
-    failures.push(
-      `weighted error/case ${weightedErrorPerCase.toFixed(2)} exceeds ${policy.maximum_weighted_error_per_case.toFixed(2)}`
-    );
-  }
+}
+
+function macroMetrics(scores) {
   return {
-    case_count: results.length,
-    policy,
-    dimensions,
-    totals: { ...totals, weighted_error_per_case: weightedErrorPerCase },
-    passed: failures.length === 0,
-    failures
+    precision: average(scores.map((score) => score.precision)),
+    recall: average(scores.map((score) => score.recall))
   };
+}
+
+function aggregateAbstentions(results) {
+  return Object.fromEntries(
+    DIMENSIONS.map((name) => [
+      name,
+      results.filter((result) => result.abstentions[name]).length
+    ])
+  );
+}
+
+function aggregateCoverage(results) {
+  return Object.fromEntries(
+    DIMENSIONS.map((name) => [
+      name,
+      results.length
+        ? 1 - (
+          results.filter((result) => result.abstentions[name]).length /
+          results.length
+        )
+        : 0
+    ])
+  );
 }
 
 function commandPredictions(commands) {
@@ -87,64 +281,37 @@ function commandPredictions(commands) {
 function scoreSet(predicted, expected) {
   const predictedSet = new Set(predicted);
   const expectedSet = new Set(expected);
-  const matched = predicted.filter((value) => expectedSet.has(value));
-  const falsePositives = predicted.filter((value) => !expectedSet.has(value));
-  const falseNegatives = expected.filter((value) => !predictedSet.has(value));
   return {
-    tp: matched.length,
-    fp: falsePositives.length,
-    fn: falseNegatives.length,
-    matched,
-    false_positives: falsePositives,
-    false_negatives: falseNegatives
+    tp: predicted.filter((value) => expectedSet.has(value)).length,
+    fp: predicted.filter((value) => !expectedSet.has(value)).length,
+    fn: expected.filter((value) => !predictedSet.has(value)).length,
+    matched: predicted.filter((value) => expectedSet.has(value)),
+    false_positives: predicted.filter((value) => !expectedSet.has(value)),
+    false_negatives: expected.filter((value) => !predictedSet.has(value))
   };
 }
 
-function scoreCommand(predicted, expected) {
-  const normalizedExpected = expected
-    ? {
-        cwd: normalizeCwd(expected.cwd),
-        command: normalizeCommand(expected.command)
-      }
-    : null;
-  const expectedKey = normalizedExpected ? commandKey(normalizedExpected) : null;
-  const matched = expectedKey
-    ? predicted.filter((value) => commandKey(value) === expectedKey)
-    : [];
-  const falsePositives = predicted.filter(
-    (value) => commandKey(value) !== expectedKey
+function scoreCommand(predicted, accepted) {
+  const expectedKeys = new Set(
+    accepted.map((value) => commandKey({
+      cwd: normalizeCwd(value.cwd),
+      command: normalizeCommand(value.command)
+    }))
+  );
+  const matched = predicted.filter((value) =>
+    expectedKeys.has(commandKey(value))
+  );
+  const falsePositives = predicted.filter((value) =>
+    !expectedKeys.has(commandKey(value))
   );
   return {
-    tp: matched.length > 0 ? 1 : 0,
+    tp: matched.length ? 1 : 0,
     fp: falsePositives.length,
-    fn: normalizedExpected && matched.length === 0 ? 1 : 0,
+    fn: accepted.length && !matched.length ? 1 : 0,
     matched,
     false_positives: falsePositives,
     false_negatives:
-      normalizedExpected && matched.length === 0 ? [normalizedExpected] : []
-  };
-}
-
-function sumScores(scores) {
-  return scores.reduce(
-    (total, score) => ({
-      tp: total.tp + score.tp,
-      fp: total.fp + score.fp,
-      fn: total.fn + score.fn
-    }),
-    { tp: 0, fp: 0, fn: 0 }
-  );
-}
-
-function withMetrics(score, falsePositiveCost, falseNegativeCost) {
-  const predicted = score.tp + score.fp;
-  const expected = score.tp + score.fn;
-  return {
-    ...score,
-    precision: predicted > 0 ? score.tp / predicted : expected === 0 ? 1 : 0,
-    recall: expected > 0 ? score.tp / expected : 1,
-    weighted_error:
-      falsePositiveCost * score.fp + falseNegativeCost * score.fn
+      accepted.length && !matched.length ? accepted : []
   };
 }
 
@@ -153,11 +320,10 @@ function normalizeCommand(command) {
 }
 
 function normalizeCwd(cwd) {
-  const normalized = String(cwd || ".")
+  return String(cwd || ".")
     .trim()
     .replaceAll("\\", "/")
-    .replace(/\/+$/, "");
-  return normalized || ".";
+    .replace(/\/+$/, "") || ".";
 }
 
 function commandKey(value) {

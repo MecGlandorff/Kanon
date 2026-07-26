@@ -3,15 +3,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  collectRuntimeDependencies,
+  PUBLIC_COMMANDS
+} from "./lib/artifact-files.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillRoot = path.join(root, "skills", "kanon");
 const checkOnly = process.argv.includes("--check");
-const commands = ["ask", "brief", "improve", "refactor", "refresh", "resume", "todo", "verify"];
+const commands = PUBLIC_COMMANDS;
 const artifacts = [];
 
 artifacts.push(copyArtifact("bin/kanon.js", "skills/kanon/runtime/bin/kanon.js", 0o755));
-for (const sourceRelative of listJavaScriptFiles("src")) {
+for (const sourceRelative of collectRuntimeDependencies(root)) {
   artifacts.push(
     copyArtifact(
       sourceRelative,
@@ -36,6 +40,19 @@ for (const command of commands) {
 }
 
 const mismatches = [];
+const expected = new Set(artifacts.map((artifact) => artifact.relative));
+const generatedFiles = [
+  ...listJavaScriptFiles("skills/kanon/runtime"),
+  ...listWrapperFiles()
+];
+for (const relative of generatedFiles) {
+  if (!expected.has(relative)) {
+    mismatches.push(relative);
+    if (!checkOnly) {
+      fs.unlinkSync(path.join(root, relative));
+    }
+  }
+}
 for (const artifact of artifacts) {
   const current = readFile(artifact.target);
   if (current !== artifact.contents) {
@@ -56,6 +73,7 @@ if (checkOnly && mismatches.length) {
   );
   process.exitCode = 1;
 } else if (!checkOnly) {
+  removeEmptyDirectories(path.join(skillRoot, "runtime", "src"));
   process.stdout.write(`Synchronized ${artifacts.length} Kanon skill artifact(s).\n`);
 }
 
@@ -82,6 +100,29 @@ function listJavaScriptFiles(relativeDirectory) {
   return files.sort();
 }
 
+function listWrapperFiles() {
+  const directory = path.join(skillRoot, "scripts");
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .filter((entry) =>
+      entry.isFile() && /^kanon-[^.]+(?:\.ps1)?$/.test(entry.name)
+    )
+    .map((entry) => `skills/kanon/scripts/${entry.name}`);
+}
+
+function removeEmptyDirectories(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      removeEmptyDirectories(path.join(directory, entry.name));
+    }
+  }
+  if (
+    directory !== path.join(skillRoot, "runtime", "src") &&
+    fs.readdirSync(directory).length === 0
+  ) {
+    fs.rmdirSync(directory);
+  }
+}
+
 function readFile(filePath) {
   try {
     return fs.readFileSync(filePath, "utf8");
@@ -105,13 +146,13 @@ if [[ ! -f "$LOCAL_KANON" ]]; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  echo "Kanon requires Node.js 20+." >&2
+  echo "Kanon requires Node.js major 20, 22, 24, or 25." >&2
   exit 127
 fi
 
 NODE_MAJOR="$(node -p 'process.versions.node.split(\".\")[0]')"
-if [[ ! "$NODE_MAJOR" =~ ^[0-9]+$ ]] || (( NODE_MAJOR < 20 )); then
-  echo "Kanon requires Node.js 20+; found $(node --version)." >&2
+if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
+  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $(node --version)." >&2
   exit 127
 fi
 
@@ -133,14 +174,14 @@ if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
 
 $Node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $Node) {
-  [Console]::Error.WriteLine("Kanon requires Node.js 20+.")
+  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
   exit 127
 }
 
 $NodeMajor = [int](& $Node.Source -p 'process.versions.node.split(".")[0]')
-if ($NodeMajor -lt 20) {
+if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
   $NodeVersion = & $Node.Source --version
-  [Console]::Error.WriteLine("Kanon requires Node.js 20+; found $NodeVersion.")
+  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
   exit 127
 }
 

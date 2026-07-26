@@ -1,5 +1,6 @@
-import fs from "node:fs";
 import path from "node:path";
+import { selectRootReadme } from "../readme.js";
+import { resolveContainedPath } from "../path-security.js";
 import { DOC_PATTERN } from "./constants.js";
 import { addCommand } from "./command-utils.js";
 import {
@@ -18,11 +19,7 @@ export function addDocumentedCommands(
   candidates,
   options = {}
 ) {
-  const rootReadme = files.find(
-    (file) =>
-      !file.path.includes("/") &&
-      /^readme(?:\.[^.]+)?$/i.test(file.basename)
-  );
+  const rootReadme = selectRootReadme(files);
   const rootText = rootReadme
     ? getText(root, rootReadme.path, texts, 220_000)
     : "";
@@ -83,6 +80,7 @@ function extractShellCommands(text, sourcePath, root) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const trimmed = lines[index].trim();
+    const prompted = /^\$\s+/.test(trimmed);
     if (/^#{1,6}\s+/.test(trimmed)) {
       heading = trimmed.replace(/^#{1,6}\s+/, "");
     } else if (
@@ -105,7 +103,10 @@ function extractShellCommands(text, sourcePath, root) {
       buffered = line.slice(0, -1).trim();
       continue;
     }
-    if (!line || (!inFence && !looksLikeShellCommand(line))) {
+    if (
+      !line ||
+      (!inFence && !prompted && !looksLikeStandaloneCommand(line))
+    ) {
       continue;
     }
     if (/^git clone\s+\S+/.test(line)) {
@@ -161,7 +162,12 @@ function classifyCommand(command, context) {
       /\b(?:quick ?start|getting started|usage|start|server)\b/.test(contextLower)
     ) ||
     /^(?:pnpm|npm|yarn|bun) (?:run )?(?:dev|start|serve|watch)\b/.test(lower) ||
-    /^python3?\s+[\w./-]*(?:train|main)\.py\b/.test(lower) ||
+    (
+      /^python3?\s+[\w./-]+\.py\b/.test(lower) &&
+      /\b(?:quick ?start|getting started|usage|run|start|train)\b/.test(
+        contextLower
+      )
+    ) ||
     /^\.[/][\w./-]+\s+(?:serve|server)\b/.test(lower)
   ) {
     return { group: "run", score: 28 + headingBonus };
@@ -174,6 +180,15 @@ function classifyCommand(command, context) {
 
 function looksLikeShellCommand(line) {
   return /^(?:\.\/[\w./-]+|python3?\b|py\.test\b|pytest\b|go\b|cargo\b|make\b|just\b|pnpm\b|npm\b|yarn\b|bun\b|uv\b|docker\b|bash\b|sh\b|torchrun\b|git clone\b|cd\b)/.test(
+    line
+  );
+}
+
+function looksLikeStandaloneCommand(line) {
+  if (!looksLikeShellCommand(line) || /[.!?]$/.test(line)) {
+    return false;
+  }
+  return !/\b(?:after|before|changes?|please|pull request|should|then)\b/i.test(
     line
   );
 }
@@ -212,15 +227,21 @@ function resolveDocumentCwd(current, requested, root, cloneDirectory) {
   }
   if (cloneDirectory && cleaned.startsWith(`${cloneDirectory}/`)) {
     const insideRepo = normalizeCwd(cleaned.slice(cloneDirectory.length + 1));
-    if (fs.existsSync(path.join(root, insideRepo))) {
+    if (containedDirectoryExists(root, insideRepo)) {
       return insideRepo;
     }
   }
   const candidate = normalizeCwd(path.posix.join(current, cleaned));
-  if (fs.existsSync(path.join(root, candidate))) {
+  if (containedDirectoryExists(root, candidate)) {
     return candidate;
   }
   return current === "." ? "." : current;
+}
+
+function containedDirectoryExists(root, relativePath) {
+  return resolveContainedPath(root, relativePath, {
+    type: "directory"
+  }).ok;
 }
 
 function clonedDirectory(command) {
