@@ -103,7 +103,7 @@ test("CLI supports top-level version flag", async () => {
     process.stdout.write = originalWrite;
   }
 
-  assert.equal(output, "0.2.0\n");
+  assert.equal(output, "0.3.0\n");
 });
 
 test("README presents Kanon as an agent skill, not a terminal package", () => {

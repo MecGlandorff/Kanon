@@ -123,11 +123,22 @@ function commandAnswer(label, commands) {
   if (!commands.length) {
     return unknown(`No explicit ${label} command was found.`);
   }
+  const confidence = commands.every((item) => item.confidence === "known")
+    ? "known"
+    : "likely";
+  const rendered = commands.map((item) =>
+    item.cwd && item.cwd !== "."
+      ? `${item.command} (from ${item.cwd})`
+      : item.command
+  );
   return {
-    confidence: "known",
-    summary: `The repository declares: ${commands.map((item) => item.command).join(", ")}.`,
+    confidence,
+    summary: `Repository evidence supports: ${rendered.join(", ")}.`,
     claims: commands.map((item) => ({
-      claim: item.command,
+      claim:
+        item.cwd && item.cwd !== "."
+          ? `${item.command} (from ${item.cwd})`
+          : item.command,
       evidence: item.evidence || []
     })),
     evidence: [],

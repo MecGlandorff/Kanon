@@ -1,0 +1,567 @@
+{
+  "schema_version": 1,
+  "label_version": "2026-07-26",
+  "policy": {
+    "false_positive_cost": 5,
+    "false_negative_cost": 1,
+    "important_file_limit": 5,
+    "minimum_precision": 0.8,
+    "minimum_recall": 0.6,
+    "maximum_weighted_error_per_case": 4
+  },
+  "cases": [
+    {
+      "id": "karpathy/micrograd",
+      "category": "python-ml",
+      "repository": "https://github.com/karpathy/micrograd.git",
+      "revision": "c911406e5ace8742e5841a7e0df113ecb5d54685",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "setup.py",
+          "micrograd/engine.py",
+          "micrograd/nn.py",
+          "test/test_engine.py"
+        ],
+        "run": null,
+        "test": { "cwd": ".", "command": "python -m pytest" }
+      },
+      "label_sources": ["README.md", "setup.py", "micrograd/engine.py", "micrograd/nn.py"]
+    },
+    {
+      "id": "karpathy/nanogpt",
+      "category": "python-ml",
+      "repository": "https://github.com/karpathy/nanoGPT.git",
+      "revision": "3adf61e154c3fe3fca428ad6bc3818b27a3b8291",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "train.py",
+          "model.py",
+          "configurator.py",
+          "config/train_shakespeare_char.py"
+        ],
+        "run": {
+          "cwd": ".",
+          "command": "python train.py config/train_shakespeare_char.py"
+        },
+        "test": null
+      },
+      "label_sources": ["README.md", "train.py", "model.py", "config/train_shakespeare_char.py"]
+    },
+    {
+      "id": "karpathy/mingpt",
+      "category": "python-ml",
+      "repository": "https://github.com/karpathy/minGPT.git",
+      "revision": "37baab71b9abea1b76ab957409a1cc2fbfba8a26",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "setup.py",
+          "mingpt/model.py",
+          "mingpt/trainer.py",
+          "tests/test_huggingface_import.py"
+        ],
+        "run": { "cwd": ".", "command": "python projects/adder/adder.py" },
+        "test": { "cwd": ".", "command": "python -m unittest discover tests" }
+      },
+      "label_sources": ["README.md", "setup.py", "mingpt/model.py", "mingpt/trainer.py"]
+    },
+    {
+      "id": "pytorch/examples",
+      "category": "python-ml",
+      "repository": "https://github.com/pytorch/examples.git",
+      "revision": "acc295dc7b90714f1bf47f06004fc19a7fe235c4",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "run_python_examples.sh",
+          "mnist/main.py",
+          "dcgan/main.py",
+          "distributed/FSDP2/example.py"
+        ],
+        "run": { "cwd": ".", "command": "python mnist/main.py" },
+        "test": { "cwd": ".", "command": "bash run_python_examples.sh" }
+      },
+      "label_sources": ["README.md", "run_python_examples.sh", "mnist/README.md"]
+    },
+    {
+      "id": "tinygrad/tinygrad",
+      "category": "python-ml",
+      "repository": "https://github.com/tinygrad/tinygrad.git",
+      "revision": "5d1aa8490144ae8fe3bdb52fec4827c933c578b5",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "pyproject.toml",
+          "tinygrad/tensor.py",
+          "tinygrad/uop/ops.py",
+          "test/test_tiny.py"
+        ],
+        "run": { "cwd": ".", "command": "python3 examples/beautiful_mnist.py" },
+        "test": { "cwd": ".", "command": "python3 -m pytest test/" }
+      },
+      "label_sources": ["README.md", "pyproject.toml", "tinygrad/tensor.py", "tinygrad/uop/ops.py"]
+    },
+    {
+      "id": "ml-explore/mlx-examples",
+      "category": "python-ml",
+      "repository": "https://github.com/ml-explore/mlx-examples.git",
+      "revision": "796f5b53cab69a3d48a44233ce21aae889e94a08",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "mnist/README.md",
+          "mnist/main.py",
+          "mnist/mnist.py",
+          "lora/lora.py"
+        ],
+        "run": { "cwd": "mnist", "command": "python main.py" },
+        "test": null
+      },
+      "label_sources": ["README.md", "mnist/README.md", "mnist/main.py", "lora/README.md"]
+    },
+    {
+      "id": "pocketbase/pocketbase",
+      "category": "go-service",
+      "repository": "https://github.com/pocketbase/pocketbase.git",
+      "revision": "0cbfc046c7548421268582db4bfb9a03a158361a",
+      "labels": {
+        "important_files": [
+          "go.mod",
+          "examples/base/main.go",
+          "pocketbase.go",
+          "core/app.go",
+          "cmd/serve.go"
+        ],
+        "run": { "cwd": "examples/base", "command": "go run main.go serve" },
+        "test": { "cwd": ".", "command": "make test" }
+      },
+      "label_sources": ["README.md", "CONTRIBUTING.md", "examples/base/main.go", "go.mod"]
+    },
+    {
+      "id": "caddyserver/caddy",
+      "category": "go-service",
+      "repository": "https://github.com/caddyserver/caddy.git",
+      "revision": "c96bca12693419ac5be751a0cbbae2c3cbf89c58",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "go.mod",
+          "cmd/caddy/main.go",
+          "cmd/commands.go",
+          "modules/caddyhttp/caddyhttp.go"
+        ],
+        "run": {
+          "cwd": "cmd/caddy",
+          "command": "go run -exec ./setcap.sh main.go"
+        },
+        "test": { "cwd": ".", "command": "go test ./..." }
+      },
+      "label_sources": ["README.md", "go.mod", "cmd/caddy/main.go", "cmd/commands.go"]
+    },
+    {
+      "id": "charmbracelet/soft-serve",
+      "category": "go-service",
+      "repository": "https://github.com/charmbracelet/soft-serve.git",
+      "revision": "16c8e08b7f1bb83ac267be438251fe523aa37dc6",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "go.mod",
+          "cmd/soft/main.go",
+          "cmd/soft/serve/server.go",
+          "pkg/backend/backend.go"
+        ],
+        "run": { "cwd": ".", "command": "go run ./cmd/soft serve" },
+        "test": { "cwd": ".", "command": "go test ./..." }
+      },
+      "label_sources": ["README.md", "go.mod", "cmd/soft/main.go", "cmd/soft/serve/server.go"]
+    },
+    {
+      "id": "adguardteam/adguardhome",
+      "category": "go-service",
+      "repository": "https://github.com/AdguardTeam/AdGuardHome.git",
+      "revision": "5c44c4b260a179a85ee4b0242b3eb1014a21e731",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Makefile",
+          "main.go",
+          "internal/home/home.go",
+          "client/package.json"
+        ],
+        "run": { "cwd": ".", "command": "make && ./AdGuardHome" },
+        "test": { "cwd": ".", "command": "make test" }
+      },
+      "label_sources": ["README.md", "Makefile", "main.go", "internal/home/home.go"]
+    },
+    {
+      "id": "usememos/memos",
+      "category": "go-service",
+      "repository": "https://github.com/usememos/memos.git",
+      "revision": "390126f1cd5f6aca55a17faf031655da4354b60b",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "go.mod",
+          "cmd/memos/main.go",
+          "server/server.go",
+          "web/package.json"
+        ],
+        "run": {
+          "cwd": ".",
+          "command": "docker run -d --name memos -p 5230:5230 -v ~/.memos:/var/opt/memos neosmemo/memos:stable"
+        },
+        "test": { "cwd": ".", "command": "go test ./..." }
+      },
+      "label_sources": ["README.md", "scripts/build.sh", "cmd/memos/main.go", ".github/workflows/backend-tests.yml"]
+    },
+    {
+      "id": "authelia/authelia",
+      "category": "go-service",
+      "repository": "https://github.com/authelia/authelia.git",
+      "revision": "b29895c4c295b628507d4cccb62b28fdedda0420",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "go.mod",
+          "cmd/authelia/main.go",
+          "internal/commands/root.go",
+          "web/package.json"
+        ],
+        "run": { "cwd": ".", "command": "authelia-scripts serve test.yml" },
+        "test": { "cwd": ".", "command": "authelia-scripts unittest" }
+      },
+      "label_sources": ["CONTRIBUTING.md", "bootstrap.sh", "cmd/authelia-scripts/cmd/const.go", "cmd/authelia/main.go"]
+    },
+    {
+      "id": "changesets/changesets",
+      "category": "monorepo",
+      "repository": "https://github.com/changesets/changesets.git",
+      "revision": "7fd0d9193a7b8bbbb01955adefc68b38d3070616",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "packages/cli/bin.js",
+          "packages/cli/src/index.ts",
+          "packages/config/src/config.ts"
+        ],
+        "run": { "cwd": ".", "command": "pnpm watch" },
+        "test": { "cwd": ".", "command": "pnpm test" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/cli/package.json", "packages/cli/bin.js"]
+    },
+    {
+      "id": "vercel/turborepo",
+      "category": "monorepo",
+      "repository": "https://github.com/vercel/turborepo.git",
+      "revision": "2f8a96293bdbd067fc9b1c5bc3d1b7f719f48cb9",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "Cargo.toml",
+          "crates/turborepo/src/main.rs",
+          "crates/turborepo-lib/src/lib.rs"
+        ],
+        "run": { "cwd": ".", "command": "pnpm turbo" },
+        "test": { "cwd": ".", "command": "pnpm test" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "Cargo.toml", "crates/turborepo/Cargo.toml"]
+    },
+    {
+      "id": "sveltejs/kit",
+      "category": "monorepo",
+      "repository": "https://github.com/sveltejs/kit.git",
+      "revision": "47643bb6750155a221e517a8894c1f45b007eee9",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "packages/kit/package.json",
+          "packages/kit/src/exports/index.js",
+          "packages/kit/src/runtime/server/index.js"
+        ],
+        "run": null,
+        "test": { "cwd": ".", "command": "pnpm test:kit" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/kit/package.json", "packages/kit/src/exports/index.js"]
+    },
+    {
+      "id": "vuejs/core",
+      "category": "monorepo",
+      "repository": "https://github.com/vuejs/core.git",
+      "revision": "b5f8518379b77c3b62a7a9d2b52f6c76cda09bd5",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "packages/vue/src/index.ts",
+          "packages/runtime-core/src/index.ts",
+          "packages/reactivity/src/index.ts"
+        ],
+        "run": { "cwd": ".", "command": "pnpm dev" },
+        "test": { "cwd": ".", "command": "pnpm test" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "packages/vue/package.json", "packages/runtime-core/package.json"]
+    },
+    {
+      "id": "tanstack/query",
+      "category": "monorepo",
+      "repository": "https://github.com/TanStack/query.git",
+      "revision": "fd50fa14d283c7d6664a796f758498d1ad5bfce7",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "nx.json",
+          "packages/query-core/src/index.ts",
+          "packages/react-query/src/index.ts"
+        ],
+        "run": { "cwd": ".", "command": "pnpm dev" },
+        "test": { "cwd": ".", "command": "pnpm test" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "nx.json", "packages/query-core/package.json"]
+    },
+    {
+      "id": "pmndrs/react-spring",
+      "category": "monorepo",
+      "repository": "https://github.com/pmndrs/react-spring.git",
+      "revision": "d0a68478583903ae072f9353b9b6a5a53683acef",
+      "labels": {
+        "important_files": [
+          "package.json",
+          "pnpm-workspace.yaml",
+          "turbo.json",
+          "packages/core/src/index.ts",
+          "packages/shared/src/index.ts"
+        ],
+        "run": { "cwd": ".", "command": "pnpm dev" },
+        "test": { "cwd": ".", "command": "pnpm test" }
+      },
+      "label_sources": ["package.json", "pnpm-workspace.yaml", "turbo.json", "packages/core/package.json"]
+    },
+    {
+      "id": "burntsushi/ripgrep",
+      "category": "rust-cli",
+      "repository": "https://github.com/BurntSushi/ripgrep.git",
+      "revision": "f9c05a949d1a0dc8e16dee28ca9605d38611faeb",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "crates/core/main.rs",
+          "crates/core/search.rs",
+          "tests/tests.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "cargo test" }
+      },
+      "label_sources": ["Cargo.toml", "crates/core/main.rs", "CONTRIBUTING.md", "ci/test-complete"]
+    },
+    {
+      "id": "sharkdp/fd",
+      "category": "rust-cli",
+      "repository": "https://github.com/sharkdp/fd.git",
+      "revision": "ca51233d277e5c0601ddb216948bcbcf0a56c80e",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "src/main.rs",
+          "src/walk.rs",
+          "tests/tests.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "cargo test" }
+      },
+      "label_sources": ["README.md", "Cargo.toml", "src/main.rs", "CONTRIBUTING.md"]
+    },
+    {
+      "id": "sharkdp/bat",
+      "category": "rust-cli",
+      "repository": "https://github.com/sharkdp/bat.git",
+      "revision": "78951393e29bfd2f2a45f4326b9d2bb5e737dd2a",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "src/bin/bat/main.rs",
+          "src/controller.rs",
+          "tests/integration_tests.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "cargo test" }
+      },
+      "label_sources": ["README.md", "Cargo.toml", "src/bin/bat/main.rs", "CONTRIBUTING.md"]
+    },
+    {
+      "id": "casey/just",
+      "category": "rust-cli",
+      "repository": "https://github.com/casey/just.git",
+      "revision": "13bf03f642f4cec7799c19f1f8f039e1cb3b095d",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "justfile",
+          "src/main.rs",
+          "tests/lib.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "just test" }
+      },
+      "label_sources": ["Cargo.toml", "justfile", "src/main.rs", "CONTRIBUTING.md"]
+    },
+    {
+      "id": "eza-community/eza",
+      "category": "rust-cli",
+      "repository": "https://github.com/eza-community/eza.git",
+      "revision": "471bfbc7b03cbac8c738e8d9050edb06ee79132a",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "justfile",
+          "src/main.rs",
+          "tests/cli_tests.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "cargo test" }
+      },
+      "label_sources": ["Cargo.toml", "justfile", "src/main.rs", "TESTING.md"]
+    },
+    {
+      "id": "ajeetdsouza/zoxide",
+      "category": "rust-cli",
+      "repository": "https://github.com/ajeetdsouza/zoxide.git",
+      "revision": "cf086b057dfcc7c306450c70829b2788a3e64219",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "Cargo.toml",
+          "justfile",
+          "src/main.rs",
+          "src/db/mod.rs"
+        ],
+        "run": { "cwd": ".", "command": "cargo run -- --help" },
+        "test": { "cwd": ".", "command": "cargo test" }
+      },
+      "label_sources": ["README.md", "Cargo.toml", "justfile", "src/main.rs"]
+    },
+    {
+      "id": "healthchecks/healthchecks",
+      "category": "django-app",
+      "repository": "https://github.com/healthchecks/healthchecks.git",
+      "revision": "2f79af0c232ae99aa66edabd7d42be7d52add601",
+      "labels": {
+        "important_files": [
+          "README.md",
+          "manage.py",
+          "requirements.txt",
+          "hc/settings.py",
+          "hc/urls.py"
+        ],
+        "run": { "cwd": ".", "command": "./manage.py runserver" },
+        "test": { "cwd": ".", "command": "./manage.py test" }
+      },
+      "label_sources": ["README.md", "manage.py", "hc/settings.py", "hc/urls.py"]
+    },
+    {
+      "id": "django/djangoproject.com",
+      "category": "django-app",
+      "repository": "https://github.com/django/djangoproject.com.git",
+      "revision": "e98f6b5b78ef6d9887277f776845bb939ec8cad8",
+      "labels": {
+        "important_files": [
+          "README.rst",
+          "Makefile",
+          "manage.py",
+          "djangoproject/settings/common.py",
+          "djangoproject/hosts.py"
+        ],
+        "run": { "cwd": ".", "command": "make run" },
+        "test": { "cwd": ".", "command": "make test" }
+      },
+      "label_sources": ["README.rst", "Makefile", "manage.py", "djangoproject/settings/common.py"]
+    },
+    {
+      "id": "saleor/saleor",
+      "category": "django-app",
+      "repository": "https://github.com/saleor/saleor.git",
+      "revision": "e3f3b439ca8ff38be297de305227791e6c85adb8",
+      "labels": {
+        "important_files": [
+          "pyproject.toml",
+          "manage.py",
+          "saleor/settings.py",
+          "saleor/urls.py",
+          "saleor/graphql/api.py"
+        ],
+        "run": { "cwd": ".", "command": "uv run poe start" },
+        "test": { "cwd": ".", "command": "uv run poe test" }
+      },
+      "label_sources": ["CONTRIBUTING.md", "pyproject.toml", "manage.py", "saleor/settings.py"]
+    },
+    {
+      "id": "pretix/pretix",
+      "category": "django-app",
+      "repository": "https://github.com/pretix/pretix.git",
+      "revision": "db147280fddf350a11d1e6883d6ccf251101f598",
+      "labels": {
+        "important_files": [
+          "README.rst",
+          "pyproject.toml",
+          "src/manage.py",
+          "src/pretix/settings.py",
+          "src/pretix/urls.py"
+        ],
+        "run": { "cwd": "src", "command": "python manage.py runserver" },
+        "test": { "cwd": "src", "command": "py.test" }
+      },
+      "label_sources": ["doc/development/setup.rst", "pyproject.toml", "src/manage.py", "src/setup.cfg"]
+    },
+    {
+      "id": "wagtail/bakerydemo",
+      "category": "django-app",
+      "repository": "https://github.com/wagtail/bakerydemo.git",
+      "revision": "51a8b92edaffc64ff050abdd95bed87c55d550c6",
+      "labels": {
+        "important_files": [
+          "readme.md",
+          "Makefile",
+          "manage.py",
+          "bakerydemo/settings/base.py",
+          "bakerydemo/urls.py"
+        ],
+        "run": { "cwd": ".", "command": "./manage.py runserver 0.0.0.0:8000" },
+        "test": { "cwd": ".", "command": "./manage.py test" }
+      },
+      "label_sources": ["readme.md", "CONTRIBUTING.md", "manage.py", "bakerydemo/settings/base.py"]
+    },
+    {
+      "id": "pallets/flask-initial-no-readme",
+      "category": "no-readme",
+      "repository": "https://github.com/pallets/flask.git",
+      "revision": "33850c0ebd23ae615e6823993d441f46d80b1ff0",
+      "expect_readme": false,
+      "labels": {
+        "important_files": [
+          "flask.py",
+          "examples/minitwit/minitwit.py",
+          "examples/minitwit/schema.sql",
+          "examples/apishowcase/apishowcase.py",
+          "examples/minitwit/templates/layout.html"
+        ],
+        "run": {
+          "cwd": ".",
+          "command": "python examples/minitwit/minitwit.py"
+        },
+        "test": null
+      },
+      "label_sources": ["flask.py", "examples/minitwit/minitwit.py", "examples/minitwit/schema.sql"]
+    }
+  ]
+}

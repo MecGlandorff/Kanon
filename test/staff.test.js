@@ -38,6 +38,71 @@ test("declared purpose stays likely and Python tests do not imply pytest", () =>
   assert.deepEqual(analysis.state.tests.frameworks, []);
 });
 
+test("negated README capabilities do not become drift claims", () => {
+  const root = makeFixture({
+    "README.md":
+      "# Demo\n\nThis project does not support PDF export.\n\n" +
+      "There is no CI, Docker support, or production-ready release.\n"
+  });
+  const analysis = analyzeRepo(root, { runId: "20260725000000008" });
+
+  assert.deepEqual(analysis.state.verification.issues, []);
+});
+
+test("negated inline commands are not treated as instructions", () => {
+  const root = makeFixture({
+    "README.md": "# Demo\n\nDo not run `npm start`; that command was removed.\n",
+    "package.json": JSON.stringify({
+      scripts: { test: "node --test" }
+    })
+  });
+  const analysis = analyzeRepo(root, { runId: "20260725000000009" });
+
+  assert.deepEqual(analysis.state.verification.issues, []);
+});
+
+test("local import fan-in surfaces a central Python module", () => {
+  const root = makeFixture({
+    "README.md": "# Demo\n",
+    "pyproject.toml": "[project]\nname = \"demo\"\n",
+    "src/model.py": "class Model:\n    pass\n",
+    "src/train.py": "from src.model import Model\n",
+    "src/evaluate.py": "from src.model import Model\n",
+    "src/serve.py": "from src.model import Model\n"
+  });
+  const analysis = analyzeRepo(root, { runId: "20260725000000010" });
+
+  assert.ok(
+    analysis.state.code_intelligence.top_fan_in.some(
+      (item) => item.path === "src/model.py" && item.fan_in === 3
+    )
+  );
+  assert.ok(
+    analysis.state.important_files
+      .slice(0, 5)
+      .some((item) => item.path === "src/model.py")
+  );
+});
+
+test("package-manager declarations control emitted script commands", () => {
+  const root = makeFixture({
+    "README.md": "# Demo\n",
+    "package.json": JSON.stringify({
+      name: "demo",
+      packageManager: "pnpm@10.0.0",
+      scripts: {
+        dev: "node src/index.js",
+        test: "node --test"
+      }
+    }),
+    "src/index.js": "console.log('demo')\n"
+  });
+  const analysis = analyzeRepo(root, { runId: "20260725000000011" });
+
+  assert.equal(analysis.state.commands.run[0].command, "pnpm dev");
+  assert.equal(analysis.state.commands.test[0].command, "pnpm test");
+});
+
 test("a self-contained skill package does not require a README", () => {
   const root = makeFixture({
     "SKILL.md": "---\nname: demo\ndescription: \"Demo repository skill.\"\n---\n\n# Demo\n"
