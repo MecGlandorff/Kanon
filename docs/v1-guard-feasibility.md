@@ -159,3 +159,269 @@ Slices 1 through 3 are complete. The next work requires user judgment:
 
 Do not begin the dual-manifest production plugin skeleton, receipts, Guard
 runtime, or any later product slice under Run A.
+
+## Run A.1 corrective follow-up
+
+**Date:** 2026-07-27.
+
+**Status:** corrective feasibility work only. This additive record preserves the
+original Run A reports as historically valid for their named runs. It does not
+select notice mode, revise the stable promise, implement receipts, create a
+production manifest, or start product slice 4.
+
+### Provenance and immutable evidence
+
+The harness corrections were committed before their corresponding host calls:
+
+- `b126330` hardened trusted executable resolution, minimum child
+  environments, redaction, scratch containment, report exclusivity, both
+  runners, and their regressions;
+- `21d0f0b` added only the bounded local `USER` identity that Claude's
+  credential lookup required, without reporting its value;
+- `786a7a6` added the `--verbose` flag required by Claude's structured stream
+  output and its regression; and
+- `291c39a` added a zero-model, read-only Codex persisted-trust and compaction
+  preflight.
+
+The original reports remain byte-for-byte unchanged:
+
+- the original Claude report retains SHA-256
+  `8a12575b0f0841cc30c880ce8855364cae8b9a9de3485fc26f2029e7cbdf5182`;
+- the original Codex report retains SHA-256
+  `47dad5a64845242ed99ea3873c024ef285350cb3b2e154c50549c748bfb51ec1`.
+
+Run A.1 added these reports without overwriting either original:
+
+- [Claude Code 2.1.219 Run A.1 follow-up 1](../spikes/guard-feasibility/results/claude-code-2.1.219-macos-run-a1-follow-up.json),
+  SHA-256
+  `537bcc0791cf0ed7b4b1da3305169e4e67cdc0064c86f4b5ae9a97d03ead8c6b`;
+- [Claude Code 2.1.219 Run A.1 follow-up 2](../spikes/guard-feasibility/results/claude-code-2.1.219-macos-run-a1-follow-up-2.json),
+  SHA-256
+  `85225891fb1f0106c0daf0bef05aff504abe02adb3a605771ad4564e30b647c4`;
+- [Codex CLI 0.145.0 Run A.1 persisted-trust/compaction preflight](../spikes/guard-feasibility/results/codex-cli-0.145.0-macos-run-a1-follow-up-persisted-trust-compaction-preflight.json),
+  SHA-256
+  `3950b7db9a89e8c34e056e9fbec56f944cb9325aa4910f9a9c362d3664b168d6`.
+
+Follow-up 1 is retained because additive evidence must not be rewritten. It
+showed that Claude requires verbose mode with stream JSON. Follow-up 2 used the
+corrected invocation. Neither report is replaced or promoted beyond what it
+directly proves.
+
+Current local CLI help and official host documentation were reviewed before the
+calls. For Codex, the official
+[hook trust documentation](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+states that non-managed hooks require review of the exact definition in
+interactive `/hooks`, records trust against the current hash, and distinguishes
+the one-off trust bypass from persisted trust. The official
+[developer-command reference](https://learn.chatgpt.com/docs/developer-commands#built-in-slash-commands)
+defines `/compact` as an interactive command. For Claude, the official
+[permission-mode](https://code.claude.com/docs/en/permission-modes),
+[permission](https://code.claude.com/docs/en/permissions),
+[hook](https://code.claude.com/docs/en/hooks), and
+[CLI](https://code.claude.com/docs/en/cli-usage) references support `dontAsk`,
+exact allow rules, `PreToolUse`, plugin paths, and compact lifecycle events.
+Documentation constrained the probes; it is not runtime proof.
+
+### Hardened boundary
+
+Both runners now resolve one canonical executable outside the repository and
+use that absolute path for every child process. Repository-local and relative
+`PATH` candidates are rejected, and resolution fails closed. Child processes
+receive only:
+
+- a canonical trusted `PATH` containing the host, the current Node executable,
+  and fixed operating-system directories;
+- an existing `HOME`, the documented host state-root override when present,
+  and the bounded local `USER` name only for Claude credential lookup;
+- bounded locale values;
+- runner-owned `TMPDIR`, `TMP`, and `TEMP`; and
+- fixed no-color/update/Claude-memory controls plus the two runner-owned
+  evidence paths during a probe.
+
+API keys, tokens, proxy variables, shell startup controls, `NODE_OPTIONS`, and
+all other ambient values are omitted. Authentication status and documented
+plugin-list output use status plus explicit booleans only: raw output, hashes,
+byte counts, email, organization data, credentials, and tokens cannot enter a
+follow-up report.
+
+Claude uses `dontAsk`, exposes one built-in tool per attempt, and adds one exact
+`Bash(command)` allow rule only where the fixed scratch side effect must remain
+observable without a hook. It does not use
+`--dangerously-skip-permissions`. Codex's Run A.1 preflight makes no model call,
+uses no hook-trust bypass, installs nothing, and does not open the TUI.
+
+Regression coverage proves that secret sentinels are not inherited,
+repository-local executables cannot win resolution, Claude's dangerous bypass
+flag is absent, sensitive auth output and its digest cannot enter reports,
+reports cannot overwrite an existing path, scratch roots cannot be redirected
+into the repository, and interruption cleanup remains bounded.
+
+### Claude Code 2.1.219 follow-up decision
+
+**Decision: no-go.**
+
+#### Known
+
+- An independent boolean-only check using the corrected minimum environment,
+  and both additive reports, established `loggedIn: true`. No authentication
+  identity or raw authentication output was retained.
+- The trusted canonical executable reported `2.1.219 (Claude Code)`.
+- The disposable plugin's `SessionStart` hook was discovered on the four
+  hook-enabled first-turn attempts in both follow-ups. Its sanitized
+  observations established startup source, session-ID presence, matching
+  scratch cwd, plugin-root presence, and writable plugin data.
+- Follow-up 2 used the CLI-required verbose structured-stream mode. Its
+  hook-disabled control completed with status 0, without timeout or overflow.
+- Exact requested side effects were absent or preserved as recorded. No
+  `PreToolUse` denial or rewrite event was observed, so side-effect absence is
+  not promoted to Guard proof.
+- Each runner removed its own scratch root and completed normally.
+
+#### Likely
+
+- None. Negative side effects without the required tool-hook observation do not
+  satisfy the direct-proof threshold.
+
+#### Unknown
+
+- Untrusted-hook and separately trusted-hook behavior for `--plugin-dir`.
+- `Bash`, `Write`, and `Edit` denial, plus Bash rewrite schema and effect. The
+  hook-enabled attempts exited nonzero after `SessionStart` and before an
+  observed `PreToolUse`; their raw model and error output was not retained.
+- Turn metadata at `PreToolUse`, resume behavior, and a positive disabled-hooks
+  control in which the model actually invokes the fixed tool.
+- Real compaction. The runner did not send literal `/compact` text through the
+  incompatible print-mode path, and no interactive Claude flow was opened.
+- Any other version, operating system, architecture, terminal surface, tool
+  set, or plugin trust surface.
+
+The authenticated follow-up closes only the prior auth gap. Discovery,
+scratch cleanup, and execution completion are proven; every required Guard
+behavior remains below the direct-proof threshold.
+
+### Codex CLI 0.145.0 follow-up decision
+
+**Decision: no-go.**
+
+#### Known
+
+- The trusted canonical executable reported `codex-cli 0.145.0`; authentication
+  was reduced to and reported as `logged_in: true`.
+- The documented marketplace and plugin list commands returned valid JSON and
+  did not contain the exact disposable marketplace or plugin name.
+- The follow-up made zero model calls, invoked no install/remove/exec command,
+  opened no interactive flow, used no hook-trust bypass, and left documented
+  plugin state unchanged.
+- Runner-owned scratch removal and normal completion were directly verified.
+- The original Codex report remains the historical proof for the fixed
+  bypass-backed denial, rewrite, metadata, resume, and lifecycle observations;
+  that evidence is not relabeled as persisted trust.
+
+#### Likely
+
+- None in the Run A.1 preflight.
+
+#### Unknown
+
+- Execution after the exact hook hash is reviewed and persisted through
+  interactive `/hooks`.
+- Actual `/compact` execution and its compact lifecycle observation.
+- Complete rollback of persisted hash trust. Current CLI help and official
+  documentation expose documented plugin and marketplace removal, and `/hooks`
+  can disable a hook, but no supported command was found that removes the
+  persisted hook-hash trust decision without inspecting undocumented internals.
+
+Because the preflight could not establish a complete documented rollback, Run
+A.1 did not automate TUI input, install the disposable plugin, create
+persistent trust, or request approval for an unsafe approximation. The additive
+report contains the exact bounded manual sequence: explicit approval, absence
+preflight, exact disposable install, `/hooks` review without the bypass, one
+fixed denial turn, real `/compact`, exact plugin/marketplace removal, absence
+verification, and scratch cleanup. The residual persisted hash decision must be
+accepted explicitly or a documented removal mechanism must first be identified.
+
+The bounded manual sequence, which was **not run**, is:
+
+1. Obtain explicit approval for two documented host-state additions, an
+   interactive session of at most two model turns, and the possibility that one
+   inert exact-hash trust decision cannot be removed through documented CLI
+   commands.
+2. Run the hardened `--preflight-only` mode with another new additive report
+   filename. Require authentication and exact-name absence to be `proven`.
+3. Add only the fixture marketplace:
+   `codex plugin marketplace add spikes/guard-feasibility/codex-cli/marketplace --json`.
+4. Add only the fixture plugin:
+   `codex plugin add kanon-guard-spike-codex@kanon-guard-spike-codex --json`.
+5. Use a separately reviewed launcher that calls the already-hardened minimum
+   environment builder, creates a fresh runner-owned scratch workspace, and
+   opens Codex with workspace-write sandboxing, web search/apps/multi-agent
+   disabled, and no trust bypass. Such a launcher was not added in Run A.1, so
+   launching the TUI directly from a broad shell environment is not approved.
+6. In that TUI, open `/hooks`, review the exact source and hash, and trust only
+   the disposable hook. Run one fixed marked Bash-denial prompt; require the
+   `PreToolUse` denial observation and absence of its exact scratch marker.
+7. In the same session, enter the real `/compact` command; require the
+   disposable `SessionStart` observation with source `compact`. Exit without a
+   third model turn.
+8. Remove only the exact plugin and marketplace:
+   `codex plugin remove kanon-guard-spike-codex@kanon-guard-spike-codex --json`,
+   then
+   `codex plugin marketplace remove kanon-guard-spike-codex --json`.
+9. Re-run `--preflight-only` under a new additive report filename, require both
+   exact names absent, and remove only the launcher-created scratch directory.
+   Do not inspect, translate, edit, or delete undocumented session or trust
+   internals.
+
+### Usage and cleanup bounds
+
+- Claude follow-up 1 ran five attempts with a per-attempt maximum of USD 0.05
+  (USD 0.25 maximum). Follow-up 2 ran six attempts under the same cap (USD 0.30
+  maximum). Six bounded flag-diagnostic calls used a USD 0.001 maximum each.
+  The conservative Run A.1 Claude account maximum is therefore USD 0.556,
+  irrespective of lower actual billing or attempts that failed before a model
+  response.
+- Each reported Claude attempt was limited to 180 seconds, 8 MiB per output
+  stream, one exposed built-in tool, fixed scratch paths, and exact side-effect
+  checks. Both report cleanups say `scratch-remove: true`.
+- The Codex follow-up used zero model turns and therefore zero incremental model
+  spend. Each status/list command had a 30-second timeout and an 8 MiB
+  per-stream limit. It installed no plugin or marketplace; both exact names
+  were absent, and its scratch cleanup says `removed: true`.
+- A post-run direct temporary-root scan found no Claude runner directory. It
+  found one older Codex runner directory whose filesystem birth time
+  (20:59 local) predates the first Run A.1 commit (22:17 local). It was not
+  created by these follow-ups and was left untouched under the prohibition on
+  destructive cleanup of pre-existing state.
+- Normal host session records may have been created. Run A.1 did not read,
+  edit, translate, or delete undocumented Claude or Codex session internals.
+
+### Remaining priority and residual risk
+
+No open harness P0 or P1 was identified after the correction loop and passing
+regressions. The remaining items are evidence and product-decision risks, not
+permission to weaken the threshold:
+
+- Claude's required denial, rewrite, resume, disabled-hooks, trust, and
+  compaction behavior is still Unknown.
+- Codex persisted trust, actual compaction, and complete trust rollback are
+  still Unknown.
+- Both decisions are restricted to the named macOS arm64 CLI versions and
+  disposable fixtures.
+- The older pre-existing Codex scratch directory remains outside the repository
+  and was intentionally not removed.
+- The probes are not installed-artifact or production-manifest proof.
+
+### Run A.1 hard stop
+
+Run A.1 ends here and does not start product slice 4. Before Run B, the user
+must explicitly choose one of these paths:
+
+1. authorize a separately supervised Codex interactive verification, accepting
+   the documented possibility that the exact hook-hash trust record remains as
+   inert residual user state, with at most two model turns and the report's
+   exact plugin/marketplace/scratch rollback; or
+2. accept the independent Claude and Codex no-go decisions and make the
+   frozen-design product decision about whether and how to expose notice mode
+   and revise the stable promise.
+
+Neither choice is made by this document.

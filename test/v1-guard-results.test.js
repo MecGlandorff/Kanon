@@ -23,14 +23,32 @@ const claudePath = path.join(
   resultsRoot,
   "claude-code-2.1.219-macos.json"
 );
+const claudeFollowUpPath = path.join(
+  resultsRoot,
+  "claude-code-2.1.219-macos-run-a1-follow-up.json"
+);
+const claudeFollowUp2Path = path.join(
+  resultsRoot,
+  "claude-code-2.1.219-macos-run-a1-follow-up-2.json"
+);
+const codexFollowUpPath = path.join(
+  resultsRoot,
+  "codex-cli-0.145.0-macos-run-a1-follow-up-persisted-trust-compaction-preflight.json"
+);
 const resultDocument = fs.readFileSync(
   path.join(repoRoot, "docs", "v1-guard-feasibility.md"),
   "utf8"
 );
 const codexText = fs.readFileSync(codexPath, "utf8");
 const claudeText = fs.readFileSync(claudePath, "utf8");
+const claudeFollowUpText = fs.readFileSync(claudeFollowUpPath, "utf8");
+const claudeFollowUp2Text = fs.readFileSync(claudeFollowUp2Path, "utf8");
+const codexFollowUpText = fs.readFileSync(codexFollowUpPath, "utf8");
 const codex = JSON.parse(codexText);
 const claude = JSON.parse(claudeText);
+const claudeFollowUp = JSON.parse(claudeFollowUpText);
+const claudeFollowUp2 = JSON.parse(claudeFollowUp2Text);
+const codexFollowUp = JSON.parse(codexFollowUpText);
 
 test("final Guard reports are hash-bound and retain no raw host payloads", () => {
   for (const [file, contents] of [
@@ -195,6 +213,84 @@ test("Claude result keeps authentication-blocked behavior Unknown", () => {
   );
 });
 
+test("Run A.1 follow-up reports are additive, redacted, and hash-bound", () => {
+  for (const [file, contents, report] of [
+    [claudeFollowUpPath, claudeFollowUpText, claudeFollowUp],
+    [claudeFollowUp2Path, claudeFollowUp2Text, claudeFollowUp2],
+    [codexFollowUpPath, codexFollowUpText, codexFollowUp]
+  ]) {
+    const digest = crypto
+      .createHash("sha256")
+      .update(contents)
+      .digest("hex");
+    assert.match(resultDocument, new RegExp(digest));
+    assert.doesNotMatch(contents, new RegExp(escapeRegExp(repoRoot)));
+    assert.doesNotMatch(contents, /KANON_GUARD_SPIKE/);
+    assert.doesNotMatch(contents, /"stdout":|"stderr":/);
+    assert.doesNotMatch(
+      contents,
+      /email|organization(?:Id|_id)|credential|access[_-]?token/i
+    );
+    assert.equal(report.schema, "kanon-guard-feasibility-report-v2");
+    assert.equal(report.disposition, "no-go");
+    assert.match(path.basename(file), /0\.145\.0|2\.1\.219/);
+    const auth = report.setup.find((entry) => entry.name === "authentication");
+    assert.equal(auth.process.output_redacted, true);
+    assert.equal(Object.hasOwn(auth.process, "stdout_sha256"), false);
+    assert.equal(Object.hasOwn(auth.process, "stderr_sha256"), false);
+  }
+
+  assert.equal(claudeFollowUp.host, "claude-code");
+  assert.equal(claudeFollowUp.setup.find(
+    (entry) => entry.name === "authentication"
+  ).logged_in, true);
+  assert.equal(claudeFollowUp.criteria.discovery, "proven");
+  assert.equal(claudeFollowUp.criteria.scratch_cleanup, "proven");
+  assert.equal(claudeFollowUp.attempts.length, 5);
+
+  assert.equal(claudeFollowUp2.host, "claude-code");
+  assert.equal(claudeFollowUp2.setup.find(
+    (entry) => entry.name === "authentication"
+  ).logged_in, true);
+  assert.equal(claudeFollowUp2.criteria.discovery, "proven");
+  assert.equal(claudeFollowUp2.criteria.scratch_cleanup, "proven");
+  assert.equal(claudeFollowUp2.criteria.shell_denial, "unknown");
+  assert.equal(claudeFollowUp2.criteria.patch_denial, "unknown");
+  assert.equal(claudeFollowUp2.criteria.compaction, "unknown");
+  assert.equal(claudeFollowUp2.attempts.length, 6);
+
+  assert.equal(codexFollowUp.host, "codex-cli");
+  assert.equal(codexFollowUp.claimed_surface.max_model_attempts, 0);
+  assert.deepEqual(codexFollowUp.attempts, []);
+  assert.equal(codexFollowUp.criteria.authentication, "proven");
+  assert.equal(
+    codexFollowUp.criteria.documented_state_preflight,
+    "proven"
+  );
+  assert.equal(codexFollowUp.criteria.host_state_unchanged, "proven");
+  assert.equal(codexFollowUp.criteria.persisted_trusted_hook, "unknown");
+  assert.equal(codexFollowUp.criteria.actual_compaction, "unknown");
+  assert.match(codexFollowUp.preflight_and_rollback.rollback_gap, /no command/);
+  assert.ok(
+    codexFollowUp.manual_verification.some((entry) => entry.includes("/hooks"))
+  );
+  assert.ok(
+    codexFollowUp.manual_verification.some((entry) => entry.includes("/compact"))
+  );
+  assert.match(
+    resultDocument,
+    /codex plugin add kanon-guard-spike-codex@kanon-guard-spike-codex --json/
+  );
+  assert.match(
+    resultDocument,
+    /codex plugin remove kanon-guard-spike-codex@kanon-guard-spike-codex --json/
+  );
+  assert.match(
+    resultDocument,
+    /launching the TUI directly from a broad shell environment is not approved/
+  );
+});
+
 test("slice 3 selects neither Guard nor notice and stops before slice 4", () => {
   assert.match(resultDocument, /No `guard` claim is made for either host/);
   assert.match(resultDocument, /No `notice` mode is selected/);
@@ -203,6 +299,8 @@ test("slice 3 selects neither Guard nor notice and stops before slice 4", () => 
     resultDocument,
     /Do not begin the dual-manifest production plugin skeleton/
   );
+  assert.match(resultDocument, /Run A\.1 hard stop/);
+  assert.match(resultDocument, /does not start product slice 4/);
 });
 
 function escapeRegExp(value) {
