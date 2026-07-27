@@ -317,6 +317,7 @@ async function invoke(name, environment, prompt, options = {}) {
     "--print",
     "--output-format",
     "stream-json",
+    "--verbose",
     "--include-hook-events",
     "--plugin-dir",
     pluginRoot,

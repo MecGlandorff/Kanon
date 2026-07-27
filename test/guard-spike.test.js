@@ -428,6 +428,7 @@ test("Claude runner contains no dangerous permission-bypass flag", () => {
   );
   assert.match(source, /"dontAsk"/);
   assert.match(source, /"--allowedTools"/);
+  assert.match(source, /"--verbose"/);
 });
 
 test("spike scratch paths use the host canonical temporary root", (t) => {

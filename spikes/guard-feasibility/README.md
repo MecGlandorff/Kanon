@@ -95,9 +95,11 @@ including hashes and byte counts.
 
 The Claude runner uses `dontAsk`, exposes exactly one built-in tool per
 attempt, and adds one exact Bash permission rule only when the fixed scratch
-side effect must remain observable without the hook. It does not use either
-dangerous permission-bypass flag. A behavior that cannot be observed under
-that contract remains `Unknown`.
+side effect must remain observable without the hook. Structured stream output
+uses the CLI-required verbose mode but only hashes and bounded sanitized
+summaries enter the report. The runner does not use either dangerous
+permission-bypass flag. A behavior that cannot be observed under that contract
+remains `Unknown`.
 
 Report creation is additive: an existing report path is never truncated or
 replaced.
