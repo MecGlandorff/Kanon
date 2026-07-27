@@ -112,6 +112,26 @@ the interactive UI, and does not use the hook-trust bypass. The resulting
 report retains persisted trust and actual `/compact` execution as `Unknown`
 when a documented rollback for the hook-hash trust decision is unavailable.
 
+Run A.2 uses the separate `--run-a2-preflight` identity for another additive,
+zero-model report. Only after that report proves authentication and exact-name
+absence may `codex-cli/interactive-run.mjs` be used. The interactive launcher
+has no caller-controlled prompt, plugin, marketplace, workspace, or extra-flag
+surface. It verifies the committed fixture hashes, creates its own external
+scratch workspace, uses the hardened executable and environment boundary,
+installs and verifies only the exact fixture, and opens a `workspace-write`,
+`on-request` TUI without either dangerous bypass. It disables web search,
+apps/connectors, configured MCP servers, memories, multi-agent behavior,
+browser/computer-use tools, plugin sharing, and related discovery features for
+that process. Codex exposes no documented session-only include-list for local
+plugins, so the launcher does not change unrelated persistent plugin state.
+
+The supervisor must inspect `/status` and `/hooks`, trust only the displayed
+committed disposable hook definition, submit the one launcher-displayed fixed
+denial probe, enter the real `/compact` command, then exit without a third
+model turn. The launcher retains only bounded sanitized hook observations and
+booleans, removes and verifies absence of its exact plugin and marketplace,
+removes its scratch root, and writes its report with exclusive creation.
+
 ## Result discipline
 
 `guard` is not selected by this spike. A host can be a go candidate only if

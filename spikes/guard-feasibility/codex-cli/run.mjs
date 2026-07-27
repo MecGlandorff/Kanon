@@ -17,13 +17,19 @@ import {
   summarizeSensitiveProcess,
   writeReport
 } from "../lib/runtime.mjs";
+import {
+  MARKETPLACE_NAME,
+  PLUGIN_NAME,
+  parseMarketplaceList,
+  parsePluginList
+} from "./fixture.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../.."
 );
-const marketplaceName = "kanon-guard-spike-codex";
-const pluginName = "kanon-guard-spike-codex";
+const marketplaceName = MARKETPLACE_NAME;
+const pluginName = PLUGIN_NAME;
 const marketplaceRoot = path.join(
   repoRoot,
   "spikes/guard-feasibility/codex-cli/marketplace"
@@ -71,8 +77,10 @@ const report = {
   cleanup: [],
   disposition: "no-go"
 };
-if (options.preflightOnly) {
-  report.follow_up = "run-a1-persisted-trust-compaction-preflight";
+if (options.preflightKind) {
+  report.follow_up = options.preflightKind === "run-a2"
+    ? "run-a2-persisted-trust-compaction-preflight"
+    : "run-a1-persisted-trust-compaction-preflight";
   report.claimed_surface = {
     cli: "codex documented status and plugin-list commands",
     operating_system: process.platform,
@@ -105,7 +113,9 @@ if (options.preflightOnly) {
     automated_action: "not-run"
   };
   report.manual_verification = [
-    "Obtain explicit approval for the exact host-state changes, the unresolved persisted-trust rollback gap, and at most two authenticated model turns.",
+    options.preflightKind === "run-a2"
+      ? "Run A.2 authorization accepts the bounded exact-hash trust residue and at most two authenticated model turns."
+      : "Obtain explicit approval for the exact host-state changes, the unresolved persisted-trust rollback gap, and at most two authenticated model turns.",
     "Re-run this read-only preflight and require both exact disposable names to be absent.",
     "Add only the repository's disposable kanon-guard-spike-codex marketplace and plugin using the documented plugin commands.",
     "Open a fresh interactive Codex workspace with workspace-write sandboxing, web search and apps disabled, and the hardened runner's minimum environment.",
@@ -174,7 +184,7 @@ try {
     process: summarizeSensitiveProcess(auth),
     logged_in: authenticated
   });
-  if (options.preflightOnly) {
+  if (options.preflightKind) {
     await runFollowUpPreflight(authenticated);
   } else if (!authenticated) {
     report.unknown.push("Codex CLI authentication was not directly available for a host run.");
@@ -275,7 +285,7 @@ try {
     );
     report.cleanup.push({ name: "marketplace-remove", process: summarizeProcess(removeMarketplace) });
   }
-  if (options.preflightOnly) {
+  if (options.preflightKind) {
     report.criteria.host_state_unchanged =
       !pluginOwned && !marketplaceOwned ? "proven" : "unknown";
   } else if (pluginOwned || marketplaceOwned) {
@@ -373,15 +383,17 @@ async function runFollowUpPreflight(authenticated) {
     ["plugin", "marketplace", "list", "--json"],
     { cwd: scratch.workspace, env: baseEnvironment, timeoutMs: 30_000 }
   );
-  const marketplaceState = exactJsonStringState(
-    marketplace.stdout,
-    marketplaceName
-  );
+  const marketplaceList = parseMarketplaceList(marketplace.stdout);
+  const marketplaceState = marketplaceList === null
+    ? null
+    : marketplaceList.exactNamePresent;
   report.setup.push({
     name: "marketplace-preflight",
     process: summarizeSensitiveProcess(marketplace),
     output_valid_json: marketplaceState !== null,
-    exact_name_absent: marketplaceState === false
+    exact_name_absent:
+      marketplaceState === false &&
+      marketplaceList?.duplicateExactNames === false
   });
 
   const plugins = await runHostProgram(
@@ -389,19 +401,28 @@ async function runFollowUpPreflight(authenticated) {
     ["plugin", "list", "--json"],
     { cwd: scratch.workspace, env: baseEnvironment, timeoutMs: 30_000 }
   );
-  const pluginState = exactJsonStringState(plugins.stdout, pluginName);
+  const pluginList = parsePluginList(plugins.stdout);
+  const pluginState = pluginList === null
+    ? null
+    : pluginList.exactNamePresent;
   report.setup.push({
     name: "plugin-preflight",
     process: summarizeSensitiveProcess(plugins),
     output_valid_json: pluginState !== null,
-    exact_name_absent: pluginState === false
+    exact_name_absent:
+      pluginState === false &&
+      pluginList?.duplicateExactNames === false,
+    unrelated_installed_plugins_present:
+      pluginList?.otherInstalledPluginsPresent === true
   });
 
   report.criteria.documented_state_preflight = status(
     marketplace.status === 0 &&
       plugins.status === 0 &&
       marketplaceState === false &&
-      pluginState === false
+      pluginState === false &&
+      marketplaceList?.duplicateExactNames === false &&
+      pluginList?.duplicateExactNames === false
   );
   if (marketplaceState === true || pluginState === true) {
     report.unknown.push(
@@ -427,7 +448,9 @@ async function runFollowUpPreflight(authenticated) {
     "Actual compaction remains Unknown: the documented /compact command is interactive and was not sent as literal text through codex exec."
   );
   report.unknown.push(
-    "Safe automation stopped at preflight because current CLI help and official host documentation expose no supported command to remove a persisted hook-hash trust decision without inspecting undocumented internals."
+    options.preflightKind === "run-a2"
+      ? "This zero-model Run A.2 preflight intentionally stops before the separately authorized interactive launcher; it does not itself create persisted trust."
+      : "Safe automation stopped at preflight because current CLI help and official host documentation expose no supported command to remove a persisted hook-hash trust decision without inspecting undocumented internals."
   );
 }
 
@@ -708,7 +731,7 @@ function signalExitCode(signal) {
 }
 
 function finalizeReport() {
-  const required = options.preflightOnly
+  const required = options.preflightKind
     ? [
         "authentication",
         "documented_state_preflight",
@@ -762,22 +785,37 @@ function finalizeReport() {
 }
 
 function parseCodexExecutionOptions(argv) {
-  const modeFlags = argv.filter(
+  const runA1Flags = argv.filter(
     (argument) => argument === "--preflight-only"
   ).length;
-  if (modeFlags > 1) {
-    throw new Error("--preflight-only may be specified only once.");
+  const runA2Flags = argv.filter(
+    (argument) => argument === "--run-a2-preflight"
+  ).length;
+  if (runA1Flags > 1 || runA2Flags > 1) {
+    throw new Error("A preflight mode may be specified only once.");
+  }
+  if (runA1Flags && runA2Flags) {
+    throw new Error("Codex preflight modes are mutually exclusive.");
   }
   const parsed = parseExecutionOptions(
-    argv.filter((argument) => argument !== "--preflight-only"),
+    argv.filter(
+      (argument) =>
+        argument !== "--preflight-only" &&
+        argument !== "--run-a2-preflight"
+    ),
     usage()
   );
   return {
     ...parsed,
-    preflightOnly: modeFlags === 1
+    preflightKind:
+      runA2Flags === 1
+        ? "run-a2"
+        : runA1Flags === 1
+          ? "run-a1"
+          : null
   };
 }
 
 function usage() {
-  return "Usage: node spikes/guard-feasibility/codex-cli/run.mjs --execute [--preflight-only] --report <repo-relative-report.json>\n";
+  return "Usage: node spikes/guard-feasibility/codex-cli/run.mjs --execute [--preflight-only | --run-a2-preflight] --report <repo-relative-report.json>\n";
 }

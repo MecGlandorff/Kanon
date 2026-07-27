@@ -9,6 +9,26 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { inspectHook as inspectCodexHook } from "../spikes/guard-feasibility/codex-cli/marketplace/plugins/kanon-guard-spike-codex/scripts/probe-core.mjs";
 import { inspectHook as inspectClaudeHook } from "../spikes/guard-feasibility/claude-code/plugin/scripts/probe-core.mjs";
 import {
+  MARKETPLACE_NAME,
+  PLUGIN_ID,
+  denialProbe,
+  marketplaceIdentityMatches,
+  parseMarketplaceList,
+  parsePluginList,
+  pluginIdentityMatches,
+  verifyFixtureIdentity
+} from "../spikes/guard-feasibility/codex-cli/fixture.mjs";
+import {
+  cleanupOwnedCodexState,
+  createInteractiveEnvironment,
+  ensureExclusiveReportTarget,
+  evaluateInteractiveEvidence,
+  interactiveArguments,
+  parseInteractiveOptions,
+  sourceBundleSha256,
+  summarizeInteractiveObservations
+} from "../spikes/guard-feasibility/codex-cli/interactive-run.mjs";
+import {
   containedReportPath,
   createMinimalHostEnvironment,
   createScratch,
@@ -252,6 +272,595 @@ test("host fixtures keep separate manifests and lifecycle hooks", () => {
   assert.ok(codexHooks.hooks.SessionStart.length > 0);
   assert.ok(claudeHooks.hooks.SessionStart.length > 0);
 });
+
+test("Codex Run A.2 fixture identity is fixed to the committed disposable files", () => {
+  const identity = verifyFixtureIdentity(repoRoot);
+  const marker = path.join(
+    os.tmpdir(),
+    "kanon-run-a2-fixture",
+    "kanon-guard-spike-deny-shell.txt"
+  );
+  const prompt = denialProbe(marker);
+
+  assert.equal(identity.verified, true);
+  assert.match(identity.bundleSha256, /^[0-9a-f]{64}$/);
+  assert.match(sourceBundleSha256(repoRoot), /^[0-9a-f]{64}$/);
+  assert.match(prompt, /Use the Bash tool exactly once/);
+  assert.match(prompt, /KANON_GUARD_SPIKE_DENY/);
+  assert.match(prompt, /do not retry if the tool is denied/);
+  assert.throws(() => denialProbe("relative-marker"), /must be absolute/);
+});
+
+test("Codex Run A.2 documented JSON identity checks require exact fixture fields", (t) => {
+  const fixture = makeTemporaryDirectory(t, "kanon-guard-marketplace-");
+  const marketplace = parseMarketplaceList(JSON.stringify({
+    marketplaces: [
+      {
+        name: MARKETPLACE_NAME,
+        root: fixture,
+        marketplaceSource: {
+          sourceType: "local",
+          source: fixture
+        }
+      }
+    ]
+  }));
+  const plugin = parsePluginList(JSON.stringify({
+    installed: [
+      {
+        pluginId: PLUGIN_ID,
+        name: MARKETPLACE_NAME,
+        marketplaceName: MARKETPLACE_NAME,
+        version: "0.0.0",
+        installed: true,
+        enabled: true,
+        source: {
+          source: "local",
+          path: fixture
+        },
+        marketplaceSource: {
+          sourceType: "local",
+          source: fixture
+        },
+        installPolicy: "AVAILABLE",
+        authPolicy: "ON_INSTALL"
+      }
+    ]
+  }));
+
+  assert.equal(marketplaceIdentityMatches(marketplace, fixture), true);
+  assert.equal(pluginIdentityMatches(plugin, fixture), true);
+  plugin.match.version = "0.0.1";
+  assert.equal(pluginIdentityMatches(plugin, fixture), false);
+  assert.equal(parseMarketplaceList("[]"), null);
+  assert.equal(parsePluginList('{"installed":"not-an-array"}'), null);
+});
+
+test("Codex Run A.2 launcher arguments and options are fixed and bounded", (t) => {
+  const workspace = makeTemporaryDirectory(t, "kanon-guard-launcher-");
+  const report = path.join(repoRoot, "spikes", "guard-feasibility", "results", "codex-cli-0.145.0-macos-run-a2-test.json");
+
+  assert.deepEqual(
+    parseInteractiveOptions(["--execute", "--report", report]),
+    { execute: true, report }
+  );
+  for (const invalid of [
+    [],
+    ["--execute"],
+    ["--execute", "--execute", "--report", report],
+    ["--execute", "--report", report, "unexpected-prompt"],
+    ["--execute", "--report", "--execute"]
+  ]) {
+    assert.throws(() => parseInteractiveOptions(invalid));
+  }
+
+  const args = interactiveArguments(workspace);
+  assert.equal(args.filter((value) => value === workspace).length, 1);
+  assert.ok(args.includes("workspace-write"));
+  assert.ok(args.includes("on-request"));
+  assert.ok(args.includes('web_search="disabled"'));
+  assert.ok(args.includes("features.apps=false"));
+  assert.ok(args.includes("features.multi_agent=false"));
+  assert.ok(args.includes("features.memories=false"));
+  assert.ok(args.includes("mcp_servers={}"));
+  assert.ok(args.includes("features.plugins=true"));
+  assert.ok(args.includes("features.hooks=true"));
+  assert.equal(args.includes("--dangerously-bypass-hook-trust"), false);
+  assert.equal(
+    args.includes("--dangerously-bypass-approvals-and-sandbox"),
+    false
+  );
+  assert.throws(() => interactiveArguments("relative-workspace"));
+});
+
+test("Codex Run A.2 interactive environment extends only the minimum boundary", (t) => {
+  const scratch = createScratch("kanon-guard-run-a2-environment-", {
+    repoRoot
+  });
+  t.after(() => {
+    if (fs.existsSync(scratch.root)) removeScratch(scratch);
+  });
+  const base = createMinimalHostEnvironment({
+    host: "codex-cli",
+    repoRoot,
+    scratchRoot: scratch.root,
+    hostExecutable: process.execPath,
+    environment: {
+      HOME: os.homedir(),
+      PATH: path.dirname(process.execPath),
+      LANG: "C",
+      OPENAI_API_KEY: "must-not-cross-boundary",
+      HTTPS_PROXY: "must-not-cross-boundary",
+      NODE_OPTIONS: "--require=must-not-cross-boundary"
+    }
+  });
+  const environment = createInteractiveEnvironment({
+    baseEnvironment: base,
+    scratch
+  });
+
+  assert.equal(environment.TERM, "xterm-256color");
+  assert.equal(environment.COLORTERM, "truecolor");
+  assert.equal(
+    environment.KANON_GUARD_SPIKE_EVIDENCE_FILE,
+    scratch.evidence
+  );
+  assert.equal(
+    environment.KANON_GUARD_SPIKE_EVIDENCE_ROOT,
+    scratch.root
+  );
+  for (const key of [
+    "OPENAI_API_KEY",
+    "HTTPS_PROXY",
+    "NODE_OPTIONS",
+    "SHELL"
+  ]) {
+    assert.equal(Object.hasOwn(environment, key), false);
+  }
+});
+
+test("Codex Run A.2 report target is additive and never overwritten", (t) => {
+  const root = makeTemporaryDirectory(t, "kanon-guard-run-a2-report-");
+  const report = path.join(root, "report.json");
+  assert.equal(ensureExclusiveReportTarget(root, report), report);
+  fs.writeFileSync(report, "historical evidence\n", "utf8");
+  assert.throws(
+    () => ensureExclusiveReportTarget(root, report),
+    (error) => error?.code === "EEXIST"
+  );
+  assert.equal(fs.readFileSync(report, "utf8"), "historical evidence\n");
+});
+
+test("Codex Run A.2 cleanup uses only exact owned identities and verifies absence", async () => {
+  const calls = [];
+  const processResult = (stdout = "") => ({
+    status: 0,
+    signal: null,
+    timed_out: false,
+    overflowed: false,
+    error_code: null,
+    stdout,
+    stderr: ""
+  });
+  const run = async (command, args) => {
+    calls.push({ command, args });
+    if (args[0] === "plugin" && args[1] === "list") {
+      return processResult('{"installed":[]}');
+    }
+    if (
+      args[0] === "plugin" &&
+      args[1] === "marketplace" &&
+      args[2] === "list"
+    ) {
+      return processResult('{"marketplaces":[]}');
+    }
+    return processResult("{}");
+  };
+  const result = await cleanupOwnedCodexState({
+    hostExecutable: "/trusted/codex",
+    cwd: "/scratch/workspace",
+    environment: Object.create(null),
+    pluginOwned: true,
+    marketplaceOwned: true,
+    run
+  });
+
+  assert.equal(result.exactNamesAbsent, true);
+  assert.deepEqual(calls.map((entry) => entry.args), [
+    ["plugin", "remove", PLUGIN_ID, "--json"],
+    [
+      "plugin",
+      "marketplace",
+      "remove",
+      MARKETPLACE_NAME,
+      "--json"
+    ],
+    ["plugin", "list", "--json"],
+    ["plugin", "marketplace", "list", "--json"]
+  ]);
+  assert.ok(calls.every((entry) => entry.command === "/trusted/codex"));
+
+  let invocation = 0;
+  const failedRemoval = await cleanupOwnedCodexState({
+    hostExecutable: "/trusted/codex",
+    cwd: "/scratch/workspace",
+    environment: Object.create(null),
+    pluginOwned: true,
+    marketplaceOwned: true,
+    run: async (_command, args) => {
+      invocation += 1;
+      if (invocation === 1) {
+        return {
+          ...processResult("{}"),
+          status: 1
+        };
+      }
+      if (args[0] === "plugin" && args[1] === "list") {
+        return processResult('{"installed":[]}');
+      }
+      if (
+        args[0] === "plugin" &&
+        args[1] === "marketplace" &&
+        args[2] === "list"
+      ) {
+        return processResult('{"marketplaces":[]}');
+      }
+      return processResult("{}");
+    }
+  });
+  assert.equal(failedRemoval.exactNamesAbsent, true);
+  assert.equal(failedRemoval.removalCommandsSucceeded, false);
+});
+
+test("Codex Run A.2 result requires direct denial, marker, compact, and supervision", () => {
+  const workspace = path.join(
+    os.tmpdir(),
+    "kanon-guard-run-a2-observations"
+  );
+  const cwdHash = createHash("sha256").update(workspace).digest("hex");
+  const observations = summarizeInteractiveObservations([
+    {
+      schema: "kanon-guard-feasibility-observation-v1",
+      host: "codex-cli",
+      hook_event_name: "PreToolUse",
+      session_start_source: null,
+      tool_name: "Bash",
+      marker: "deny",
+      decision: "deny",
+      session_id: { present: true },
+      turn_id: { present: true },
+      cwd: { present: true, sha256: cwdHash },
+      plugin_root_present: true,
+      plugin_data: { writable: true },
+      evidence_sink: { written: true }
+    },
+    {
+      schema: "kanon-guard-feasibility-observation-v1",
+      host: "codex-cli",
+      hook_event_name: "SessionStart",
+      session_start_source: "compact",
+      tool_name: null,
+      marker: "none",
+      decision: "observe",
+      session_id: { present: true },
+      turn_id: { present: false },
+      cwd: { present: true, sha256: cwdHash },
+      plugin_root_present: true,
+      plugin_data: { writable: true },
+      evidence_sink: { written: true }
+    }
+  ], workspace);
+  const launchArgs = interactiveArguments(workspace);
+  const proven = evaluateInteractiveEvidence({
+    observations,
+    markerAbsent: true,
+    supervisionConfirmed: true,
+    launchArgs,
+    interactiveProcess: {
+      status: 0,
+      timed_out: false,
+      aborted: false
+    }
+  });
+
+  assert.deepEqual(proven, {
+    preToolUseDenial: true,
+    markerAbsent: true,
+    actualCompaction: true,
+    persistedExactHashTrust: true,
+    executionBounds: true
+  });
+  assert.equal(
+    evaluateInteractiveEvidence({
+      observations,
+      markerAbsent: true,
+      supervisionConfirmed: false,
+      launchArgs,
+      interactiveProcess: {
+        status: 0,
+        timed_out: false,
+        aborted: false
+      }
+    }).persistedExactHashTrust,
+    false
+  );
+});
+
+test("Codex Run A.2 launcher passes only its resolved executable to the TUI", () => {
+  const source = fs.readFileSync(
+    path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "codex-cli",
+      "interactive-run.mjs"
+    ),
+    "utf8"
+  );
+  assert.match(
+    source,
+    /hostExecutable = resolveTrustedExecutable\("codex"/
+  );
+  assert.match(
+    source,
+    /runInteractiveProgram\(\s*hostExecutable,\s*launchArgs/
+  );
+  assert.doesNotMatch(source, /spawn\(\s*["']codex["']/);
+});
+
+test(
+  "Codex Run A.2 launcher completes a fixed fake lifecycle and cleans all owned state",
+  { skip: process.platform === "win32", timeout: 20_000 },
+  async (t) => {
+    const fixture = makeTemporaryDirectory(
+      t,
+      "kanon-guard-run-a2-lifecycle-"
+    );
+    const bin = path.join(fixture, "bin");
+    const state = path.join(fixture, "state");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(state);
+    const fakeGit = path.join(bin, "git");
+    fs.writeFileSync(
+      fakeGit,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === "rev-parse" && args[1] === "HEAD") {
+  process.stdout.write("${"a".repeat(40)}\\n");
+} else if (args.includes("status")) {
+  process.stdout.write("");
+} else if (args[0] === "merge-base") {
+  process.exitCode = 0;
+} else {
+  process.exitCode = 2;
+}
+`,
+      { mode: 0o755 }
+    );
+    const fakeCodex = path.join(bin, "codex");
+    fs.writeFileSync(
+      fakeCodex,
+      `#!/usr/bin/env node
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+const args = process.argv.slice(2);
+const stateRoot = ${JSON.stringify(state)};
+const marketplaceFile = path.join(stateRoot, "marketplace");
+const pluginFile = path.join(stateRoot, "plugin");
+const name = "kanon-guard-spike-codex";
+const pluginId = name + "@" + name;
+const result = (value) => process.stdout.write(JSON.stringify(value) + "\\n");
+const marketplaceRoot = () => fs.readFileSync(marketplaceFile, "utf8");
+
+if (process.env.KANON_SECRET_SENTINEL) {
+  fs.writeFileSync(path.join(stateRoot, "secret-leaked"), "leaked\\n");
+}
+if (args[0] === "--version") {
+  process.stdout.write("codex-cli 0.145.0\\n");
+} else if (args[0] === "login" && args[1] === "status") {
+  process.stderr.write("Logged in SENSITIVE_RUN_A2_AUTH@example.invalid\\n");
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
+  result({
+    marketplaces: fs.existsSync(marketplaceFile)
+      ? [{
+          name,
+          root: marketplaceRoot(),
+          marketplaceSource: {
+            sourceType: "local",
+            source: marketplaceRoot()
+          }
+        }]
+      : []
+  });
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "add") {
+  fs.writeFileSync(marketplaceFile, args[3], "utf8");
+  result({});
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "remove") {
+  if (args[3] !== name) process.exitCode = 2;
+  fs.rmSync(marketplaceFile, { force: true });
+  result({});
+} else if (args[0] === "plugin" && args[1] === "list") {
+  result({
+    installed: fs.existsSync(pluginFile)
+      ? [{
+          pluginId,
+          name,
+          marketplaceName: name,
+          version: "0.0.0",
+          installed: true,
+          enabled: true,
+          source: {
+            source: "local",
+            path: path.join(marketplaceRoot(), "plugins", name)
+          },
+          marketplaceSource: {
+            sourceType: "local",
+            source: marketplaceRoot()
+          },
+          installPolicy: "AVAILABLE",
+          authPolicy: "ON_INSTALL"
+        }]
+      : []
+  });
+} else if (args[0] === "plugin" && args[1] === "add") {
+  if (args[2] !== pluginId) process.exitCode = 2;
+  fs.writeFileSync(pluginFile, "owned\\n", "utf8");
+  result({});
+} else if (args[0] === "plugin" && args[1] === "remove") {
+  if (args[2] !== pluginId) process.exitCode = 2;
+  fs.rmSync(pluginFile, { force: true });
+  result({});
+} else if (args[0] === "--strict-config") {
+  if (
+    args.includes("--dangerously-bypass-hook-trust") ||
+    args.includes("--dangerously-bypass-approvals-and-sandbox") ||
+    !args.includes("workspace-write") ||
+    !args.includes("on-request")
+  ) {
+    process.exitCode = 2;
+  } else {
+    const cwdHash = crypto
+      .createHash("sha256")
+      .update(process.cwd())
+      .digest("hex");
+    const identity = (present) => ({ present, sha256: present ? "b".repeat(64) : null });
+    const common = {
+      schema: "kanon-guard-feasibility-observation-v1",
+      host: "codex-cli",
+      session_id: identity(true),
+      cwd: { present: true, sha256: cwdHash },
+      plugin_root_present: true,
+      plugin_data: { present: true, writable: true }
+    };
+    const events = [
+      {
+        ...common,
+        hook_event_name: "PreToolUse",
+        session_start_source: null,
+        tool_name: "Bash",
+        marker: "deny",
+        turn_id: identity(true),
+        decision: "deny"
+      },
+      {
+        ...common,
+        hook_event_name: "SessionStart",
+        session_start_source: "compact",
+        tool_name: null,
+        marker: "none",
+        turn_id: identity(false),
+        decision: "observe"
+      }
+    ];
+    fs.writeFileSync(
+      process.env.KANON_GUARD_SPIKE_EVIDENCE_FILE,
+      events.map((event) => JSON.stringify(event)).join("\\n") + "\\n",
+      "utf8"
+    );
+    fs.writeFileSync(path.join(stateRoot, "scratch-cwd"), process.cwd(), "utf8");
+    fs.writeFileSync(path.join(stateRoot, "tui-complete"), "complete\\n", "utf8");
+  }
+} else {
+  process.exitCode = 2;
+}
+`,
+      { mode: 0o755 }
+    );
+
+    const report = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.codex-cli-0.145.0-macos-run-a2-lifecycle-test-${randomUUID()}.json`
+    );
+    t.after(() => fs.rmSync(report, { force: true }));
+    const launcher = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "codex-cli",
+      "interactive-run.mjs"
+    );
+    const child = spawn(
+      process.execPath,
+      [launcher, "--execute", "--report", report],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    });
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+    });
+
+    await waitForFile(path.join(state, "tui-complete"), 10_000);
+    await waitForCondition(
+      () => stdout.includes("KANON_STATUS_HOOK_AND_TWO_TURNS_CONFIRMED"),
+      10_000,
+      "Run A.2 supervision prompt"
+    );
+    child.stdin.end("KANON_STATUS_HOOK_AND_TWO_TURNS_CONFIRMED\n");
+    const exit = await completion;
+
+    assert.deepEqual(
+      exit,
+      { code: 0, signal: null },
+      `${stderr}\n${
+        fs.existsSync(report) ? fs.readFileSync(report, "utf8") : "no report"
+      }`
+    );
+    assert.equal(fs.existsSync(path.join(state, "marketplace")), false);
+    assert.equal(fs.existsSync(path.join(state, "plugin")), false);
+    assert.equal(fs.existsSync(path.join(state, "secret-leaked")), false);
+    const scratchCwd = fs.readFileSync(
+      path.join(state, "scratch-cwd"),
+      "utf8"
+    );
+    assert.equal(fs.existsSync(scratchCwd), false);
+    const reportText = fs.readFileSync(report, "utf8");
+    const parsed = JSON.parse(reportText);
+    assert.equal(parsed.disposition, "go");
+    assert.ok(
+      Object.values(parsed.criteria).every((criterion) => criterion === "proven")
+    );
+    assert.equal(parsed.interactive.observation_count, 2);
+    assert.equal(parsed.interactive.marker_absent, true);
+    assert.equal(parsed.cleanup.at(-1).removed, true);
+    assert.match(stdout, /"disposition":"go"/);
+    assert.doesNotMatch(
+      reportText,
+      new RegExp(
+        [
+          escapeRegExp(repoRoot),
+          "SENSITIVE_RUN_A2_AUTH",
+          "must-not-cross-boundary",
+          "KANON_GUARD_SPIKE_DENY"
+        ].join("|")
+      )
+    );
+  }
+);
 
 test("spike report paths reject a symlinked parent", (t) => {
   const root = makeTemporaryDirectory(t, "kanon-guard-report-root-");
@@ -508,9 +1117,11 @@ if (args[0] === "--version") {
 } else if (args[0] === "login" && args[1] === "status") {
   process.stderr.write("Logged in SENSITIVE_AUTH_EMAIL@example.invalid SENSITIVE_ORG_IDENTIFIER\\n");
 } else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
-  process.stdout.write(JSON.stringify([{ name: "kanon-guard-spike-codex-suffix" }]) + "\\n");
+  process.stdout.write(JSON.stringify({
+    marketplaces: [{ name: "kanon-guard-spike-codex-suffix" }]
+  }) + "\\n");
 } else if (args[0] === "plugin" && args[1] === "list") {
-  process.stdout.write(JSON.stringify({ plugins: [] }) + "\\n");
+  process.stdout.write(JSON.stringify({ installed: [] }) + "\\n");
 } else {
   fs.writeFileSync(path.join(stateRoot, "mutation-attempted"), JSON.stringify(args));
   process.exitCode = 2;
@@ -586,6 +1197,53 @@ if (args[0] === "--version") {
       assert.equal(Object.hasOwn(summary, "stdout_sha256"), false);
       assert.equal(Object.hasOwn(summary, "stderr_sha256"), false);
     }
+
+    const runA2Report = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.run-a2-preflight-test-${randomUUID()}.json`
+    );
+    t.after(() => fs.rmSync(runA2Report, { force: true }));
+    const runA2 = await runProgramAsync(
+      process.execPath,
+      [
+        runner,
+        "--execute",
+        "--run-a2-preflight",
+        "--report",
+        runA2Report
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        timeoutMs: 10_000
+      }
+    );
+    assert.equal(runA2.status, 0, runA2.stderr);
+    const runA2Text = fs.readFileSync(runA2Report, "utf8");
+    const runA2Parsed = JSON.parse(runA2Text);
+    assert.equal(
+      runA2Parsed.follow_up,
+      "run-a2-persisted-trust-compaction-preflight"
+    );
+    assert.equal(runA2Parsed.claimed_surface.max_model_attempts, 0);
+    assert.deepEqual(runA2Parsed.attempts, []);
+    assert.equal(
+      runA2Parsed.criteria.documented_state_preflight,
+      "proven"
+    );
+    assert.equal(runA2Parsed.criteria.host_state_unchanged, "proven");
+    assert.equal(fs.existsSync(path.join(state, "mutation-attempted")), false);
+    assert.doesNotMatch(
+      runA2Text,
+      /SENSITIVE_AUTH_EMAIL|SENSITIVE_ORG_IDENTIFIER|must-not-cross-boundary/
+    );
   }
 );
 
@@ -945,6 +1603,19 @@ async function waitForFile(file, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`Timed out waiting for ${path.basename(file)}.`);
+}
+
+async function waitForCondition(predicate, timeoutMs, label) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function assertGuardCriteria(report, extras = []) {
