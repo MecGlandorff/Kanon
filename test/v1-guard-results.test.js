@@ -509,6 +509,49 @@ test("slice 3 selects neither Guard nor notice and stops before slice 4", () => 
   assert.match(resultDocument, /does not start product slice 4/);
 });
 
+test("Run B additively selects advisory notice without rewriting host evidence", () => {
+  assert.match(resultDocument, /Run B approved notice-mode product decision/);
+  assert.match(resultDocument, /\| Codex CLI \| `notice` \| `false` \|/);
+  assert.match(resultDocument, /\| Claude Code CLI \| `notice` \| `false` \|/);
+  assert.match(
+    resultDocument,
+    /surfaces context readiness and available receipt state through\s+> advisory notice/
+  );
+  assert.match(
+    resultDocument,
+    /must never deny, rewrite, suppress, or\s+auto-approve a host operation/
+  );
+  assert.match(
+    resultDocument,
+    /unobservable hook state remains `Unknown`/
+  );
+  assert.match(
+    resultDocument,
+    /Hard Guard remains future experimental work outside the public v1 capability\s+contract/
+  );
+  assert.match(
+    resultDocument,
+    /historical result files remain immutable/
+  );
+
+  for (const [contents, digest] of [
+    [codexText, "47dad5a64845242ed99ea3873c024ef285350cb3b2e154c50549c748bfb51ec1"],
+    [claudeText, "8a12575b0f0841cc30c880ce8855364cae8b9a9de3485fc26f2029e7cbdf5182"],
+    [claudeFollowUpText, "537bcc0791cf0ed7b4b1da3305169e4e67cdc0064c86f4b5ae9a97d03ead8c6b"],
+    [claudeFollowUp2Text, "85225891fb1f0106c0daf0bef05aff504abe02adb3a605771ad4564e30b647c4"],
+    [codexFollowUpText, "3950b7db9a89e8c34e056e9fbec56f944cb9325aa4910f9a9c362d3664b168d6"],
+    [codexRunA2PreflightText, "05e354743e58ec902602f19de29d415a8ac25a21fc68a59b23f73c744768b693"],
+    [codexRunA2LauncherText, "cb9fb5ad3973f7f7f305a29cf93c378d594a22547f05d2a3e9c3e47f08295b2d"],
+    [codexRunA2PostCleanupText, "067810ce08aa022ebbe385cc3e1065fcf689f33a015cda63dd6ddc74d39b4537"],
+    [codexRunA2OutcomeText, "456be74f897b3a30cf8828db96ca8db639432f51765423dadf5a79724b5dbfc9"]
+  ]) {
+    assert.equal(
+      crypto.createHash("sha256").update(contents).digest("hex"),
+      digest
+    );
+  }
+});
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

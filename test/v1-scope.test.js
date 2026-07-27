@@ -46,7 +46,7 @@ test("v1 compatibility freeze preserves every v0.4 workflow mapping", () => {
   assert.match(scope, /`todo` \| Explicit continuity note/);
 });
 
-test("v1 scope does not infer a Guard mode without per-host proof", () => {
+test("v1 scope preserves the historical gate and records the Run B decision", () => {
   assert.match(
     scope,
     /deliberately selects no Guard mode for either host/
@@ -58,5 +58,25 @@ test("v1 scope does not infer a Guard mode without per-host proof", () => {
   assert.match(
     scope,
     /A result from one host is never evidence for the\s+other/
+  );
+  assert.match(scope, /Run B notice-mode decision/);
+  assert.match(scope, /\| Codex CLI \| `notice` \| `false` \|/);
+  assert.match(scope, /\| Claude Code CLI \| `notice` \| `false` \|/);
+  assert.match(
+    scope,
+    /surfaces whether context and the available receipt data\s+are current; it does not enforce mutation blocking/
+  );
+  assert.match(scope, /unobservable hook state remains `Unknown`/);
+  assert.match(
+    scope,
+    /Hard Guard remains future experimental work outside the public v1 capability\s+contract/
+  );
+  assert.match(
+    scope,
+    /six-skill stable target and dual-host support are unchanged/
+  );
+  assert.doesNotMatch(
+    scope,
+    /notice[^.\n]*(?:denies?|rewrites?|auto-approves?|blocks?) a host operation/i
   );
 });

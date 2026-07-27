@@ -602,3 +602,43 @@ this product decision:
 
 `guard` cannot be selected from this evidence. Run A.2 ends here regardless of
 outcome.
+
+## Run B approved notice-mode product decision
+
+**Date:** 2026-07-27.
+
+**Status:** additive product decision after Runs A, A.1, and A.2. This section
+authorizes product slice 4 while preserving every preceding report, host
+decision, classification, limitation, and hard stop as the historical record
+of its named run.
+
+The user explicitly accepts the independent Codex CLI and Claude Code
+hard-Guard no-go decisions. Stable v1 therefore uses this host matrix:
+
+| Host surface | Stable v1 mode | Enforcement |
+| --- | --- | --- |
+| Codex CLI | `notice` | `false` |
+| Claude Code CLI | `notice` | `false` |
+
+The revised stable promise is:
+
+> Kanon v1 surfaces context readiness and available receipt state through
+> advisory notice; it does not enforce mutation blocking on either supported
+> host.
+
+Notice is observational only. It must never deny, rewrite, suppress, or
+auto-approve a host operation; force repository reading; block mutation; or
+claim that repository context was understood. Unsupported, disabled,
+untrusted, or otherwise unobservable hook state remains `Unknown`.
+
+Hard Guard remains future experimental work outside the public v1 capability
+contract. No production Guard enforcement, emergency bypass, mutation hook, or
+persisted receipt lifecycle is authorized by this decision. Product slice 8
+may return only the smallest versioned, non-enforcing receipt data required by
+`orient`, `verify`, and `status`; broader receipt lifecycle behavior remains
+slice 9 work.
+
+The stable six-skill target and dual-host support remain unchanged. Runs A,
+A.1, and A.2 are not reinterpreted: missing evidence remains `Unknown`, the
+historical result files remain immutable, and a result from one host remains
+no evidence for the other.

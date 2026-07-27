@@ -20,11 +20,13 @@ The following six skills are the entire stable v1 skill surface:
 | `$kanon:steer` | Keep a small evidence-backed work state for one verified slice at a time. |
 | `$kanon:aswitch` | Prepare a consented handoff with a manual fallback. |
 
-The stable promises remain context before covered mutation where Guard is
-proven, continuity without invented memory, epistemic honesty, and no hidden
-execution. They do not promise that a model understood evidence, that a
-declared command is safe or succeeds, or that Kanon replaces host sandboxing,
-approvals, or human review.
+The stable promises are advisory context readiness and receipt-state notice,
+continuity without invented memory, epistemic honesty, and no hidden
+execution. Stable v1 surfaces whether context and the available receipt data
+are current; it does not enforce mutation blocking on either supported host.
+The promises do not say that a model understood evidence, that a declared
+command is safe or succeeds, or that Kanon replaces host sandboxing, approvals,
+or human review.
 
 Codex CLI and Claude Code CLI are the two stable skill-host candidates. The
 six-skill surface is a target contract for both hosts; it is not evidence of a
@@ -39,6 +41,31 @@ proves denial for the covered calls. Until that proof and the user decision
 required by the design are present, this document makes neither a `guard` nor a
 `notice` runtime claim. A result from one host is never evidence for the
 other.
+
+### Run B notice-mode decision
+
+**Decision date:** 2026-07-27.
+
+This additive decision resolves the runtime-mode question left open by the
+slice 1 freeze. The user explicitly accepts the independent Codex CLI and
+Claude Code hard-Guard no-go decisions recorded by Runs A, A.1, and A.2.
+
+| Stable host | v1 mode | Enforcement |
+| --- | --- | --- |
+| Codex CLI | `notice` | `false` |
+| Claude Code CLI | `notice` | `false` |
+
+Notice is advisory and observational. It must not deny, rewrite, suppress, or
+auto-approve a host operation; force repository reading; block mutation; or
+imply that repository context was understood. Unsupported, disabled,
+untrusted, or otherwise unobservable hook state remains `Unknown`.
+
+Hard Guard remains future experimental work outside the public v1 capability
+contract. The six-skill stable target and dual-host support are unchanged.
+Runs A, A.1, and A.2 remain historical evidence for their named host surfaces;
+this product decision does not rewrite their reports, promote non-observation
+to a negative capability conclusion, or turn either no-go into proof that
+enforcement is impossible.
 
 ## Compatibility map
 
