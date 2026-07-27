@@ -16,11 +16,7 @@ if (!read.ok) {
       ? adaptCodexNotice(parsed)
       : host === "claude-code"
         ? adaptClaudeNotice(parsed)
-        : {
-            ok: false,
-            status: "Unknown",
-            diagnostic: INVALID_NOTICE.trim()
-          };
+        : unknownHost();
 
   if (adapted.ok) {
     process.stdout.write(`${JSON.stringify(adapted.output)}\n`);
@@ -97,4 +93,15 @@ function selectHost(environment) {
  */
 function isBoundedEnvironmentPath(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 8_192;
+}
+
+/**
+ * @returns {import("./codex.js").CodexAdapterResult}
+ */
+function unknownHost() {
+  return {
+    ok: false,
+    status: "Unknown",
+    diagnostic: INVALID_NOTICE.trim()
+  };
 }

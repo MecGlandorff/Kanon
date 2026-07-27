@@ -73,30 +73,38 @@ export function readEmbeddedBuildMetadata(
  * @returns {BuildMetadataResult}
  */
 export function validateEmbeddedBuildMetadata(value) {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(value, [
-      "package_name",
-      "package_version",
-      "plugin_name",
-      "public_capabilities",
-      "runtime",
-      "schema"
-    ]) ||
-    value.schema !== "kanon-build-metadata-v1" ||
-    !boundedString(value.package_name, 214) ||
-    !boundedString(value.package_version, 128) ||
-    !SEMVER.test(value.package_version) ||
-    value.plugin_name !== "kanon" ||
-    !validRuntime(value.runtime) ||
-    !validCapabilities(value.public_capabilities)
-  ) {
+  if (!isBuildMetadata(value)) {
     return unavailableMetadata();
   }
   return {
     ok: true,
     value
   };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is BuildMetadata}
+ */
+function isBuildMetadata(value) {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      "package_name",
+      "package_version",
+      "plugin_name",
+      "public_capabilities",
+      "runtime",
+      "schema"
+    ]) &&
+    value.schema === "kanon-build-metadata-v1" &&
+    boundedString(value.package_name, 214) &&
+    boundedString(value.package_version, 128) &&
+    SEMVER.test(value.package_version) &&
+    value.plugin_name === "kanon" &&
+    validRuntime(value.runtime) &&
+    validCapabilities(value.public_capabilities)
+  );
 }
 
 /**

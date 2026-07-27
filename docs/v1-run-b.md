@@ -59,3 +59,49 @@ notice-only product decision is recorded in
   manifest validation is **Unknown** host-side validation, not a negative
   capability conclusion. Hook observability also remains **Unknown**.
 - **P0/P1 at completion:** none.
+
+## Slice 5 frame — strict checked-JS ratchet
+
+- **User outcome:** v1 production changes fail validation when hostile-boundary
+  values are used without narrowing or when result states are ambiguous.
+- **Changed invariant:** canonical `src/v1/**/*.js` is a strict no-emit
+  TypeScript project. Generated runtime copies remain synchronized from those
+  checked sources.
+- **Trust boundary:** hook input, environment values, parsed JSON, and embedded
+  metadata enter typed code as `unknown` and become usable only after runtime
+  narrowing.
+- **Non-goals:** transpilation, runtime TypeScript, runtime dependencies, broad
+  historical-source conversion, experimental-source coverage, or a decorative
+  type claim over excluded stable modules.
+
+### Slice 5 correction-loop result
+
+- **Pinned tooling:** `typescript@7.0.2` and
+  `@types/node@20.19.43` are exact development dependencies in the
+  reproducible lockfile. `npm ci --ignore-scripts --dry-run --offline` passed.
+- **Strict configuration:** `allowJs`, `checkJs`, `strict`,
+  `strictNullChecks`, `noUncheckedIndexedAccess`,
+  `useUnknownInCatchVariables`, and `noEmit` are enabled. The project has no
+  broad `any`, `ts-ignore`, `nocheck`, unsafe-cast, or source-exclusion escape.
+- **Typed production scope:** all six canonical slice 4 modules covering host
+  adapters, bounded hook I/O, trust narrowing, fixed notice output, and
+  embedded build metadata pass `npm run typecheck`. Registry and continuity
+  modules join the same glob when introduced in slices 6 and 7.
+- **Focused type, package, and prior plugin checks:** 13 passed with no skip or
+  failure. Focused compatibility plus ratchet checks: 20 passed.
+- **Normal validation:** `npm run validate` passed with 124 tests passed,
+  1 Windows-only junction proof skipped, and no failures; typechecking runs
+  between generated synchronization and tests.
+- **Artifact state:** the exact production allowlist excludes `node_modules`,
+  the lockfile, `tsconfig.json`, and all development dependency metadata.
+  Runtime dependencies remain zero.
+- **Diff hygiene:** generated synchronization and `git diff --check` passed;
+  the raw diff contains only the checked source corrections, deterministic
+  tests, strict configuration, pinned development metadata, and this record.
+- **Principal challenge:** the first compiler run rejected an imprecise
+  unknown-host branch and an unproven conversion from a generic JSON object to
+  build metadata. Both now use discriminated results and runtime-backed type
+  predicates. The first normal validation also caught a legacy test that
+  prohibited all development dependencies; it now requires exactly the two
+  design-approved pins while preserving the zero-runtime-dependency gate.
+- **P0/P1 at completion:** none.

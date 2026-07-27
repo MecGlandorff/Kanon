@@ -22,7 +22,8 @@
     "eval:release": "node scripts/eval-corpus.js --corpus eval/release-corpus.json --require-role release",
     "results:dev": "node scripts/render-results.js",
     "test": "node --test",
-    "validate": "npm run check:skill && node --test"
+    "typecheck": "tsc --project tsconfig.json",
+    "validate": "npm run check:skill && npm run typecheck && node --test"
   },
   "keywords": [
     "repo",
@@ -36,5 +37,9 @@
   "license": "MIT",
   "engines": {
     "node": "^20.0.0 || ^22.0.0 || ^24.0.0 || ^25.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "7.0.2"
   }
 }

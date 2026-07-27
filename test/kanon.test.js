@@ -374,12 +374,19 @@ test("package metadata is clean and has no self-dependency", () => {
   const lock = readJson(path.join(repoRoot, "package-lock.json"));
 
   assert.equal(pkg.dependencies, undefined);
-  assert.equal(pkg.devDependencies, undefined);
+  assert.deepEqual(pkg.devDependencies, {
+    "@types/node": "20.19.43",
+    typescript: "7.0.2"
+  });
   assert.equal(
     pkg.engines.node,
     "^20.0.0 || ^22.0.0 || ^24.0.0 || ^25.0.0"
   );
   assert.equal(lock.packages[""].dependencies, undefined);
+  assert.deepEqual(
+    lock.packages[""].devDependencies,
+    pkg.devDependencies
+  );
 });
 
 test("rendered public outputs identify repository content as data", () => {
