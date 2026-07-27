@@ -26,6 +26,8 @@ const CURRENT_FIELDS = new Set([
   "evidence_count",
   "schema_version"
 ]);
+const DEFAULT_HANDOFF_BYTES = 256 * 1024;
+const MAX_HANDOFF_BYTES = 2 * 1024 * 1024;
 
 export function inspectPreviousState(root, options = {}) {
   const maximumBytes = options.maxBytes ?? 2 * 1024 * 1024;
@@ -68,6 +70,85 @@ export function inspectPreviousState(root, options = {}) {
     },
     found: true,
     valid: true,
+    warning: null
+  };
+}
+
+export function inspectPreviousHandoff(root, options = {}) {
+  const maximumBytes =
+    options &&
+    typeof options === "object" &&
+    !Array.isArray(options) &&
+    (
+      options.maxBytes === undefined ||
+      (
+        Number.isSafeInteger(options.maxBytes) &&
+        options.maxBytes > 0 &&
+        options.maxBytes <= MAX_HANDOFF_BYTES
+      )
+    )
+      ? options.maxBytes ?? DEFAULT_HANDOFF_BYTES
+      : null;
+  if (maximumBytes === null) {
+    return {
+      handoff: {
+        found: true,
+        valid: false,
+        status: "invalid-options",
+        bytes: 0
+      },
+      warning:
+        "HANDOFF.md was not inspected because its read limit was invalid."
+    };
+  }
+  const read = readContainedText(
+    root,
+    ".kanon/HANDOFF.md",
+    maximumBytes,
+    { optional: true }
+  );
+  if (!read.ok && read.status === "missing") {
+    return {
+      handoff: {
+        found: false,
+        valid: true,
+        status: "missing",
+        bytes: 0
+      },
+      warning: null
+    };
+  }
+  if (!read.ok) {
+    return {
+      handoff: {
+        found: true,
+        valid: false,
+        status: read.status,
+        bytes: 0
+      },
+      warning:
+        `HANDOFF.md was ignored because it was ${read.status}: ${read.reason}`
+    };
+  }
+  if (!read.text.startsWith("# Resume This Repo\n")) {
+    return {
+      handoff: {
+        found: true,
+        valid: false,
+        status: "malformed",
+        bytes: read.bytes
+      },
+      warning:
+        "HANDOFF.md was ignored because its Kanon header was unavailable."
+    };
+  }
+  return {
+    handoff: {
+      found: true,
+      valid: true,
+      status: "available",
+      bytes: read.bytes
+    },
     warning: null
   };
 }

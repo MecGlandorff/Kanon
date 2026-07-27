@@ -67,11 +67,16 @@ export function renderResume(analysis, previousState = null, options = {}) {
 
   for (const warning of [
     options.stateWarning,
-    options.todoWarning
+    options.todoWarning,
+    options.handoffWarning
   ].filter(Boolean)) {
     lines.push(`Warning: ${escapeMarkdownText(warning)}`);
   }
-  if (options.stateWarning || options.todoWarning) {
+  if (
+    options.stateWarning ||
+    options.todoWarning ||
+    options.handoffWarning
+  ) {
     lines.push("");
   }
 
@@ -84,7 +89,11 @@ export function renderResume(analysis, previousState = null, options = {}) {
     );
     lines.push(`Current analysis: ${codeSpan(state.generated_at)}`);
     lines.push("");
-    appendStateDiff(lines, previousState, state);
+    appendStateDiff(lines, previousState, state, {
+      continuity: options.continuity,
+      handoff: options.handoff,
+      previousWarning: options.stateWarning
+    });
   }
 
   if (openTodos.length) {

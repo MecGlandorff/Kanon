@@ -242,6 +242,11 @@ export function scanRepo(root, options = {}) {
       basename,
       extension: path.extname(basename).toLowerCase(),
       size: resolved.stat.size,
+      mtime_ms:
+        Number.isFinite(resolved.stat.mtimeMs) &&
+        resolved.stat.mtimeMs >= 0
+          ? Math.floor(resolved.stat.mtimeMs)
+          : null,
       text: isTextFile(relPath, basename),
       sha256
     });

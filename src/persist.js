@@ -1,5 +1,9 @@
 import path from "node:path";
 import { DEFAULT_CONFIG, readKanonConfig } from "./config.js";
+import {
+  buildContinuityArtifactMetadata,
+  buildContinuityReport
+} from "./continuity/engine.js";
 import { renderBrief, renderResume } from "./render.js";
 import {
   sanitizeFilenameComponent
@@ -13,6 +17,7 @@ import {
   readContainedText
 } from "./persistence/safe-fs.js";
 import {
+  inspectPreviousHandoff,
   inspectPreviousState,
   validatePersistedState
 } from "./persistence/state.js";
@@ -33,8 +38,19 @@ export function writeKanonOutputs(analysis, options = {}) {
   const previousInspection = inspectPreviousState(root, {
     maxBytes: config.inputs.max_state_bytes
   });
+  const handoffInspection = inspectPreviousHandoff(root);
   const todoInspection = inspectKanonTodos(root, {
     maxBytes: config.inputs.max_todo_bytes
+  });
+  const continuity = buildContinuityReport({
+    artifact_metadata:
+      buildContinuityArtifactMetadata(analysis.inspection),
+    current: analysis.state,
+    previous: previousInspection.state,
+    ...(previousInspection.warning
+      ? { previous_warning: previousInspection.warning }
+      : {}),
+    handoff: handoffInspection.handoff
   });
   const snapshotId = sanitizeFilenameComponent(
     analysis.state.run_id ||
@@ -64,14 +80,18 @@ export function writeKanonOutputs(analysis, options = {}) {
     renderResume(analysis, previousInspection.state, {
       todos: todoInspection.todos,
       stateWarning: previousInspection.warning,
-      todoWarning: todoInspection.warning
+      todoWarning: todoInspection.warning,
+      handoff: handoffInspection.handoff,
+      handoffWarning: handoffInspection.warning,
+      continuity
     })
   );
   ensureKanonConfig(root);
 
   const warnings = [
     previousInspection.warning,
-    todoInspection.warning
+    todoInspection.warning,
+    handoffInspection.warning
   ].filter(Boolean);
   const snapshotPath = writeSnapshot(
     root,
@@ -106,7 +126,11 @@ export function readPreviousState(root, options = {}) {
   return inspectPreviousState(root, options).state;
 }
 
-export { inspectPreviousState, validatePersistedState };
+export {
+  inspectPreviousHandoff,
+  inspectPreviousState,
+  validatePersistedState
+};
 
 export function inspectKanonTodos(root, options = {}) {
   const read = readContainedText(

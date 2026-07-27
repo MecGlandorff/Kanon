@@ -19,6 +19,7 @@
     "useUnknownInCatchVariables": true
   },
   "include": [
+    "src/continuity/**/*.js",
     "src/v1/**/*.js"
   ]
 }

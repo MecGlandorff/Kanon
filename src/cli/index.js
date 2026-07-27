@@ -3,7 +3,12 @@ import path from "node:path";
 import { analyzeRepo } from "../analyze.js";
 import { answerRepoQuestion } from "../ask.js";
 import {
+  buildContinuityArtifactMetadata,
+  buildContinuityReport
+} from "../continuity/engine.js";
+import {
   inspectKanonTodos,
+  inspectPreviousHandoff,
   inspectPreviousState,
   writeKanonOutputs
 } from "../persist.js";
@@ -93,15 +98,27 @@ export async function runCli(argv = [], ioOptions = {}) {
 
     case "resume": {
       const previous = inspectPreviousState(root);
+      const handoff = inspectPreviousHandoff(root);
       const todos = inspectKanonTodos(root);
       const analysis = analyzeRepo(root);
+      const continuity = buildContinuityReport({
+        artifact_metadata:
+          buildContinuityArtifactMetadata(analysis.inspection),
+        current: analysis.state,
+        previous: previous.state,
+        previous_warning: previous.warning || undefined,
+        handoff: handoff.handoff
+      });
       if (parsed.flags.json) {
         writeStdout(
           io,
           `${safeJsonStringify({
             previous: previous.state,
             previous_warning: previous.warning,
+            handoff: handoff.handoff,
+            handoff_warning: handoff.warning,
             current: analysis.state,
+            continuity,
             todos: todos.todos,
             todo_warning: todos.warning
           })}\n`
@@ -112,7 +129,10 @@ export async function runCli(argv = [], ioOptions = {}) {
           renderResume(analysis, previous.state, {
             todos: todos.todos,
             stateWarning: previous.warning,
-            todoWarning: todos.warning
+            todoWarning: todos.warning,
+            handoff: handoff.handoff,
+            handoffWarning: handoff.warning,
+            continuity
           })
         );
       }

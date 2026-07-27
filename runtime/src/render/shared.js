@@ -4,6 +4,7 @@ import {
   repositoryDataBlock,
   safeEvidenceId
 } from "../trust.js";
+import { buildContinuityReport } from "../continuity/engine.js";
 
 export function appendCommandGroup(
   lines,
@@ -66,47 +67,67 @@ export function appendIssueList(lines, issues) {
   }
 }
 
-export function appendStateDiff(lines, previous, current) {
-  const before = new Map(
-    (previous.files?.fingerprints || [])
-      .map((file) => [file.path, file.sha256])
-  );
-  const after = new Map(
-    (current.files?.fingerprints || [])
-      .map((file) => [file.path, file.sha256])
-  );
-  const added = [];
-  const removed = [];
-  const changed = [];
-
-  for (const [file, hash] of after) {
-    if (!before.has(file)) {
-      added.push(file);
-    } else if (hash && before.get(file) && hash !== before.get(file)) {
-      changed.push(file);
-    }
-  }
-
-  for (const file of before.keys()) {
-    if (!after.has(file)) {
-      removed.push(file);
-    }
-  }
-
+export function appendStateDiff(lines, previous, current, options = {}) {
+  const report = options.continuity?.schema === "kanon-continuity-report-v1"
+    ? options.continuity
+    : buildContinuityReport({
+        current,
+        previous,
+        ...(options.previousWarning
+          ? { previous_warning: options.previousWarning }
+          : {}),
+        ...(options.handoff ? { handoff: options.handoff } : {})
+      });
   lines.push("## Changes Since Checkpoint");
-  if (!added.length && !removed.length && !changed.length) {
+  if (!report.ok) {
+    lines.push(`- Unknown: ${escapeMarkdownText(report.diagnostic)}`);
+    lines.push("");
+    return;
+  }
+  if (!report.observations.added.length &&
+      !report.observations.changed.length &&
+      !report.observations.contradicted.length) {
     lines.push(
       "- No file-level changes detected from the last Kanon checkpoint."
     );
   }
-  for (const file of added.slice(0, 8)) {
-    lines.push(`- Added: ${codeSpan(file)}`);
+  for (const category of ["added", "changed", "contradicted"]) {
+    for (const observation of report.observations[category].slice(0, 8)) {
+      const label =
+        `${category.slice(0, 1).toUpperCase()}${category.slice(1)}`;
+      lines.push(
+        `- ${label}: ${
+          observation.path
+            ? codeSpan(observation.path)
+            : escapeMarkdownText(observation.claim)
+        }`
+      );
+    }
   }
-  for (const file of changed.slice(0, 8)) {
-    lines.push(`- Changed: ${codeSpan(file)}`);
+  lines.push("");
+
+  appendContinuityCategory(
+    lines,
+    "Stale Continuity",
+    report.observations.stale
+  );
+  appendContinuityCategory(
+    lines,
+    "Unavailable Continuity Evidence",
+    report.observations.unavailable
+  );
+}
+
+function appendContinuityCategory(lines, title, observations) {
+  if (!observations.length) {
+    return;
   }
-  for (const file of removed.slice(0, 8)) {
-    lines.push(`- Removed: ${codeSpan(file)}`);
+  lines.push(`## ${title}`);
+  for (const observation of observations.slice(0, 8)) {
+    lines.push(
+      `- ${observation.path ? `${codeSpan(observation.path)}: ` : ""}` +
+      escapeMarkdownText(observation.claim)
+    );
   }
   lines.push("");
 }

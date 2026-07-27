@@ -51,7 +51,10 @@ test("strict no-emit checked-JS options are non-decorative", () => {
   ]) {
     assert.equal(options[option], true, `${option} must remain enabled`);
   }
-  assert.deepEqual(typeConfig.include, ["src/v1/**/*.js"]);
+  assert.deepEqual(typeConfig.include, [
+    "src/continuity/**/*.js",
+    "src/v1/**/*.js"
+  ]);
   assert.equal(typeConfig.exclude, undefined);
   assert.equal(options.skipLibCheck, undefined);
 });
@@ -74,6 +77,19 @@ test("every canonical v1 production module is in the strict project", () => {
     ]
   );
   for (const relative of productionFiles) {
+    const source = fs.readFileSync(path.join(repoRoot, relative), "utf8");
+    assert.match(source, /\/\*\*[\s\S]*@(?:param|returns|typedef)/);
+    assert.doesNotMatch(
+      source,
+      /@ts-(?:ignore|nocheck)|@(?:param|returns|type)\s*\{\s*any\b/
+    );
+  }
+  const continuityFiles = listJavaScriptFiles(
+    path.join(repoRoot, "src", "continuity")
+  );
+  assert.deepEqual(continuityFiles, ["src/continuity/engine.js"]);
+  const checkedProductionFiles = [...productionFiles, ...continuityFiles];
+  for (const relative of continuityFiles) {
     const source = fs.readFileSync(path.join(repoRoot, relative), "utf8");
     assert.match(source, /\/\*\*[\s\S]*@(?:param|returns|typedef)/);
     assert.doesNotMatch(
@@ -106,7 +122,7 @@ test("every canonical v1 production module is in the strict project", () => {
       .filter(Boolean)
       .map((file) => path.resolve(file))
   );
-  for (const relative of productionFiles) {
+  for (const relative of checkedProductionFiles) {
     assert.equal(
       checked.has(path.join(repoRoot, relative)),
       true,

@@ -167,3 +167,62 @@ notice-only product decision is recorded in
   between canonical validation and atomic rename remains a lower-risk
   platform residual shared with existing persistence.
 - **P0/P1 at completion:** none.
+
+## Slice 7 frame — shared continuity engine
+
+- **User outcome:** read-only resume compares bounded prior continuity claims
+  with authoritative live repository evidence through one Kanon engine.
+- **Changed invariant:** the existing v0.4 resume path now delegates
+  classification to the shared checked-JS engine; `refresh` and `todo` remain
+  the only explicit continuity-write paths.
+- **Trust boundary:** repository paths, fingerprints, Git metadata, file
+  timestamps, persisted state, handoff observations, warnings, and render
+  values are untrusted and runtime-validated before use.
+- **Non-goals:** receipt persistence or invalidation, mutation hooks, Guard,
+  enforcement, host session internals, user-level skill imports, `steer`,
+  `aswitch`, or a new handoff subsystem.
+
+### Slice 7 correction-loop result
+
+- **Dedicated schema, authority, staleness, containment, budget, malformed
+  state, handoff, concurrency-residual, and read-only checks:** 10 passed with
+  no skip or failure.
+- **Focused continuity, persistence, trust, compatibility, and strict-type
+  checks:** 47 passed, 1 Windows-only junction proof skipped, and no failures.
+- **Strict checked-JS:** the canonical continuity engine and its artifact
+  metadata adapter pass `npm run typecheck`; the strict project contains the
+  module and forbids broad `any`, `ts-ignore`, `nocheck`, or exclusion escapes.
+- **Normal validation:** `npm run validate` passed with 148 tests passed,
+  1 Windows-only junction proof skipped, and no failures.
+- **Continuity behavior:** the report distinguishes `added`, `changed`,
+  `contradicted`, `stale`, and `unavailable`; complete live scans may
+  contradict absent stored paths, while incomplete scans preserve absence as
+  Unknown. Live root, Git, purpose, files, commits, instructions,
+  documentation, and recent artifact observations remain authoritative over
+  stored claims.
+- **State and handoff behavior:** missing, malformed, oversized, linked, and
+  unsupported inputs warn and recover without retaining content. Handoff
+  inspection records only bounded availability metadata; it does not add a
+  handoff schema or lifecycle. A byte-for-byte repository snapshot proves that
+  CLI `resume --json` performs no repository write.
+- **Generated and package state:** `npm run check:skill` passed after 82
+  generated artifacts. The deterministic package builder succeeded beneath
+  the canonical temporary root; the exact-allowlist and installed-artifact
+  conformance checks passed and continued to exclude source, tests,
+  development tooling, and runtime dependencies.
+- **Manifest validation:** the bundled Codex plugin validator and Claude Code
+  2.1.219 `plugin validate --strict` both passed independently. No public
+  manifest or capability surface changed in this slice.
+- **Diff hygiene:** `git diff --check`, generated synchronization, forbidden
+  execution/capability scans, and raw source review passed.
+- **Principal challenge:** the first integration check correctly failed only
+  on unsynchronized generated copies. Principal review then prevented two
+  false conclusions: duplicate path claims are rejected, and incomplete scans
+  cannot imply that recent artifacts are absent. Artifact recency now uses
+  bounded scanner timestamps and becomes Unknown when coverage or timestamps
+  are incomplete.
+- **Residual classification:** same-user replacement during an already-open
+  read remains a documented lower-risk filesystem concurrency residual.
+  Unsupported host introspection and any host session association remain
+  **Unknown**; the engine imports neither.
+- **P0/P1 at completion:** none.
