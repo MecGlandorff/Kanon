@@ -66,7 +66,11 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/adapters/notice-hook.js",
       "src/v1/adapters/shared.js",
       "src/v1/core/build-metadata.js",
-      "src/v1/core/notice.js"
+      "src/v1/core/notice.js",
+      "src/v1/registry/cache.js",
+      "src/v1/registry/deprecation.js",
+      "src/v1/registry/sanitize.js",
+      "src/v1/registry/transport.js"
     ]
   );
   for (const relative of productionFiles) {

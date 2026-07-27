@@ -17,7 +17,11 @@ export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/adapters/notice-hook.js", "runtime/adapters/notice-hook.js"],
   ["src/v1/adapters/shared.js", "runtime/adapters/shared.js"],
   ["src/v1/core/build-metadata.js", "runtime/core/build-metadata.js"],
-  ["src/v1/core/notice.js", "runtime/core/notice.js"]
+  ["src/v1/core/notice.js", "runtime/core/notice.js"],
+  ["src/v1/registry/cache.js", "runtime/registry/cache.js"],
+  ["src/v1/registry/deprecation.js", "runtime/registry/deprecation.js"],
+  ["src/v1/registry/sanitize.js", "runtime/registry/sanitize.js"],
+  ["src/v1/registry/transport.js", "runtime/registry/transport.js"]
 ]);
 
 export function collectRuntimeDependencies(repoRoot, entry = "bin/kanon.js") {

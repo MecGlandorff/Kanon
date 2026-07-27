@@ -105,3 +105,65 @@ notice-only product decision is recorded in
   prohibited all development dependencies; it now requires exactly the two
   design-approved pins while preserving the zero-runtime-dependency gate.
 - **P0/P1 at completion:** none.
+
+## Slice 6 frame — exact-version deprecation status
+
+- **User outcome:** every delivered stable skill can surface whether the exact
+  installed Kanon version is deprecated without making repository analysis
+  depend on network availability.
+- **Changed invariant:** one checked runtime module derives the only registry
+  URL from validated embedded package metadata and treats every transport,
+  registry, session, and cache value as hostile.
+- **Trust boundary:** the checker accepts no repository URL, registry
+  configuration, package-manager configuration, shell, or user npm settings.
+  The only network origin is `https://registry.npmjs.org`.
+- **Non-goals:** automatic upgrades, package-manager invocation, release-state
+  mutation, repository cache files, host-session inference, or a live-registry
+  correctness claim.
+
+### Slice 6 correction-loop result
+
+- **Deterministic transport and cache checks:** 14 passed for deprecated,
+  current, malformed, mismatched, oversized, redirected, cross-origin,
+  redirect-loop, timed-out, offline, cached, expired, sticky, later-proven,
+  session-isolated, session-ended, malformed-cache, linked-cache, hostile
+  transport, malformed-input, and fixed-origin cases.
+- **Focused registry, adapter, type, package, and trust checks:** 44 passed,
+  1 Windows-only junction proof skipped, and no failures.
+- **Strict checked-JS:** all 10 canonical v1 production modules pass
+  `npm run typecheck` with runtime narrowing at metadata, options, transport,
+  JSON, cache-schema, path, time, status, and header boundaries.
+- **Normal validation:** `npm run validate` passed with 138 tests passed,
+  1 Windows-only junction proof skipped, and no failures.
+- **Generated and package state:** `npm run check:skill` passed after 81
+  generated artifacts. The exact package allowlist includes the four registry
+  runtime modules and still excludes source, tests, development tooling, and
+  all runtime dependencies.
+- **Manifest checks:** the bundled Codex schema validator and Claude Code
+  strict native validator both passed independently.
+- **Network behavior:** the production transport uses Node HTTPS directly,
+  a 2.5-second timeout, a 64 KiB body cap, at most two same-origin redirects,
+  strict HTTP/content-type handling, and no implicit npm configuration. A live
+  smoke observation was not used or required.
+- **Cache behavior:** only bounded exact-version status is stored in validated
+  plugin data, keyed by a SHA-256 host-session key, for at most one hour and
+  eight entries. Explicit session end removes its entry. Deprecated status
+  remains sticky across failed refresh and changes only after a successful
+  exact-version response.
+- **Failure behavior:** missing session or plugin-data evidence disables cache
+  with a bounded diagnostic; offline, timeout, malformed, and unsafe results
+  become `Unknown` and never block analysis. The checker never substitutes a
+  repository or user cache.
+- **Diff hygiene:** generated synchronization, `git diff --check`, fixed-origin
+  and forbidden-execution scans, package review, and raw source review passed.
+- **Principal challenge:** initial strict compilation found numeric and union
+  narrowing gaps. The subsequent principal review found and fixed two P1s:
+  repository-adjacent plugin-data roots are now rejected, and the entire
+  public options object is runtime-validated before access. Cached registry
+  prose is also revalidated against the sanitizer boundary.
+- **Residual classification:** documented active-session and plugin-data input
+  may be unavailable on a host invocation; that remains **Unknown**, disables
+  caching, and must be surfaced by slice 8. Same-user concurrent replacement
+  between canonical validation and atomic rename remains a lower-risk
+  platform residual shared with existing persistence.
+- **P0/P1 at completion:** none.
