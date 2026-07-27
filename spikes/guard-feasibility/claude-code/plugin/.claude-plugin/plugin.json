@@ -1,0 +1,9 @@
+{
+  "name": "kanon-guard-spike-claude",
+  "version": "0.0.0",
+  "description": "Disposable v1 Guard feasibility probe for Claude Code.",
+  "author": {
+    "name": "Kanon v1 feasibility spike"
+  },
+  "license": "MIT"
+}
