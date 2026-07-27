@@ -1,0 +1,72 @@
+{
+  "schema": "kanon-guard-feasibility-report-v1",
+  "host": "claude-code",
+  "generated_at": "2026-07-27T19:42:54.633Z",
+  "claimed_surface": {
+    "cli": "claude --plugin-dir",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "non-interactive local CLI",
+    "max_budget_usd_per_attempt": 0.25,
+    "cli_version": "2.1.219 (Claude Code)"
+  },
+  "known": [
+    "Directly proven on this named surface: execution_completed."
+  ],
+  "likely": [],
+  "unknown": [
+    "Claude Code authentication was not directly available for a host run.",
+    "Hard Guard is not claimable on this surface; direct proof is missing for: discovery, untrusted_hook, shell_denial, patch_denial, rewrite_schema_and_effect, metadata, resume, compaction, disabled_hooks, trusted_hook, scratch_cleanup."
+  ],
+  "stale_or_suspicious": [],
+  "suggested": [
+    "Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go."
+  ],
+  "setup": [
+    {
+      "name": "claude-version",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "cb758819034d05e8cc7388238af3ba029dfed891a74bce2c348d2da06a268ffd",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 22,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "authentication",
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "a46263f97c4274b9103f8dcd26791b8281db79bd99fdca6e00df1617f00460c4",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 79,
+        "stderr_bytes": 0
+      }
+    }
+  ],
+  "attempts": [],
+  "criteria": {
+    "discovery": "unknown",
+    "untrusted_hook": "unknown",
+    "trusted_hook": "unknown",
+    "shell_denial": "unknown",
+    "patch_denial": "unknown",
+    "rewrite_schema_and_effect": "unknown",
+    "metadata": "unknown",
+    "resume": "unknown",
+    "compaction": "unknown",
+    "disabled_hooks": "unknown",
+    "scratch_cleanup": "not-run",
+    "execution_completed": "proven"
+  },
+  "cleanup": [],
+  "disposition": "no-go"
+}
