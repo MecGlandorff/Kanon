@@ -45,7 +45,21 @@ const report = {
   suggested: [],
   setup: [],
   attempts: [],
-  criteria: {},
+  criteria: {
+    discovery: "unknown",
+    untrusted_hook: "unknown",
+    trusted_hook: "unknown",
+    shell_denial: "unknown",
+    patch_denial: "unknown",
+    rewrite_schema_and_effect: "unknown",
+    metadata: "unknown",
+    resume: "unknown",
+    compaction: "unknown",
+    disabled_hooks: "unknown",
+    lifecycle_cleanup: "unknown",
+    scratch_cleanup: "unknown",
+    execution_completed: "unknown"
+  },
   cleanup: [],
   disposition: "no-go"
 };
@@ -355,9 +369,19 @@ function summarizeObservation(event) {
     decision: event.decision,
     session_id_present: event.session_id?.present === true,
     turn_id_present: event.turn_id?.present === true,
+    cwd_present: event.cwd?.present === true,
     cwd_matches_workspace: event.cwd?.sha256 === sha256(scratch.workspace),
     plugin_root_present: event.plugin_root_present === true,
-    plugin_data_writable: event.plugin_data?.writable === true
+    plugin_data_present: event.plugin_data?.present === true,
+    plugin_data_writable: event.plugin_data?.writable || "unknown",
+    plugin_data_reason: event.plugin_data?.reason || null,
+    plugin_data_directory_created_for_probe:
+      event.plugin_data?.directory_created_for_probe === true,
+    plugin_data_created_directory_count:
+      Number.isInteger(event.plugin_data?.created_directory_count)
+        ? event.plugin_data.created_directory_count
+        : 0,
+    tool_input_shape: event.tool_input_shape || null
   };
 }
 
@@ -442,6 +466,7 @@ function signalExitCode(signal) {
 function finalizeReport() {
   const required = [
     "discovery",
+    "untrusted_hook",
     "shell_denial",
     "patch_denial",
     "rewrite_schema_and_effect",
@@ -454,6 +479,14 @@ function finalizeReport() {
     "scratch_cleanup",
     "execution_completed"
   ];
+  const provenCriteria = Object.entries(report.criteria)
+    .filter(([, value]) => value === "proven")
+    .map(([name]) => name);
+  if (provenCriteria.length) {
+    report.known.push(
+      `Directly proven on this named surface: ${provenCriteria.join(", ")}.`
+    );
+  }
   const likelyCriteria = Object.entries(report.criteria)
     .filter(([, value]) => value === "likely")
     .map(([name]) => name);
@@ -470,7 +503,6 @@ function finalizeReport() {
     );
   } else {
     report.disposition = "go";
-    report.known.push("Every required Guard spike criterion was directly proven on this named host surface.");
   }
   report.suggested.push("Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go.");
 }

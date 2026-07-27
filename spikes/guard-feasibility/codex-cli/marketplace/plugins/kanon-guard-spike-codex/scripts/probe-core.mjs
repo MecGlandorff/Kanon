@@ -112,60 +112,114 @@ function probePluginData(value) {
   if (!path.isAbsolute(directory)) {
     return { present: true, writable: "unknown", reason: "relative-directory" };
   }
+  const root = path.resolve(directory);
+  const createdDirectories = [];
+  const probe = path.join(
+    root,
+    `.kanon-guard-spike-${process.pid}-${crypto.randomUUID()}`
+  );
+  let descriptor;
+  let opened = false;
+  let failure = null;
   try {
-    const root = path.resolve(directory);
-    const stat = fs.lstatSync(root);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) {
-      return { present: true, writable: "unknown", reason: "unsafe-directory" };
-    }
-    const probe = path.join(root, `.kanon-guard-spike-${process.pid}-${crypto.randomUUID()}`);
-    let descriptor;
-    let opened = false;
-    let failure = null;
-    try {
-      descriptor = fs.openSync(
-        probe,
-        fs.constants.O_CREAT |
-          fs.constants.O_EXCL |
-          fs.constants.O_WRONLY |
-          (fs.constants.O_NOFOLLOW || 0),
-        0o600
-      );
-      opened = true;
-      fs.writeFileSync(descriptor, "probe\n", "utf8");
-    } catch (error) {
-      failure = error;
-    } finally {
-      if (descriptor !== undefined) {
-        try {
-          fs.closeSync(descriptor);
-        } catch (error) {
-          failure ||= error;
-        }
-      }
-      if (opened) {
-        try {
-          fs.unlinkSync(probe);
-        } catch (error) {
-          failure ||= error;
-        }
-      }
-    }
-    if (failure) {
-      return {
-        present: true,
-        writable: "unknown",
-        reason: boundedString(failure?.code, 80) || "write-failed"
-      };
-    }
-    return { present: true, writable: true, reason: null };
+    ensurePluginDataDirectory(root, createdDirectories);
+    descriptor = fs.openSync(
+      probe,
+      fs.constants.O_CREAT |
+        fs.constants.O_EXCL |
+        fs.constants.O_WRONLY |
+        (fs.constants.O_NOFOLLOW || 0),
+      0o600
+    );
+    opened = true;
+    fs.writeFileSync(descriptor, "probe\n", "utf8");
   } catch (error) {
+    failure = error;
+  } finally {
+    if (descriptor !== undefined) {
+      try {
+        fs.closeSync(descriptor);
+      } catch (error) {
+        failure ||= error;
+      }
+    }
+    if (opened) {
+      try {
+        fs.unlinkSync(probe);
+      } catch (error) {
+        failure ||= error;
+      }
+    }
+    for (const created of [...createdDirectories].reverse()) {
+      try {
+        fs.rmdirSync(created);
+      } catch (error) {
+        failure ||= error;
+      }
+    }
+  }
+  if (failure) {
     return {
       present: true,
       writable: "unknown",
-      reason: boundedString(error?.code, 80) || "write-failed"
+      reason: boundedString(failure?.code, 80) || "write-failed",
+      directory_created_for_probe: createdDirectories.length > 0,
+      created_directory_count: createdDirectories.length
     };
   }
+  return {
+    present: true,
+    writable: true,
+    reason: null,
+    directory_created_for_probe: createdDirectories.length > 0,
+    created_directory_count: createdDirectories.length
+  };
+}
+
+function ensurePluginDataDirectory(root, createdDirectories) {
+  const missing = [];
+  let current = root;
+  while (true) {
+    try {
+      const stat = fs.lstatSync(current);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        throw codedError("unsafe-plugin-data-directory");
+      }
+      if (fs.realpathSync(current) !== current) {
+        throw codedError("non-canonical-plugin-data-directory");
+      }
+      break;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      missing.unshift(current);
+      if (missing.length > 8) {
+        throw codedError("plugin-data-depth");
+      }
+      const parent = path.dirname(current);
+      if (parent === current) {
+        throw codedError("plugin-data-root-missing");
+      }
+      current = parent;
+    }
+  }
+  for (const missingDirectory of missing) {
+    fs.mkdirSync(missingDirectory, { mode: 0o700 });
+    createdDirectories.push(missingDirectory);
+    const stat = fs.lstatSync(missingDirectory);
+    if (
+      !stat.isDirectory() ||
+      stat.isSymbolicLink() ||
+      fs.realpathSync(missingDirectory) !== missingDirectory
+    ) {
+      throw codedError("unsafe-created-plugin-data-directory");
+    }
+  }
+}
+
+function codedError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
 }
 
 function writeEvidence(value, rootValue, observation) {

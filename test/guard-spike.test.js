@@ -10,6 +10,9 @@ import { inspectHook as inspectCodexHook } from "../spikes/guard-feasibility/cod
 import { inspectHook as inspectClaudeHook } from "../spikes/guard-feasibility/claude-code/plugin/scripts/probe-core.mjs";
 import {
   containedReportPath,
+  createScratch,
+  removeScratch,
+  runProgramAsync,
   writeReport
 } from "../spikes/guard-feasibility/lib/runtime.mjs";
 
@@ -91,6 +94,69 @@ for (const [host, inspect, environment] of [
       Object.keys(result.output.hookSpecificOutput.updatedInput),
       ["command"]
     );
+  });
+
+  test(`${host} spike safely probes and removes a missing plugin-data leaf`, (t) => {
+    const fixture = makeFixture(t);
+    const pluginData = path.join(fixture, "plugin-data");
+    fs.rmdirSync(pluginData);
+    const result = inspect(
+      hookInput("KANON_GUARD_SPIKE_DENY"),
+      environment(fixture)
+    );
+
+    assert.equal(result.observation.plugin_data.writable, true);
+    assert.equal(
+      result.observation.plugin_data.directory_created_for_probe,
+      true
+    );
+    assert.equal(fs.existsSync(pluginData), false);
+  });
+
+  test(`${host} spike safely creates and removes a bounded plugin-data suffix`, (t) => {
+    const fixture = makeFixture(t);
+    const values = environment(fixture);
+    const dataKey = Object.hasOwn(values, "PLUGIN_DATA")
+      ? "PLUGIN_DATA"
+      : "CLAUDE_PLUGIN_DATA";
+    const missingParent = path.join(fixture, "missing-parent");
+    values[dataKey] = path.join(missingParent, "plugin-data");
+    const result = inspect(
+      hookInput("KANON_GUARD_SPIKE_DENY"),
+      values
+    );
+
+    assert.equal(result.observation.plugin_data.writable, true);
+    assert.equal(
+      result.observation.plugin_data.directory_created_for_probe,
+      true
+    );
+    assert.equal(
+      result.observation.plugin_data.created_directory_count,
+      2
+    );
+    assert.equal(fs.existsSync(missingParent), false);
+  });
+
+  test(`${host} spike refuses an excessive missing plugin-data suffix`, (t) => {
+    const fixture = makeFixture(t);
+    const values = environment(fixture);
+    const dataKey = Object.hasOwn(values, "PLUGIN_DATA")
+      ? "PLUGIN_DATA"
+      : "CLAUDE_PLUGIN_DATA";
+    const segments = Array.from(
+      { length: 9 },
+      (_, index) => `missing-${index}`
+    );
+    values[dataKey] = path.join(fixture, ...segments);
+    const result = inspect(
+      hookInput("KANON_GUARD_SPIKE_DENY"),
+      values
+    );
+
+    assert.equal(result.observation.plugin_data.writable, "unknown");
+    assert.equal(result.observation.plugin_data.reason, "plugin-data-depth");
+    assert.equal(fs.existsSync(path.join(fixture, segments[0])), false);
   });
 
   test(`${host} spike refuses an evidence sink outside the runner root`, (t) => {
@@ -237,6 +303,32 @@ test("spike report writes reject a symbolic-link target", (t) => {
   assert.equal(fs.readFileSync(source, "utf8"), "outside\n");
 });
 
+test("async host execution closes stdin so non-interactive CLIs can start", async () => {
+  const result = await runProgramAsync(
+    process.execPath,
+    [
+      "-e",
+      "process.stdin.resume(); process.stdin.once('end', () => process.stdout.write('eof\\n'));"
+    ],
+    { timeoutMs: 2_000 }
+  );
+
+  assert.equal(result.status, 0);
+  assert.equal(result.timed_out, false);
+  assert.equal(result.stdout, "eof\n");
+});
+
+test("spike scratch paths use the host canonical temporary root", (t) => {
+  const scratch = createScratch("kanon-guard-canonical-");
+  t.after(() => {
+    if (fs.existsSync(scratch.root)) removeScratch(scratch);
+  });
+
+  assert.equal(scratch.root, fs.realpathSync(scratch.root));
+  assert.equal(scratch.workspace, fs.realpathSync(scratch.workspace));
+  removeScratch(scratch);
+});
+
 test(
   "Codex runner rolls back its exact plugin state after SIGINT",
   { skip: process.platform === "win32", timeout: 20_000 },
@@ -358,9 +450,13 @@ if (args[0] === "--version") {
     assert.equal(fs.existsSync(path.join(state, "plugin")), false);
     const result = JSON.parse(fs.readFileSync(report, "utf8"));
     assert.equal(result.disposition, "no-go");
+    assertGuardCriteria(result, ["lifecycle_cleanup"]);
     assert.equal(result.criteria.lifecycle_cleanup, "proven");
     assert.equal(result.criteria.scratch_cleanup, "proven");
     assert.equal(result.criteria.execution_completed, "unknown");
+    assert.ok(
+      result.known.some((entry) => entry.includes("lifecycle_cleanup"))
+    );
     assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
     assert.match(stdout, /"disposition":"no-go"/);
 
@@ -510,8 +606,12 @@ if (args[0] === "--version") {
     assert.equal(fs.existsSync(scratchCwd), false);
     const result = JSON.parse(fs.readFileSync(report, "utf8"));
     assert.equal(result.disposition, "no-go");
+    assertGuardCriteria(result);
     assert.equal(result.criteria.scratch_cleanup, "proven");
     assert.equal(result.criteria.execution_completed, "unknown");
+    assert.ok(
+      result.known.some((entry) => entry.includes("scratch_cleanup"))
+    );
     assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
   }
 );
@@ -535,7 +635,9 @@ function makeFixture(t) {
 }
 
 function makeTemporaryDirectory(t, prefix) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const root = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -547,4 +649,32 @@ async function waitForFile(file, timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`Timed out waiting for ${path.basename(file)}.`);
+}
+
+function assertGuardCriteria(report, extras = []) {
+  for (const criterion of [
+    "discovery",
+    "untrusted_hook",
+    "trusted_hook",
+    "shell_denial",
+    "patch_denial",
+    "rewrite_schema_and_effect",
+    "metadata",
+    "resume",
+    "compaction",
+    "disabled_hooks",
+    "scratch_cleanup",
+    "execution_completed",
+    ...extras
+  ]) {
+    assert.equal(
+      Object.hasOwn(report.criteria, criterion),
+      true,
+      `missing criterion ${criterion}`
+    );
+  }
+  assert.ok(
+    report.unknown.some((entry) => entry.includes("untrusted_hook")),
+    "untrusted-hook uncertainty must gate the result"
+  );
 }

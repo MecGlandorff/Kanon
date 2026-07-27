@@ -42,7 +42,8 @@ export function containedReportPath(repoRoot, value) {
 }
 
 export function createScratch(prefix) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const created = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const root = fs.realpathSync(created);
   const workspace = path.join(root, "workspace");
   fs.mkdirSync(workspace, { mode: 0o700 });
   return {
@@ -53,7 +54,7 @@ export function createScratch(prefix) {
 }
 
 export function removeScratch(scratch) {
-  const expected = path.join(os.tmpdir(), "kanon-guard-");
+  const expected = path.join(fs.realpathSync(os.tmpdir()), "kanon-guard-");
   if (!scratch.root.startsWith(expected)) {
     throw new Error("Refusing to remove a scratch directory with an unexpected prefix.");
   }
@@ -134,6 +135,7 @@ export function runProgramAsync(command, args, options = {}) {
           });
         }
       );
+      child.stdin?.end();
       signal?.addEventListener("abort", abort, { once: true });
       timeout = setTimeout(() => stop("timeout"), timeoutMs);
       timeout.unref();
