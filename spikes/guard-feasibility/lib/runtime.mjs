@@ -4,6 +4,17 @@ import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 
+const HOST_STATE_PATHS = Object.freeze({
+  "claude-code": ["CLAUDE_CONFIG_DIR"],
+  "codex-cli": ["CODEX_HOME"]
+});
+const LOCALE_KEYS = Object.freeze(["LANG", "LC_ALL", "LC_CTYPE"]);
+const SYSTEM_EXECUTABLE_DIRECTORIES = Object.freeze(
+  process.platform === "win32"
+    ? []
+    : ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+);
+
 export function parseExecutionOptions(argv, usage) {
   const options = { execute: false, report: null };
   for (let index = 0; index < argv.length; index += 1) {
@@ -41,24 +52,158 @@ export function containedReportPath(repoRoot, value) {
   return output;
 }
 
-export function createScratch(prefix) {
-  const created = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+export function createScratch(prefix, options = {}) {
+  const tempRoot = fs.realpathSync(os.tmpdir());
+  if (
+    options.repoRoot &&
+    isContained(canonicalPath(options.repoRoot), tempRoot)
+  ) {
+    throw new Error("Refusing a temporary root inside the repository.");
+  }
+  const created = fs.mkdtempSync(path.join(tempRoot, prefix));
   const root = fs.realpathSync(created);
   const workspace = path.join(root, "workspace");
   fs.mkdirSync(workspace, { mode: 0o700 });
   return {
+    tempRoot,
     root,
     workspace,
     evidence: path.join(root, "evidence.jsonl")
   };
 }
 
+/**
+ * Resolve a host executable from the caller's PATH without ever selecting a
+ * repository-controlled file. The returned path is canonical and absolute so
+ * later process creation does not repeat PATH lookup.
+ */
+export function resolveTrustedExecutable(
+  command,
+  { repoRoot, environment = process.env } = {}
+) {
+  if (!repoRoot) {
+    throw new Error("Trusted executable resolution requires a repository root.");
+  }
+  const root = canonicalPath(repoRoot);
+  const pathValue = boundedEnvironmentValue(environment.PATH, 64 * 1024);
+  const candidates = executableNames(command, environment);
+  for (const directory of pathValue.split(path.delimiter)) {
+    if (!directory || !path.isAbsolute(directory)) continue;
+    for (const candidateName of candidates) {
+      const lexical = path.resolve(directory, candidateName);
+      if (isContained(root, lexical)) continue;
+      let stat;
+      let resolved;
+      try {
+        resolved = fs.realpathSync(lexical);
+        stat = fs.statSync(resolved);
+      } catch {
+        continue;
+      }
+      if (
+        isContained(root, resolved) ||
+        !stat.isFile() ||
+        (process.platform !== "win32" && (stat.mode & 0o111) === 0)
+      ) {
+        continue;
+      }
+      return resolved;
+    }
+  }
+  throw new Error(
+    `No trusted ${path.basename(command)} executable was found outside the repository.`
+  );
+}
+
+/**
+ * Build the complete child environment for a host probe.
+ *
+ * The allowlist is intentionally small:
+ * - canonical PATH entries for the resolved host, this Node runtime, and
+ *   fixed operating-system tools;
+ * - HOME plus the host's documented state-root override for authentication;
+ * - bounded locale values; and
+ * - a disposable TMPDIR/TMP/TEMP rooted in this probe's scratch directory.
+ *
+ * API keys, tokens, shell startup controls, NODE_OPTIONS, proxy settings, and
+ * every other caller variable are omitted. Callers add only the two bounded
+ * Kanon evidence paths after this function returns.
+ */
+export function createMinimalHostEnvironment({
+  host,
+  repoRoot,
+  scratchRoot,
+  hostExecutable,
+  nodeExecutable = process.execPath,
+  environment = process.env
+}) {
+  if (!Object.hasOwn(HOST_STATE_PATHS, host)) {
+    throw new Error(`Unsupported host environment: ${host}`);
+  }
+  const root = canonicalPath(repoRoot);
+  const scratch = canonicalExistingDirectory(scratchRoot, "scratch root");
+  if (isContained(root, scratch)) {
+    throw new Error("Probe scratch state must be outside the repository.");
+  }
+  const trustedHost = trustedAbsoluteExecutable(
+    hostExecutable,
+    root,
+    "host executable"
+  );
+  const trustedNode = trustedAbsoluteExecutable(
+    nodeExecutable,
+    root,
+    "Node executable"
+  );
+  const home = safeAuthenticationPath(
+    environment.HOME,
+    root,
+    "HOME",
+    { requireExistingDirectory: true }
+  );
+
+  const output = Object.create(null);
+  output.PATH = trustedPath([
+    path.dirname(trustedNode),
+    path.dirname(trustedHost),
+    ...SYSTEM_EXECUTABLE_DIRECTORIES
+  ], root);
+  output.HOME = home;
+  output.TMPDIR = scratch;
+  output.TMP = scratch;
+  output.TEMP = scratch;
+  output.NO_COLOR = "1";
+  for (const key of LOCALE_KEYS) {
+    const value = boundedEnvironmentValue(environment[key], 160);
+    if (/^[A-Za-z0-9_.@-]+$/.test(value)) output[key] = value;
+  }
+  if (!output.LANG) output.LANG = "C";
+
+  for (const key of HOST_STATE_PATHS[host]) {
+    if (!environment[key]) continue;
+    output[key] = safeAuthenticationPath(
+      environment[key],
+      root,
+      key
+    );
+  }
+  if (host === "claude-code") {
+    output.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
+    output.DISABLE_AUTOUPDATER = "1";
+  }
+  return output;
+}
+
 export function removeScratch(scratch) {
-  const expected = path.join(fs.realpathSync(os.tmpdir()), "kanon-guard-");
-  if (!scratch.root.startsWith(expected)) {
+  const tempRoot = fs.realpathSync(scratch.tempRoot || os.tmpdir());
+  const root = fs.realpathSync(scratch.root);
+  if (
+    path.dirname(root) !== tempRoot ||
+    !path.basename(root).startsWith("kanon-guard-")
+  ) {
     throw new Error("Refusing to remove a scratch directory with an unexpected prefix.");
   }
-  fs.rmSync(scratch.root, { recursive: true, force: false });
+  fs.rmSync(root, { recursive: true, force: false });
 }
 
 export function runProgramAsync(command, args, options = {}) {
@@ -104,7 +249,10 @@ export function runProgramAsync(command, args, options = {}) {
         {
           cwd: options.cwd,
           encoding: "utf8",
-          env: options.env || process.env,
+          // Never inherit the ambient environment implicitly. Host runners
+          // provide createMinimalHostEnvironment(); unit callers default to
+          // an empty environment.
+          env: options.env || Object.create(null),
           maxBuffer: 8 * 1024 * 1024,
           windowsHide: true
         },
@@ -169,6 +317,17 @@ export function summarizeProcess(result) {
   };
 }
 
+export function summarizeSensitiveProcess(result) {
+  return {
+    status: result.status,
+    signal: result.signal,
+    timed_out: result.timed_out,
+    overflowed: result.overflowed,
+    error_code: result.error_code,
+    output_redacted: true
+  };
+}
+
 export function readObservations(file) {
   try {
     const stat = fs.statSync(file);
@@ -215,7 +374,7 @@ export function writeReport(file, report) {
     descriptor = fs.openSync(
       resolved,
       fs.constants.O_CREAT |
-        fs.constants.O_TRUNC |
+        fs.constants.O_EXCL |
         fs.constants.O_WRONLY |
         (fs.constants.O_NOFOLLOW || 0),
       0o600
@@ -278,6 +437,112 @@ function canonicalPath(value) {
       current = parent;
     }
   }
+}
+
+function canonicalExistingDirectory(value, label) {
+  if (!value || !path.isAbsolute(value)) {
+    throw new Error(`Expected an absolute ${label}.`);
+  }
+  const resolved = fs.realpathSync(value);
+  const stat = fs.statSync(resolved);
+  if (!stat.isDirectory()) {
+    throw new Error(`Expected a real ${label} directory.`);
+  }
+  return resolved;
+}
+
+function safeAuthenticationPath(
+  value,
+  repoRoot,
+  label,
+  options = {}
+) {
+  const text = boundedEnvironmentValue(value, 4_096);
+  if (!text || !path.isAbsolute(text)) {
+    throw new Error(`${label} must be an absolute authentication-state path.`);
+  }
+  const resolved = options.requireExistingDirectory
+    ? canonicalExistingDirectory(text, label)
+    : canonicalPath(text);
+  if (isContained(repoRoot, text) || isContained(repoRoot, resolved)) {
+    throw new Error(`${label} must not resolve inside the repository.`);
+  }
+  return resolved;
+}
+
+function trustedAbsoluteExecutable(value, repoRoot, label) {
+  if (!value || !path.isAbsolute(value)) {
+    throw new Error(`Expected an absolute ${label}.`);
+  }
+  const resolved = fs.realpathSync(value);
+  const stat = fs.statSync(resolved);
+  if (
+    isContained(repoRoot, value) ||
+    isContained(repoRoot, resolved) ||
+    !stat.isFile() ||
+    (process.platform !== "win32" && (stat.mode & 0o111) === 0)
+  ) {
+    throw new Error(`Refusing an untrusted ${label}.`);
+  }
+  return resolved;
+}
+
+function trustedPath(directories, repoRoot) {
+  const trusted = [];
+  for (const directory of directories) {
+    if (!directory || !path.isAbsolute(directory)) continue;
+    let resolved;
+    try {
+      resolved = fs.realpathSync(directory);
+      if (!fs.statSync(resolved).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    if (
+      isContained(repoRoot, directory) ||
+      isContained(repoRoot, resolved) ||
+      trusted.includes(resolved)
+    ) {
+      continue;
+    }
+    trusted.push(resolved);
+  }
+  if (!trusted.length) {
+    throw new Error("Trusted PATH construction produced no directories.");
+  }
+  return trusted.join(path.delimiter);
+}
+
+function executableNames(command, environment) {
+  if (path.basename(command) !== command) {
+    throw new Error("Host executable resolution accepts a basename only.");
+  }
+  if (process.platform !== "win32" || path.extname(command)) {
+    return [command];
+  }
+  const extensions = boundedEnvironmentValue(environment.PATHEXT, 4_096)
+    .split(";")
+    .filter((value) => /^\.[A-Za-z0-9]+$/.test(value));
+  return [command, ...extensions.map((extension) => `${command}${extension}`)];
+}
+
+function boundedEnvironmentValue(value, limit) {
+  return typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= limit &&
+    !value.includes("\0")
+    ? value
+    : "";
+}
+
+function isContained(root, candidate) {
+  const relative = path.relative(root, path.resolve(candidate));
+  return (
+    !relative ||
+    (!relative.startsWith(`..${path.sep}`) &&
+      relative !== ".." &&
+      !path.isAbsolute(relative))
+  );
 }
 
 function ensureRealDirectory(directory) {

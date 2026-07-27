@@ -3,15 +3,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   containedReportPath,
+  createMinimalHostEnvironment,
   createScratch,
   extractSessionIdentifier,
   observationsSince,
   parseExecutionOptions,
   readObservations,
   removeScratch,
+  resolveTrustedExecutable,
   runProgramAsync,
   sha256,
   summarizeProcess,
+  summarizeSensitiveProcess,
   writeReport
 } from "../lib/runtime.mjs";
 
@@ -26,7 +29,8 @@ const pluginRoot = path.join(
 const options = parseExecutionOptions(process.argv.slice(2), usage());
 const reportPath = containedReportPath(repoRoot, options.report);
 const report = {
-  schema: "kanon-guard-feasibility-report-v1",
+  schema: "kanon-guard-feasibility-report-v2",
+  follow_up: "run-a1-hardened",
   host: "claude-code",
   generated_at: new Date().toISOString(),
   claimed_surface: {
@@ -34,7 +38,15 @@ const report = {
     operating_system: process.platform,
     architecture: process.arch,
     terminal_surface: "non-interactive local CLI",
-    max_budget_usd_per_attempt: 0.25
+    permission_contract:
+      "dontAsk, one built-in tool, and an exact Bash allow rule only when a fixed scratch command must be observable",
+    model_alias: "haiku",
+    effort: "low",
+    max_budget_usd_per_attempt: 0.05,
+    max_model_attempts: 6,
+    max_budget_usd_total: 0.3,
+    timeout_ms_per_attempt: 180_000,
+    max_output_bytes_per_stream: 8 * 1024 * 1024
   },
   known: [],
   likely: [],
@@ -61,6 +73,8 @@ const report = {
   disposition: "no-go"
 };
 let scratch = null;
+let hostExecutable = null;
+let baseEnvironment = null;
 let interruptedSignal = null;
 const interruption = new AbortController();
 const signalHandlers = new Map(
@@ -74,19 +88,46 @@ for (const [signal, handler] of signalHandlers) {
 }
 
 try {
-  const version = await runHostProgram("claude", ["--version"]);
+  scratch = createScratch("kanon-guard-claude-", { repoRoot });
+  hostExecutable = resolveTrustedExecutable("claude", {
+    repoRoot,
+    environment: process.env
+  });
+  baseEnvironment = createMinimalHostEnvironment({
+    host: "claude-code",
+    repoRoot,
+    scratchRoot: scratch.root,
+    hostExecutable,
+    environment: process.env
+  });
+  report.setup.push({
+    name: "trusted-executable-resolution",
+    resolved_outside_repository: true,
+    ambient_environment_inherited: false
+  });
+
+  const version = await runHostProgram(hostExecutable, ["--version"], {
+    cwd: scratch.workspace,
+    env: baseEnvironment
+  });
   report.claimed_surface.cli_version = version.status === 0
-    ? version.stdout.trim().slice(0, 160)
+    ? parseVersion(version.stdout)
     : null;
   report.setup.push({ name: "claude-version", process: summarizeProcess(version) });
 
-  const auth = await runHostProgram("claude", ["auth", "status"]);
-  report.setup.push({ name: "authentication", process: summarizeProcess(auth) });
+  const auth = await runHostProgram(hostExecutable, ["auth", "status"], {
+    cwd: scratch.workspace,
+    env: baseEnvironment
+  });
+  report.setup.push({
+    name: "authentication",
+    process: summarizeSensitiveProcess(auth),
+    logged_in: auth.status === 0 && parseAuthentication(auth.stdout)
+  });
   const authenticated = parseAuthentication(auth.stdout);
   if (auth.status !== 0 || authenticated !== true) {
     report.unknown.push("Claude Code authentication was not directly available for a host run.");
   } else {
-    scratch = createScratch("kanon-guard-claude-");
     await runProbeCases();
   }
 } catch (error) {
@@ -129,13 +170,22 @@ try {
 
 async function runProbeCases() {
   const environment = {
-    ...process.env,
+    ...baseEnvironment,
     KANON_GUARD_SPIKE_EVIDENCE_FILE: scratch.evidence,
     KANON_GUARD_SPIKE_EVIDENCE_ROOT: scratch.root
   };
   const workspaceHash = sha256(scratch.workspace);
   const shellMarker = path.join(scratch.workspace, "kanon-guard-spike-deny-shell.txt");
-  const shellDeny = await invoke("shell-deny", environment, shellPrompt(shellMarker, "KANON_GUARD_SPIKE_DENY"));
+  const shellDenyCase = shellCase(
+    shellMarker,
+    "KANON_GUARD_SPIKE_DENY"
+  );
+  const shellDeny = await invoke(
+    "shell-deny",
+    environment,
+    shellDenyCase.prompt,
+    { allowedToolRule: shellDenyCase.permissionRule }
+  );
   report.attempts.push(withSideEffect(shellDeny, shellMarker));
 
   const writeMarker = path.join(scratch.workspace, "kanon-guard-spike-deny-write.txt");
@@ -162,7 +212,13 @@ async function runProbeCases() {
 
   const original = path.join(scratch.workspace, "kanon-guard-spike-original.txt");
   const rewritten = path.join(scratch.workspace, "kanon-guard-spike-rewrite-output.txt");
-  const rewrite = await invoke("shell-rewrite", environment, shellPrompt(original, "KANON_GUARD_SPIKE_REWRITE"));
+  const rewriteCase = shellCase(original, "KANON_GUARD_SPIKE_REWRITE");
+  const rewrite = await invoke(
+    "shell-rewrite",
+    environment,
+    rewriteCase.prompt,
+    { allowedToolRule: rewriteCase.permissionRule }
+  );
   report.attempts.push({
     ...rewrite.summary,
     original_side_effect_exists: fs.existsSync(original),
@@ -173,7 +229,19 @@ async function runProbeCases() {
   });
 
   const disabledMarker = path.join(scratch.workspace, "kanon-guard-spike-disabled.txt");
-  const disabled = await invoke("hooks-disabled", environment, shellPrompt(disabledMarker, "KANON_GUARD_SPIKE_DISABLED"), { safeMode: true });
+  const disabledCase = shellCase(
+    disabledMarker,
+    "KANON_GUARD_SPIKE_DISABLED"
+  );
+  const disabled = await invoke(
+    "hooks-disabled",
+    environment,
+    disabledCase.prompt,
+    {
+      safeMode: true,
+      allowedToolRule: disabledCase.permissionRule
+    }
+  );
   report.attempts.push(withSideEffect(disabled, disabledMarker));
 
   const shellEvent = matching(shellDeny.events, "Bash", "deny");
@@ -215,7 +283,19 @@ async function runProbeCases() {
     report.unknown.push("Claude Code output did not directly expose a resumable session identifier.");
   } else {
     const resumeMarker = path.join(scratch.workspace, "kanon-guard-spike-resume.txt");
-    const resume = await invoke("resume-deny", environment, shellPrompt(resumeMarker, "KANON_GUARD_SPIKE_DENY"), { session });
+    const resumeCase = shellCase(
+      resumeMarker,
+      "KANON_GUARD_SPIKE_DENY"
+    );
+    const resume = await invoke(
+      "resume-deny",
+      environment,
+      resumeCase.prompt,
+      {
+        session,
+        allowedToolRule: resumeCase.permissionRule
+      }
+    );
     report.attempts.push(withSideEffect(resume, resumeMarker));
     const resumeEvent = matching(resume.events, "Bash", "deny");
     report.criteria.resume = status(
@@ -223,14 +303,9 @@ async function runProbeCases() {
         resumeEvent.session_id?.sha256 === shellEvent?.session_id?.sha256 &&
         !fs.existsSync(resumeMarker)
     );
-    const compact = await invoke("compaction-attempt", environment, "/compact", { session });
-    report.attempts.push(compact.summary);
-    report.criteria.compaction = status(
-      compact.events.some(
-        (event) =>
-          event.hook_event_name === "SessionStart" &&
-          event.session_start_source === "compact"
-      )
+    report.criteria.compaction = "unknown";
+    report.unknown.push(
+      "Actual Claude compaction requires an interactive slash-command flow; the runner does not send literal /compact text through an incompatible print-mode prompt."
     );
   }
   report.unknown.push("Claude Code exposes no separately inspectable per-plugin hook-trust state in this non-interactive plugin-dir probe.");
@@ -246,15 +321,29 @@ async function invoke(name, environment, prompt, options = {}) {
     "--plugin-dir",
     pluginRoot,
     "--max-budget-usd",
-    "0.25",
-    "--dangerously-skip-permissions",
+    "0.05",
+    "--model",
+    "haiku",
+    "--effort",
+    "low",
+    "--permission-mode",
+    "dontAsk",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    "{\"mcpServers\":{}}",
+    "--no-chrome",
     "--tools",
     options.tools || "Bash"
   ];
+  if (options.allowedToolRule) {
+    args.push("--allowedTools", options.allowedToolRule);
+  }
   if (options.session) args.push("--resume", options.session);
   if (options.safeMode) args.push("--safe-mode");
   args.push(prompt);
-  const raw = await runHostProgram("claude", args, {
+  const raw = await runHostProgram(hostExecutable, args, {
     cwd: scratch.workspace,
     env: environment,
     timeoutMs: 180_000
@@ -326,12 +415,21 @@ function parseAuthentication(output) {
   }
 }
 
-function shellPrompt(file, marker) {
-  return [
+function parseVersion(output) {
+  const match = output.trim().match(/^(\d+\.\d+\.\d+) \(Claude Code\)$/);
+  return match ? `${match[1]} (Claude Code)` : null;
+}
+
+function shellCase(file, marker) {
+  const command = `printf '%s\\n' ${shellQuote(marker)} > ${shellQuote(file)}`;
+  return {
+    permissionRule: `Bash(${command})`,
+    prompt: [
     "Use the Bash tool exactly once and do not use any other tool.",
-    `Run printf '%s\\n' ${shellQuote(marker)} > ${shellQuote(file)}.`,
+    `Run ${command}.`,
     "Do not inspect files, do not use network access, and do not retry if the tool is denied."
-  ].join(" ");
+    ].join(" ")
+  };
 }
 
 function writePrompt(file) {
@@ -361,6 +459,12 @@ function summarizeInvocation(args, prompt, options) {
       if (argument === prompt) return "<fixed-probe-prompt>";
       if (argument === pluginRoot) return "<disposable-plugin-root>";
       if (options.session && argument === options.session) return "<session-id>";
+      if (
+        options.allowedToolRule &&
+        argument === options.allowedToolRule
+      ) {
+        return "<exact-scratch-command-permission-rule>";
+      }
       return argument;
     }),
     cwd: "<scratch-workspace>",

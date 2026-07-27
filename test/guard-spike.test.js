@@ -1,17 +1,19 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { inspectHook as inspectCodexHook } from "../spikes/guard-feasibility/codex-cli/marketplace/plugins/kanon-guard-spike-codex/scripts/probe-core.mjs";
 import { inspectHook as inspectClaudeHook } from "../spikes/guard-feasibility/claude-code/plugin/scripts/probe-core.mjs";
 import {
   containedReportPath,
+  createMinimalHostEnvironment,
   createScratch,
   removeScratch,
+  resolveTrustedExecutable,
   runProgramAsync,
   writeReport
 } from "../spikes/guard-feasibility/lib/runtime.mjs";
@@ -303,6 +305,15 @@ test("spike report writes reject a symbolic-link target", (t) => {
   assert.equal(fs.readFileSync(source, "utf8"), "outside\n");
 });
 
+test("spike report writes never overwrite an existing evidence file", (t) => {
+  const root = makeTemporaryDirectory(t, "kanon-guard-report-root-");
+  const target = path.join(root, "report.json");
+  fs.writeFileSync(target, "historical evidence\n", "utf8");
+
+  assert.throws(() => writeReport(target, { replacement: true }), /EEXIST/);
+  assert.equal(fs.readFileSync(target, "utf8"), "historical evidence\n");
+});
+
 test("async host execution closes stdin so non-interactive CLIs can start", async () => {
   const result = await runProgramAsync(
     process.execPath,
@@ -318,15 +329,154 @@ test("async host execution closes stdin so non-interactive CLIs can start", asyn
   assert.equal(result.stdout, "eof\n");
 });
 
+test("minimal host environments do not inherit secret sentinel variables", async (t) => {
+  const scratch = createScratch("kanon-guard-environment-");
+  t.after(() => {
+    if (fs.existsSync(scratch.root)) removeScratch(scratch);
+  });
+  const environment = createMinimalHostEnvironment({
+    host: "claude-code",
+    repoRoot,
+    scratchRoot: scratch.root,
+    hostExecutable: process.execPath,
+    environment: {
+      HOME: os.homedir(),
+      PATH: path.dirname(process.execPath),
+      LANG: "C",
+      KANON_SECRET_SENTINEL: "must-not-cross-boundary",
+      ANTHROPIC_API_KEY: "must-not-cross-boundary",
+      OPENAI_API_KEY: "must-not-cross-boundary",
+      NODE_OPTIONS: "--require=must-not-cross-boundary"
+    }
+  });
+
+  for (const name of [
+    "KANON_SECRET_SENTINEL",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "NODE_OPTIONS"
+  ]) {
+    assert.equal(Object.hasOwn(environment, name), false);
+  }
+  const result = await runProgramAsync(
+    process.execPath,
+    [
+      "-e",
+      "process.stdout.write(process.env.KANON_SECRET_SENTINEL === undefined ? 'absent\\n' : 'present\\n')"
+    ],
+    { env: environment, timeoutMs: 2_000 }
+  );
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "absent\n");
+});
+
+test("trusted executable resolution rejects repository-controlled PATH entries", (t) => {
+  const fixture = makeTemporaryDirectory(t, "kanon-guard-resolution-");
+  const repository = path.join(fixture, "repo");
+  const repositoryBin = path.join(repository, "bin");
+  const trustedBin = path.join(fixture, "trusted-bin");
+  fs.mkdirSync(repositoryBin, { recursive: true });
+  fs.mkdirSync(trustedBin);
+  const executableName = process.platform === "win32"
+    ? "claude.CMD"
+    : "claude";
+  const repositoryExecutable = path.join(repositoryBin, executableName);
+  const trustedExecutable = path.join(trustedBin, executableName);
+  for (const executable of [repositoryExecutable, trustedExecutable]) {
+    fs.writeFileSync(executable, "not executed\n", { mode: 0o755 });
+  }
+  const environment = {
+    PATH: [repositoryBin, trustedBin].join(path.delimiter),
+    PATHEXT: ".CMD"
+  };
+
+  assert.equal(
+    resolveTrustedExecutable("claude", {
+      repoRoot: repository,
+      environment
+    }),
+    fs.realpathSync(trustedExecutable)
+  );
+  assert.throws(
+    () => resolveTrustedExecutable("claude", {
+      repoRoot: repository,
+      environment: {
+        PATH: repositoryBin,
+        PATHEXT: ".CMD"
+      }
+    }),
+    /No trusted claude executable/
+  );
+});
+
+test("Claude runner contains no dangerous permission-bypass flag", () => {
+  const source = fs.readFileSync(
+    path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "claude-code",
+      "run.mjs"
+    ),
+    "utf8"
+  );
+  assert.doesNotMatch(
+    source,
+    /--(?:allow-)?dangerously-skip-permissions/
+  );
+  assert.match(source, /"dontAsk"/);
+  assert.match(source, /"--allowedTools"/);
+});
+
 test("spike scratch paths use the host canonical temporary root", (t) => {
-  const scratch = createScratch("kanon-guard-canonical-");
+  const scratch = createScratch("kanon-guard-canonical-", { repoRoot });
   t.after(() => {
     if (fs.existsSync(scratch.root)) removeScratch(scratch);
   });
 
   assert.equal(scratch.root, fs.realpathSync(scratch.root));
   assert.equal(scratch.workspace, fs.realpathSync(scratch.workspace));
+  assert.equal(path.dirname(scratch.root), scratch.tempRoot);
   removeScratch(scratch);
+});
+
+test("spike scratch creation rejects an environment-selected repository temp root", async (t) => {
+  const fixture = makeTemporaryDirectory(t, "kanon-guard-temp-root-");
+  const repository = path.join(fixture, "repo");
+  fs.mkdirSync(repository);
+  const runtimeUrl = pathToFileURL(
+    path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "lib",
+      "runtime.mjs"
+    )
+  ).href;
+  const script = [
+    `const { createScratch } = await import(${JSON.stringify(runtimeUrl)});`,
+    `try { createScratch("kanon-guard-hostile-", { repoRoot: ${JSON.stringify(repository)} });`,
+    `process.stdout.write("created\\n"); } catch { process.stdout.write("rejected\\n"); }`
+  ].join(" ");
+  const result = await runProgramAsync(
+    process.execPath,
+    ["--input-type=module", "-e", script],
+    {
+      env: {
+        HOME: os.homedir(),
+        USERPROFILE: os.homedir(),
+        PATH: path.dirname(process.execPath),
+        TMPDIR: repository,
+        TMP: repository,
+        TEMP: repository
+      },
+      timeoutMs: 2_000
+    }
+  );
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "rejected\n");
+  assert.deepEqual(fs.readdirSync(repository), []);
 });
 
 test(
@@ -346,11 +496,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const args = process.argv.slice(2);
-const stateRoot = process.env.KANON_FAKE_CODEX_STATE;
+const stateRoot = ${JSON.stringify(state)};
 const stateFile = (name) => path.join(stateRoot, name);
 const touch = (name) => fs.writeFileSync(stateFile(name), "owned\\n");
 const remove = (name) => {
-  if (process.env.KANON_FAKE_REMOVE_FAIL === "1") {
+  if (fs.existsSync(stateFile("remove-fail"))) {
     process.exitCode = 1;
     return;
   }
@@ -365,7 +515,7 @@ const list = (name) => process.stdout.write(
 if (args[0] === "--version") {
   process.stdout.write("codex-cli 0.0.0-fake\\n");
 } else if (args[0] === "login" && args[1] === "status") {
-  process.stderr.write("Logged in using fake credentials\\n");
+  process.stderr.write("Logged in SENSITIVE_AUTH_EMAIL@example.invalid SENSITIVE_ORG_IDENTIFIER\\n");
 } else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
   list("marketplace");
 } else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "add") {
@@ -383,6 +533,7 @@ if (args[0] === "--version") {
   remove("plugin");
   process.stdout.write("{}\\n");
 } else if (args[0] === "exec") {
+  if (process.env.KANON_SECRET_SENTINEL) touch("secret-leaked");
   touch("exec-started");
   setInterval(() => {}, 1_000);
 } else {
@@ -415,7 +566,7 @@ if (args[0] === "--version") {
         cwd: repoRoot,
         env: {
           ...process.env,
-          KANON_FAKE_CODEX_STATE: state,
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
           PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
         },
         stdio: ["ignore", "pipe", "pipe"]
@@ -449,6 +600,7 @@ if (args[0] === "--version") {
     assert.equal(fs.existsSync(path.join(state, "marketplace")), false);
     assert.equal(fs.existsSync(path.join(state, "plugin")), false);
     const result = JSON.parse(fs.readFileSync(report, "utf8"));
+    const reportText = fs.readFileSync(report, "utf8");
     assert.equal(result.disposition, "no-go");
     assertGuardCriteria(result, ["lifecycle_cleanup"]);
     assert.equal(result.criteria.lifecycle_cleanup, "proven");
@@ -459,8 +611,20 @@ if (args[0] === "--version") {
     );
     assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
     assert.match(stdout, /"disposition":"no-go"/);
+    assert.equal(fs.existsSync(path.join(state, "secret-leaked")), false);
+    assert.doesNotMatch(
+      reportText,
+      /SENSITIVE_AUTH_EMAIL|SENSITIVE_ORG_IDENTIFIER|must-not-cross-boundary/
+    );
+    const authSummary = result.setup.find(
+      (entry) => entry.name === "authentication"
+    ).process;
+    assert.equal(authSummary.output_redacted, true);
+    assert.equal(Object.hasOwn(authSummary, "stdout_sha256"), false);
+    assert.equal(Object.hasOwn(authSummary, "stderr_sha256"), false);
 
     fs.rmSync(path.join(state, "exec-started"), { force: true });
+    fs.writeFileSync(path.join(state, "remove-fail"), "fail\n", "utf8");
     const failedReport = path.join(
       repoRoot,
       "spikes",
@@ -476,8 +640,7 @@ if (args[0] === "--version") {
         cwd: repoRoot,
         env: {
           ...process.env,
-          KANON_FAKE_CODEX_STATE: state,
-          KANON_FAKE_REMOVE_FAIL: "1",
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
           PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
         },
         stdio: ["ignore", "ignore", "pipe"]
@@ -534,12 +697,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const args = process.argv.slice(2);
-const stateRoot = process.env.KANON_FAKE_CLAUDE_STATE;
+const stateRoot = ${JSON.stringify(state)};
 if (args[0] === "--version") {
   process.stdout.write("0.0.0-fake (Claude Code)\\n");
 } else if (args[0] === "auth" && args[1] === "status") {
-  process.stdout.write(JSON.stringify({ loggedIn: true }) + "\\n");
+  process.stdout.write(JSON.stringify({
+    loggedIn: true,
+    email: "SENSITIVE_AUTH_EMAIL@example.invalid",
+    organizationId: "SENSITIVE_ORG_IDENTIFIER"
+  }) + "\\n");
 } else if (args[0] === "--print") {
+  if (process.env.KANON_SECRET_SENTINEL) {
+    fs.writeFileSync(path.join(stateRoot, "secret-leaked"), "leaked\\n");
+  }
   fs.writeFileSync(path.join(stateRoot, "scratch-cwd"), process.cwd());
   fs.writeFileSync(path.join(stateRoot, "exec-started"), "started\\n");
   setInterval(() => {}, 1_000);
@@ -573,7 +743,7 @@ if (args[0] === "--version") {
         cwd: repoRoot,
         env: {
           ...process.env,
-          KANON_FAKE_CLAUDE_STATE: state,
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
           PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
         },
         stdio: ["ignore", "ignore", "pipe"]
@@ -605,6 +775,7 @@ if (args[0] === "--version") {
     assert.deepEqual(exit, { code: 130, signal: null }, stderr);
     assert.equal(fs.existsSync(scratchCwd), false);
     const result = JSON.parse(fs.readFileSync(report, "utf8"));
+    const reportText = fs.readFileSync(report, "utf8");
     assert.equal(result.disposition, "no-go");
     assertGuardCriteria(result);
     assert.equal(result.criteria.scratch_cleanup, "proven");
@@ -613,6 +784,21 @@ if (args[0] === "--version") {
       result.known.some((entry) => entry.includes("scratch_cleanup"))
     );
     assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
+    assert.equal(fs.existsSync(path.join(state, "secret-leaked")), false);
+    assert.doesNotMatch(
+      reportText,
+      /SENSITIVE_AUTH_EMAIL|SENSITIVE_ORG_IDENTIFIER|must-not-cross-boundary/
+    );
+    const sensitiveDigest = createHash("sha256")
+      .update("SENSITIVE_AUTH_EMAIL@example.invalid")
+      .digest("hex");
+    assert.doesNotMatch(reportText, new RegExp(sensitiveDigest));
+    const authSummary = result.setup.find(
+      (entry) => entry.name === "authentication"
+    ).process;
+    assert.equal(authSummary.output_redacted, true);
+    assert.equal(Object.hasOwn(authSummary, "stdout_sha256"), false);
+    assert.equal(Object.hasOwn(authSummary, "stderr_sha256"), false);
   }
 );
 

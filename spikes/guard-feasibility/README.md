@@ -70,6 +70,37 @@ result can pass. Both hosts may persist the session metadata needed for the
 explicit resume check. The runners must therefore be reviewed before execution
 and their reports must be treated as the only runtime evidence.
 
+### Host process boundary
+
+Each runner resolves the requested host executable once from the caller's
+`PATH`, rejects lexical or resolved candidates inside this repository, and
+then invokes only the canonical absolute path. Child processes receive an
+explicit minimum environment:
+
+- a `PATH` assembled from the canonical host and Node executable directories
+  plus fixed operating-system binary directories;
+- `HOME` and only the host's documented authentication-state override
+  (`CODEX_HOME` or `CLAUDE_CONFIG_DIR`) when present;
+- bounded `LANG`, `LC_ALL`, and `LC_CTYPE` values;
+- `TMPDIR`, `TMP`, and `TEMP` set to the disposable probe root; and
+- fixed non-secret safety controls such as disabled Claude auto-memory and
+  auto-update behavior.
+
+API keys, tokens, proxy variables, `NODE_OPTIONS`, shell startup controls, and
+all other ambient variables are not inherited. The two Kanon evidence paths
+are added only after this environment is built. Authentication command output
+is parsed in memory for a boolean result and is fully redacted from reports,
+including hashes and byte counts.
+
+The Claude runner uses `dontAsk`, exposes exactly one built-in tool per
+attempt, and adds one exact Bash permission rule only when the fixed scratch
+side effect must remain observable without the hook. It does not use either
+dangerous permission-bypass flag. A behavior that cannot be observed under
+that contract remains `Unknown`.
+
+Report creation is additive: an existing report path is never truncated or
+replaced.
+
 ## Result discipline
 
 `guard` is not selected by this spike. A host can be a go candidate only if

@@ -4,15 +4,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   containedReportPath,
+  createMinimalHostEnvironment,
   createScratch,
   extractSessionIdentifier,
   observationsSince,
   parseExecutionOptions,
   readObservations,
   removeScratch,
+  resolveTrustedExecutable,
   runProgramAsync,
   sha256,
   summarizeProcess,
+  summarizeSensitiveProcess,
   writeReport
 } from "../lib/runtime.mjs";
 
@@ -29,14 +32,20 @@ const marketplaceRoot = path.join(
 const options = parseExecutionOptions(process.argv.slice(2), usage());
 const reportPath = containedReportPath(repoRoot, options.report);
 const report = {
-  schema: "kanon-guard-feasibility-report-v1",
+  schema: "kanon-guard-feasibility-report-v2",
+  follow_up: "run-a1-hardened",
   host: "codex-cli",
   generated_at: new Date().toISOString(),
   claimed_surface: {
     cli: "codex exec",
     operating_system: process.platform,
     architecture: process.arch,
-    terminal_surface: "non-interactive local CLI"
+    terminal_surface: "non-interactive local CLI",
+    permission_contract:
+      "workspace-write sandbox, never-ask approval policy, user config and rules ignored, fixed single-tool prompts",
+    max_model_attempts: 6,
+    timeout_ms_per_attempt: 180_000,
+    max_output_bytes_per_stream: 8 * 1024 * 1024
   },
   known: [],
   likely: [],
@@ -64,6 +73,8 @@ const report = {
   disposition: "no-go"
 };
 let scratch = null;
+let hostExecutable = null;
+let baseEnvironment = null;
 let marketplaceOwned = false;
 let pluginOwned = false;
 let interruptedSignal = null;
@@ -79,22 +90,53 @@ for (const [signal, handler] of signalHandlers) {
 }
 
 try {
-  const version = await runHostProgram("codex", ["--version"]);
+  scratch = createScratch("kanon-guard-codex-", { repoRoot });
+  hostExecutable = resolveTrustedExecutable("codex", {
+    repoRoot,
+    environment: process.env
+  });
+  baseEnvironment = createMinimalHostEnvironment({
+    host: "codex-cli",
+    repoRoot,
+    scratchRoot: scratch.root,
+    hostExecutable,
+    environment: process.env
+  });
+  report.setup.push({
+    name: "trusted-executable-resolution",
+    resolved_outside_repository: true,
+    ambient_environment_inherited: false
+  });
+
+  const version = await runHostProgram(hostExecutable, ["--version"], {
+    cwd: scratch.workspace,
+    env: baseEnvironment
+  });
   report.claimed_surface.cli_version = version.status === 0
-    ? version.stdout.trim().slice(0, 160)
+    ? parseVersion(version.stdout)
     : null;
   report.setup.push({ name: "codex-version", process: summarizeProcess(version) });
 
-  const auth = await runHostProgram("codex", ["login", "status"]);
-  report.setup.push({ name: "authentication", process: summarizeProcess(auth) });
+  const auth = await runHostProgram(hostExecutable, ["login", "status"], {
+    cwd: scratch.workspace,
+    env: baseEnvironment
+  });
   const authenticationOutput = `${auth.stdout}\n${auth.stderr}`;
-  if (auth.status !== 0 || !/(^|\n)Logged in\b/i.test(authenticationOutput)) {
+  const authenticated =
+    auth.status === 0 &&
+    /(^|\n)Logged in\b/i.test(authenticationOutput);
+  report.setup.push({
+    name: "authentication",
+    process: summarizeSensitiveProcess(auth),
+    logged_in: authenticated
+  });
+  if (!authenticated) {
     report.unknown.push("Codex CLI authentication was not directly available for a host run.");
   } else {
-    scratch = createScratch("kanon-guard-codex-");
     const existing = await runHostProgram(
-      "codex",
-      ["plugin", "marketplace", "list", "--json"]
+      hostExecutable,
+      ["plugin", "marketplace", "list", "--json"],
+      { cwd: scratch.workspace, env: baseEnvironment }
     );
     report.setup.push({ name: "marketplace-preflight", process: summarizeProcess(existing) });
     if (existing.status !== 0) {
@@ -103,8 +145,9 @@ try {
       report.unknown.push("The disposable Codex marketplace name already exists, so the runner refused to alter user plugin state.");
     } else {
       const installed = await runHostProgram(
-        "codex",
-        ["plugin", "list", "--json"]
+        hostExecutable,
+        ["plugin", "list", "--json"],
+        { cwd: scratch.workspace, env: baseEnvironment }
       );
       report.setup.push({ name: "plugin-preflight", process: summarizeProcess(installed) });
       if (installed.status !== 0) {
@@ -114,8 +157,9 @@ try {
       } else {
         marketplaceOwned = true;
         const addMarketplace = await runHostProgram(
-          "codex",
-          ["plugin", "marketplace", "add", marketplaceRoot, "--json"]
+          hostExecutable,
+          ["plugin", "marketplace", "add", marketplaceRoot, "--json"],
+          { cwd: scratch.workspace, env: baseEnvironment }
         );
         report.setup.push({ name: "marketplace-add", process: summarizeProcess(addMarketplace) });
         if (addMarketplace.status !== 0) {
@@ -123,8 +167,9 @@ try {
         } else {
           pluginOwned = true;
           const addPlugin = await runHostProgram(
-            "codex",
-            ["plugin", "add", `${pluginName}@${marketplaceName}`, "--json"]
+            hostExecutable,
+            ["plugin", "add", `${pluginName}@${marketplaceName}`, "--json"],
+            { cwd: scratch.workspace, env: baseEnvironment }
           );
           report.setup.push({ name: "plugin-add", process: summarizeProcess(addPlugin) });
           if (addPlugin.status !== 0) {
@@ -143,30 +188,46 @@ try {
 } finally {
   if (pluginOwned) {
     const removePlugin = await runProgramAsync(
-      "codex",
+      hostExecutable,
       ["plugin", "remove", `${pluginName}@${marketplaceName}`, "--json"],
-      { timeoutMs: 30_000 }
+      {
+        cwd: scratch?.workspace,
+        env: baseEnvironment,
+        timeoutMs: 30_000
+      }
     );
     report.cleanup.push({ name: "plugin-remove", process: summarizeProcess(removePlugin) });
   }
   if (marketplaceOwned) {
     const removeMarketplace = await runProgramAsync(
-      "codex",
+      hostExecutable,
       ["plugin", "marketplace", "remove", marketplaceName, "--json"],
-      { timeoutMs: 30_000 }
+      {
+        cwd: scratch?.workspace,
+        env: baseEnvironment,
+        timeoutMs: 30_000
+      }
     );
     report.cleanup.push({ name: "marketplace-remove", process: summarizeProcess(removeMarketplace) });
   }
   if (pluginOwned || marketplaceOwned) {
     const pluginState = await runProgramAsync(
-      "codex",
+      hostExecutable,
       ["plugin", "list", "--json"],
-      { timeoutMs: 30_000 }
+      {
+        cwd: scratch?.workspace,
+        env: baseEnvironment,
+        timeoutMs: 30_000
+      }
     );
     const marketplaceState = await runProgramAsync(
-      "codex",
+      hostExecutable,
       ["plugin", "marketplace", "list", "--json"],
-      { timeoutMs: 30_000 }
+      {
+        cwd: scratch?.workspace,
+        env: baseEnvironment,
+        timeoutMs: 30_000
+      }
     );
     report.cleanup.push({
       name: "plugin-cleanup-verification",
@@ -225,7 +286,7 @@ try {
 
 async function runProbeCases() {
   const environment = {
-    ...process.env,
+    ...baseEnvironment,
     KANON_GUARD_SPIKE_EVIDENCE_FILE: scratch.evidence,
     KANON_GUARD_SPIKE_EVIDENCE_ROOT: scratch.root
   };
@@ -307,14 +368,9 @@ async function runProbeCases() {
         resumeEvent.session_id?.sha256 === shellEvent?.session_id?.sha256 &&
         !fs.existsSync(resumeMarker)
     );
-    const compact = await invoke("compaction-attempt", environment, "/compact", { bypassTrust: true, session });
-    report.attempts.push(compact.summary);
-    report.criteria.compaction = status(
-      compact.events.some(
-        (event) =>
-          event.hook_event_name === "SessionStart" &&
-          event.session_start_source === "compact"
-      )
+    report.criteria.compaction = "unknown";
+    report.unknown.push(
+      "Actual Codex compaction requires the documented interactive /compact flow; the runner does not send literal /compact text through codex exec."
     );
   }
 }
@@ -324,14 +380,27 @@ async function invoke(name, environment, prompt, options = {}) {
   const args = options.session
     ? ["exec", "resume", options.session]
     : ["exec"];
-  args.push("--json", "--skip-git-repo-check");
+  args.push(
+    "--json",
+    "--skip-git-repo-check",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "-a",
+    "never",
+    "-c",
+    "web_search=\"disabled\"",
+    "-c",
+    "features.apps=false",
+    "-c",
+    "features.multi_agent=false"
+  );
   if (!options.session) {
     args.push("-s", "workspace-write");
   }
   if (options.bypassTrust) args.push("--dangerously-bypass-hook-trust");
   if (options.disabled) args.push("--disable", "hooks");
   args.push(prompt);
-  const raw = await runHostProgram("codex", args, {
+  const raw = await runHostProgram(hostExecutable, args, {
     cwd: scratch.workspace,
     env: environment,
     timeoutMs: 180_000
@@ -393,6 +462,11 @@ function matching(events, tool, decision) {
 
 function status(value) {
   return value ? "proven" : "unknown";
+}
+
+function parseVersion(output) {
+  const match = output.trim().match(/^codex-cli (\d+\.\d+\.\d+)$/);
+  return match ? `codex-cli ${match[1]}` : null;
 }
 
 function shellPrompt(file, marker) {
