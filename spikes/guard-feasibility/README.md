@@ -104,6 +104,14 @@ remains `Unknown`.
 Report creation is additive: an existing report path is never truncated or
 replaced.
 
+For the Codex persisted-trust and real-compaction follow-up, pass
+`--preflight-only`. That mode resolves the trusted host and records only
+redacted authentication status plus exact-name absence from the documented
+plugin lists. It makes no model call, does not install a plugin, does not open
+the interactive UI, and does not use the hook-trust bypass. The resulting
+report retains persisted trust and actual `/compact` execution as `Unknown`
+when a documented rollback for the hook-hash trust decision is unavailable.
+
 ## Result discipline
 
 `guard` is not selected by this spike. A host can be a go candidate only if

@@ -483,6 +483,113 @@ test("spike scratch creation rejects an environment-selected repository temp roo
 });
 
 test(
+  "Codex follow-up preflight is read-only and keeps trust and compaction Unknown",
+  { skip: process.platform === "win32", timeout: 15_000 },
+  async (t) => {
+    const fixture = makeTemporaryDirectory(t, "kanon-guard-preflight-");
+    const bin = path.join(fixture, "bin");
+    const state = path.join(fixture, "state");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(state);
+    const fakeCodex = path.join(bin, "codex");
+    fs.writeFileSync(
+      fakeCodex,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+
+const args = process.argv.slice(2);
+const stateRoot = ${JSON.stringify(state)};
+if (process.env.KANON_SECRET_SENTINEL) {
+  fs.writeFileSync(path.join(stateRoot, "secret-leaked"), "leaked\\n");
+}
+if (args[0] === "--version") {
+  process.stdout.write("codex-cli 0.145.0\\n");
+} else if (args[0] === "login" && args[1] === "status") {
+  process.stderr.write("Logged in SENSITIVE_AUTH_EMAIL@example.invalid SENSITIVE_ORG_IDENTIFIER\\n");
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
+  process.stdout.write(JSON.stringify([{ name: "kanon-guard-spike-codex-suffix" }]) + "\\n");
+} else if (args[0] === "plugin" && args[1] === "list") {
+  process.stdout.write(JSON.stringify({ plugins: [] }) + "\\n");
+} else {
+  fs.writeFileSync(path.join(stateRoot, "mutation-attempted"), JSON.stringify(args));
+  process.exitCode = 2;
+}
+`,
+      { mode: 0o755 }
+    );
+
+    const report = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.preflight-test-${randomUUID()}.json`
+    );
+    t.after(() => fs.rmSync(report, { force: true }));
+    const runner = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "codex-cli",
+      "run.mjs"
+    );
+    const result = await runProgramAsync(
+      process.execPath,
+      [runner, "--execute", "--preflight-only", "--report", report],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_SECRET_SENTINEL: "must-not-cross-boundary",
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        timeoutMs: 10_000
+      }
+    );
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(state, "secret-leaked")), false);
+    assert.equal(fs.existsSync(path.join(state, "mutation-attempted")), false);
+    const reportText = fs.readFileSync(report, "utf8");
+    const parsed = JSON.parse(reportText);
+    assert.equal(
+      parsed.follow_up,
+      "run-a1-persisted-trust-compaction-preflight"
+    );
+    assert.equal(parsed.claimed_surface.max_model_attempts, 0);
+    assert.deepEqual(parsed.attempts, []);
+    assert.equal(parsed.criteria.authentication, "proven");
+    assert.equal(parsed.criteria.documented_state_preflight, "proven");
+    assert.equal(parsed.criteria.persisted_trusted_hook, "unknown");
+    assert.equal(parsed.criteria.actual_compaction, "unknown");
+    assert.equal(parsed.criteria.host_state_unchanged, "proven");
+    assert.equal(parsed.criteria.scratch_cleanup, "proven");
+    assert.equal(parsed.criteria.execution_completed, "proven");
+    assert.equal(parsed.disposition, "no-go");
+    assert.ok(parsed.manual_verification.some((entry) => entry.includes("/hooks")));
+    assert.ok(parsed.manual_verification.some((entry) => entry.includes("/compact")));
+    assert.match(parsed.preflight_and_rollback.rollback_gap, /no command/);
+    assert.doesNotMatch(
+      reportText,
+      /SENSITIVE_AUTH_EMAIL|SENSITIVE_ORG_IDENTIFIER|must-not-cross-boundary/
+    );
+    const sensitiveDigest = createHash("sha256")
+      .update(
+        "Logged in SENSITIVE_AUTH_EMAIL@example.invalid SENSITIVE_ORG_IDENTIFIER\n"
+      )
+      .digest("hex");
+    assert.equal(reportText.includes(sensitiveDigest), false);
+    for (const name of ["authentication", "marketplace-preflight", "plugin-preflight"]) {
+      const summary = parsed.setup.find((entry) => entry.name === name).process;
+      assert.equal(summary.output_redacted, true);
+      assert.equal(Object.hasOwn(summary, "stdout_sha256"), false);
+      assert.equal(Object.hasOwn(summary, "stderr_sha256"), false);
+    }
+  }
+);
+
+test(
   "Codex runner rolls back its exact plugin state after SIGINT",
   { skip: process.platform === "win32", timeout: 20_000 },
   async (t) => {

@@ -1,5 +1,4 @@
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -29,7 +28,7 @@ const marketplaceRoot = path.join(
   repoRoot,
   "spikes/guard-feasibility/codex-cli/marketplace"
 );
-const options = parseExecutionOptions(process.argv.slice(2), usage());
+const options = parseCodexExecutionOptions(process.argv.slice(2));
 const reportPath = containedReportPath(repoRoot, options.report);
 const report = {
   schema: "kanon-guard-feasibility-report-v2",
@@ -72,6 +71,51 @@ const report = {
   cleanup: [],
   disposition: "no-go"
 };
+if (options.preflightOnly) {
+  report.follow_up = "run-a1-persisted-trust-compaction-preflight";
+  report.claimed_surface = {
+    cli: "codex documented status and plugin-list commands",
+    operating_system: process.platform,
+    architecture: process.arch,
+    terminal_surface: "non-interactive read-only preflight",
+    permission_contract:
+      "no model call, no hook-trust bypass, no plugin mutation, and no interactive host flow",
+    max_model_attempts: 0,
+    timeout_ms_per_command: 30_000,
+    max_output_bytes_per_stream: 8 * 1024 * 1024
+  };
+  report.criteria = {
+    authentication: "unknown",
+    documented_state_preflight: "unknown",
+    persisted_trusted_hook: "unknown",
+    actual_compaction: "unknown",
+    host_state_unchanged: "unknown",
+    scratch_cleanup: "unknown",
+    execution_completed: "unknown"
+  };
+  report.preflight_and_rollback = {
+    preflight:
+      "Resolve a trusted executable, reduce authentication to a boolean, and verify the exact disposable marketplace and plugin names are absent.",
+    proposed_changes:
+      "Install only the exact disposable marketplace and plugin, then use interactive /hooks and /compact in a fresh scratch workspace.",
+    documented_rollback:
+      "Remove the exact plugin and marketplace, verify both names are absent, and remove runner-owned scratch state.",
+    rollback_gap:
+      "Current CLI help and official host documentation expose no command to remove a persisted hook-hash trust decision without inspecting undocumented internals.",
+    automated_action: "not-run"
+  };
+  report.manual_verification = [
+    "Obtain explicit approval for the exact host-state changes, the unresolved persisted-trust rollback gap, and at most two authenticated model turns.",
+    "Re-run this read-only preflight and require both exact disposable names to be absent.",
+    "Add only the repository's disposable kanon-guard-spike-codex marketplace and plugin using the documented plugin commands.",
+    "Open a fresh interactive Codex workspace with workspace-write sandboxing, web search and apps disabled, and the hardened runner's minimum environment.",
+    "Use /hooks to review and trust only the exact disposable hook hash; do not use --dangerously-bypass-hook-trust.",
+    "Run one fixed marked tool-denial turn and verify the exact scratch marker remains absent.",
+    "Use /compact in that same interactive session and verify the documented compaction lifecycle event in the disposable evidence sink.",
+    "Exit after those two turns, remove the exact plugin and marketplace, verify both names are absent, and remove only the fresh scratch directory.",
+    "Treat the persisted hook-hash trust record as residual user state unless the host documents a supported removal command."
+  ];
+}
 let scratch = null;
 let hostExecutable = null;
 let baseEnvironment = null;
@@ -130,7 +174,9 @@ try {
     process: summarizeSensitiveProcess(auth),
     logged_in: authenticated
   });
-  if (!authenticated) {
+  if (options.preflightOnly) {
+    await runFollowUpPreflight(authenticated);
+  } else if (!authenticated) {
     report.unknown.push("Codex CLI authentication was not directly available for a host run.");
   } else {
     const existing = await runHostProgram(
@@ -138,10 +184,21 @@ try {
       ["plugin", "marketplace", "list", "--json"],
       { cwd: scratch.workspace, env: baseEnvironment }
     );
-    report.setup.push({ name: "marketplace-preflight", process: summarizeProcess(existing) });
+    const marketplaceState = exactJsonStringState(
+      existing.stdout,
+      marketplaceName
+    );
+    report.setup.push({
+      name: "marketplace-preflight",
+      process: summarizeSensitiveProcess(existing),
+      output_valid_json: marketplaceState !== null,
+      exact_name_absent: marketplaceState === false
+    });
     if (existing.status !== 0) {
       report.unknown.push("Codex marketplace state could not be inspected before the disposable install.");
-    } else if (existing.stdout.includes(marketplaceName)) {
+    } else if (marketplaceState === null) {
+      report.unknown.push("Codex marketplace state was not valid bounded JSON, so the runner refused to alter user plugin state.");
+    } else if (marketplaceState) {
       report.unknown.push("The disposable Codex marketplace name already exists, so the runner refused to alter user plugin state.");
     } else {
       const installed = await runHostProgram(
@@ -149,10 +206,18 @@ try {
         ["plugin", "list", "--json"],
         { cwd: scratch.workspace, env: baseEnvironment }
       );
-      report.setup.push({ name: "plugin-preflight", process: summarizeProcess(installed) });
+      const pluginState = exactJsonStringState(installed.stdout, pluginName);
+      report.setup.push({
+        name: "plugin-preflight",
+        process: summarizeSensitiveProcess(installed),
+        output_valid_json: pluginState !== null,
+        exact_name_absent: pluginState === false
+      });
       if (installed.status !== 0) {
         report.unknown.push("Codex installed-plugin state could not be inspected before the disposable install.");
-      } else if (installed.stdout.includes(pluginName)) {
+      } else if (pluginState === null) {
+        report.unknown.push("Codex installed-plugin state was not valid bounded JSON, so the runner refused to alter user plugin state.");
+      } else if (pluginState) {
         report.unknown.push("The disposable Codex plugin name already exists, so the runner refused to alter user plugin state.");
       } else {
         marketplaceOwned = true;
@@ -210,7 +275,10 @@ try {
     );
     report.cleanup.push({ name: "marketplace-remove", process: summarizeProcess(removeMarketplace) });
   }
-  if (pluginOwned || marketplaceOwned) {
+  if (options.preflightOnly) {
+    report.criteria.host_state_unchanged =
+      !pluginOwned && !marketplaceOwned ? "proven" : "unknown";
+  } else if (pluginOwned || marketplaceOwned) {
     const pluginState = await runProgramAsync(
       hostExecutable,
       ["plugin", "list", "--json"],
@@ -231,17 +299,25 @@ try {
     );
     report.cleanup.push({
       name: "plugin-cleanup-verification",
-      process: summarizeProcess(pluginState)
+      process: summarizeSensitiveProcess(pluginState),
+      output_valid_json:
+        exactJsonStringState(pluginState.stdout, pluginName) !== null,
+      exact_name_absent:
+        exactJsonStringState(pluginState.stdout, pluginName) === false
     });
     report.cleanup.push({
       name: "marketplace-cleanup-verification",
-      process: summarizeProcess(marketplaceState)
+      process: summarizeSensitiveProcess(marketplaceState),
+      output_valid_json:
+        exactJsonStringState(marketplaceState.stdout, marketplaceName) !== null,
+      exact_name_absent:
+        exactJsonStringState(marketplaceState.stdout, marketplaceName) === false
     });
     report.criteria.lifecycle_cleanup = status(
       pluginState.status === 0 &&
         marketplaceState.status === 0 &&
-        !pluginState.stdout.includes(pluginName) &&
-        !marketplaceState.stdout.includes(marketplaceName)
+        exactJsonStringState(pluginState.stdout, pluginName) === false &&
+        exactJsonStringState(marketplaceState.stdout, marketplaceName) === false
     );
     if (report.criteria.lifecycle_cleanup !== "proven") {
       report.unknown.push(
@@ -282,6 +358,77 @@ try {
   if (interruptedSignal) {
     process.exitCode = signalExitCode(interruptedSignal);
   }
+}
+
+async function runFollowUpPreflight(authenticated) {
+  report.criteria.authentication = status(authenticated);
+  if (!authenticated) {
+    report.unknown.push(
+      "Codex CLI authentication was not directly available for the persisted-trust and compaction follow-up."
+    );
+  }
+
+  const marketplace = await runHostProgram(
+    hostExecutable,
+    ["plugin", "marketplace", "list", "--json"],
+    { cwd: scratch.workspace, env: baseEnvironment, timeoutMs: 30_000 }
+  );
+  const marketplaceState = exactJsonStringState(
+    marketplace.stdout,
+    marketplaceName
+  );
+  report.setup.push({
+    name: "marketplace-preflight",
+    process: summarizeSensitiveProcess(marketplace),
+    output_valid_json: marketplaceState !== null,
+    exact_name_absent: marketplaceState === false
+  });
+
+  const plugins = await runHostProgram(
+    hostExecutable,
+    ["plugin", "list", "--json"],
+    { cwd: scratch.workspace, env: baseEnvironment, timeoutMs: 30_000 }
+  );
+  const pluginState = exactJsonStringState(plugins.stdout, pluginName);
+  report.setup.push({
+    name: "plugin-preflight",
+    process: summarizeSensitiveProcess(plugins),
+    output_valid_json: pluginState !== null,
+    exact_name_absent: pluginState === false
+  });
+
+  report.criteria.documented_state_preflight = status(
+    marketplace.status === 0 &&
+      plugins.status === 0 &&
+      marketplaceState === false &&
+      pluginState === false
+  );
+  if (marketplaceState === true || pluginState === true) {
+    report.unknown.push(
+      "An exact disposable Codex marketplace or plugin name already exists; no host state was changed."
+    );
+  } else if (
+    marketplace.status !== 0 ||
+    plugins.status !== 0 ||
+    marketplaceState === null ||
+    pluginState === null
+  ) {
+    report.unknown.push(
+      "The documented Codex plugin-state preflight did not produce valid successful JSON; no host state was changed."
+    );
+  }
+
+  report.criteria.persisted_trusted_hook = "unknown";
+  report.criteria.actual_compaction = "unknown";
+  report.unknown.push(
+    "Persisted hook execution remains Unknown: official host behavior requires interactive /hooks review of the exact hook hash, and this read-only follow-up did not open an interactive flow."
+  );
+  report.unknown.push(
+    "Actual compaction remains Unknown: the documented /compact command is interactive and was not sent as literal text through codex exec."
+  );
+  report.unknown.push(
+    "Safe automation stopped at preflight because current CLI help and official host documentation expose no supported command to remove a persisted hook-hash trust decision without inspecting undocumented internals."
+  );
 }
 
 async function runProbeCases() {
@@ -469,6 +616,29 @@ function parseVersion(output) {
   return match ? `codex-cli ${match[1]}` : null;
 }
 
+function exactJsonStringState(output, expected) {
+  let parsed;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    return null;
+  }
+  const pending = [parsed];
+  let inspected = 0;
+  while (pending.length) {
+    inspected += 1;
+    if (inspected > 100_000) return null;
+    const value = pending.pop();
+    if (value === expected) return true;
+    if (Array.isArray(value)) {
+      for (const entry of value) pending.push(entry);
+    } else if (value && typeof value === "object") {
+      for (const entry of Object.values(value)) pending.push(entry);
+    }
+  }
+  return false;
+}
+
 function shellPrompt(file, marker) {
   return [
     "Use the Bash tool exactly once and do not use any other tool.",
@@ -538,21 +708,31 @@ function signalExitCode(signal) {
 }
 
 function finalizeReport() {
-  const required = [
-    "discovery",
-    "untrusted_hook",
-    "shell_denial",
-    "patch_denial",
-    "rewrite_schema_and_effect",
-    "metadata",
-    "resume",
-    "compaction",
-    "disabled_hooks",
-    "trusted_hook",
-    "lifecycle_cleanup",
-    "scratch_cleanup",
-    "execution_completed"
-  ];
+  const required = options.preflightOnly
+    ? [
+        "authentication",
+        "documented_state_preflight",
+        "persisted_trusted_hook",
+        "actual_compaction",
+        "host_state_unchanged",
+        "scratch_cleanup",
+        "execution_completed"
+      ]
+    : [
+        "discovery",
+        "untrusted_hook",
+        "shell_denial",
+        "patch_denial",
+        "rewrite_schema_and_effect",
+        "metadata",
+        "resume",
+        "compaction",
+        "disabled_hooks",
+        "trusted_hook",
+        "lifecycle_cleanup",
+        "scratch_cleanup",
+        "execution_completed"
+      ];
   const provenCriteria = Object.entries(report.criteria)
     .filter(([, value]) => value === "proven")
     .map(([name]) => name);
@@ -581,6 +761,23 @@ function finalizeReport() {
   report.suggested.push("Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go.");
 }
 
+function parseCodexExecutionOptions(argv) {
+  const modeFlags = argv.filter(
+    (argument) => argument === "--preflight-only"
+  ).length;
+  if (modeFlags > 1) {
+    throw new Error("--preflight-only may be specified only once.");
+  }
+  const parsed = parseExecutionOptions(
+    argv.filter((argument) => argument !== "--preflight-only"),
+    usage()
+  );
+  return {
+    ...parsed,
+    preflightOnly: modeFlags === 1
+  };
+}
+
 function usage() {
-  return "Usage: node spikes/guard-feasibility/codex-cli/run.mjs --execute --report <repo-relative-report.json>\n";
+  return "Usage: node spikes/guard-feasibility/codex-cli/run.mjs --execute [--preflight-only] --report <repo-relative-report.json>\n";
 }
