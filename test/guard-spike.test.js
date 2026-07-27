@@ -341,6 +341,7 @@ test("minimal host environments do not inherit secret sentinel variables", async
     hostExecutable: process.execPath,
     environment: {
       HOME: os.homedir(),
+      USER: "fixture-user",
       PATH: path.dirname(process.execPath),
       LANG: "C",
       KANON_SECRET_SENTINEL: "must-not-cross-boundary",
@@ -358,6 +359,7 @@ test("minimal host environments do not inherit secret sentinel variables", async
   ]) {
     assert.equal(Object.hasOwn(environment, name), false);
   }
+  assert.equal(environment.USER, "fixture-user");
   const result = await runProgramAsync(
     process.execPath,
     [

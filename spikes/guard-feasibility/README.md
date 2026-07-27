@@ -79,7 +79,8 @@ explicit minimum environment:
 
 - a `PATH` assembled from the canonical host and Node executable directories
   plus fixed operating-system binary directories;
-- `HOME` and only the host's documented authentication-state override
+- `HOME`, the bounded local `USER` identity required by Claude credential
+  lookup, and only the host's documented authentication-state override
   (`CODEX_HOME` or `CLAUDE_CONFIG_DIR`) when present;
 - bounded `LANG`, `LC_ALL`, and `LC_CTYPE` values;
 - `TMPDIR`, `TMP`, and `TEMP` set to the disposable probe root; and

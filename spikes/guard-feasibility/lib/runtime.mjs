@@ -121,7 +121,8 @@ export function resolveTrustedExecutable(
  * The allowlist is intentionally small:
  * - canonical PATH entries for the resolved host, this Node runtime, and
  *   fixed operating-system tools;
- * - HOME plus the host's documented state-root override for authentication;
+ * - HOME, Claude's bounded local USER identity, and the host's documented
+ *   state-root override for authentication;
  * - bounded locale values; and
  * - a disposable TMPDIR/TMP/TEMP rooted in this probe's scratch directory.
  *
@@ -188,6 +189,13 @@ export function createMinimalHostEnvironment({
     );
   }
   if (host === "claude-code") {
+    const user = boundedEnvironmentValue(environment.USER, 256);
+    if (!/^[A-Za-z0-9._-]+$/.test(user)) {
+      throw new Error(
+        "Claude Code authentication requires a bounded local USER identity."
+      );
+    }
+    output.USER = user;
     output.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
     output.DISABLE_AUTOUPDATER = "1";
   }
