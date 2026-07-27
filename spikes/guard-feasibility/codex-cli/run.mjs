@@ -62,7 +62,8 @@ try {
 
   const auth = runProgram("codex", ["login", "status"]);
   report.setup.push({ name: "authentication", process: summarizeProcess(auth) });
-  if (auth.status !== 0 || !/(^|\n)Logged in\b/i.test(auth.stdout)) {
+  const authenticationOutput = `${auth.stdout}\n${auth.stderr}`;
+  if (auth.status !== 0 || !/(^|\n)Logged in\b/i.test(authenticationOutput)) {
     report.unknown.push("Codex CLI authentication was not directly available for a host run.");
   } else {
     scratch = createScratch("kanon-guard-codex-");
