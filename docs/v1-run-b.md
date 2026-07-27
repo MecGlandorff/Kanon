@@ -226,3 +226,23 @@ notice-only product decision is recorded in
   Unsupported host introspection and any host session association remain
   **Unknown**; the engine imports neither.
 - **P0/P1 at completion:** none.
+
+### Slice 7 post-commit type-scope audit
+
+The corrective audit covered every other production file touched by slice 7.
+`src/cli/index.js`, `src/index.js`, `src/persist.js`,
+`src/persistence/state.js`, `src/render/continuity.js`,
+`src/render/shared.js`, and `src/scanner/scan.js` are pre-existing v0.4
+compatibility runtime modules. They remain outside `src/v1/**/*.js` and
+`src/continuity/**/*.js`, are reached only through the compatibility runtime,
+and are not exposed as new v1 skill identifiers in the embedded metadata.
+The shipped metadata still lists only the implemented `kanon` compatibility
+skill; `orient`, `resume`, `verify`, and `status` skill directories do not yet
+exist at this slice boundary. Generated `runtime/` copies are artifacts, not
+canonical source modules. A temporary strict-project expansion was tested and
+produced the historical analyzer graph's pre-existing unchecked-JS errors;
+it was reverted rather than weakening checks or hiding failures. The
+deterministic type-scope test now fails if any of these compatibility files is
+silently pulled into the staged v1 claim. This is a scope record, not a waiver
+for slice 8's new stable modules: every new slice 8 v1 production module must
+enter the strict project immediately.

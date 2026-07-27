@@ -137,6 +137,59 @@ test("every canonical v1 production module is in the strict project", () => {
   );
 });
 
+test("historical compatibility runtime stays outside the staged v1 type claim", () => {
+  const legacyCompatibilityModules = [
+    "src/cli/index.js",
+    "src/index.js",
+    "src/persist.js",
+    "src/persistence/state.js",
+    "src/render/continuity.js",
+    "src/render/shared.js",
+    "src/scanner/scan.js"
+  ];
+  assert.deepEqual(typeConfig.include, [
+    "src/continuity/**/*.js",
+    "src/v1/**/*.js"
+  ]);
+  const execution = spawnSync(
+    process.execPath,
+    [
+      path.join(repoRoot, "node_modules", "typescript", "bin", "tsc"),
+      "--project",
+      path.join(repoRoot, "tsconfig.json"),
+      "--pretty",
+      "false",
+      "--listFilesOnly"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 30_000,
+      maxBuffer: 8 * 1024 * 1024
+    }
+  );
+  assert.equal(execution.status, 0, execution.stderr);
+  const checked = new Set(
+    execution.stdout
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((file) => path.resolve(file))
+  );
+  for (const relative of legacyCompatibilityModules) {
+    assert.equal(checked.has(path.join(repoRoot, relative)), false, relative);
+  }
+  const metadata = readJson("runtime/build-metadata.json");
+  assert.deepEqual(metadata.public_capabilities.skills, ["kanon"]);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "skills", "orient", "SKILL.md")),
+    false
+  );
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "skills", "status", "SKILL.md")),
+    false
+  );
+});
+
 test("release allowlist excludes type tooling and development metadata", () => {
   const output = fs.mkdtempSync(
     path.join(os.tmpdir(), "kanon-types-package-")
