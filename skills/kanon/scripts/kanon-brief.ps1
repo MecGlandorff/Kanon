@@ -1,11 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $KanonCommand = "brief"
-$LocalKanon = Join-Path $PSScriptRoot "../runtime/bin/kanon.js"
+$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/kanon.js"
 
 if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
   [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
-  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon skill.")
+  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon plugin.")
   exit 127
 }
 

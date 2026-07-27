@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
+import { validateEmbeddedBuildMetadata } from "../src/v1/core/build-metadata.js";
 import { PUBLIC_COMMANDS } from "./lib/artifact-files.js";
 import { npmInvocation } from "./lib/npm-runner.js";
 
@@ -89,6 +90,51 @@ function inspectPackage(root, input) {
       !manifest.dependencies,
       "public manifest exposes no scripts, bin, exports, or dependencies"
     ));
+    const codexManifest = readJsonFile(
+      root,
+      ".codex-plugin/plugin.json",
+      256 * 1024
+    );
+    const claudeManifest = readJsonFile(
+      root,
+      ".claude-plugin/plugin.json",
+      256 * 1024
+    );
+    const runtimeManifest = readJsonFile(
+      root,
+      "runtime/package.json",
+      64 * 1024
+    );
+    const buildMetadata = readJsonFile(
+      root,
+      "runtime/build-metadata.json",
+      32 * 1024
+    );
+    checks.push(result(
+      codexManifest.name === "kanon" &&
+      claudeManifest.name === "kanon" &&
+      codexManifest.version === input.candidateVersion &&
+      claudeManifest.version === input.candidateVersion &&
+      codexManifest.skills === "./skills/" &&
+      claudeManifest.skills === "./skills/",
+      "separate host manifests share the package version and skill root"
+    ));
+    checks.push(result(
+      runtimeManifest.private === true &&
+      runtimeManifest.type === "module" &&
+      !runtimeManifest.dependencies,
+      "shared runtime has an independent ESM boundary and no dependencies"
+    ));
+    const metadataResult = validateEmbeddedBuildMetadata(buildMetadata);
+    checks.push(result(
+      metadataResult.ok &&
+      metadataResult.value.package_version === input.candidateVersion &&
+      metadataResult.value.public_capabilities.hosts["codex-cli"]
+        .enforcement === false &&
+      metadataResult.value.public_capabilities.hosts["claude-code"]
+        .enforcement === false,
+      "embedded capability metadata is valid and non-enforcing"
+    ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))
       .sort();
@@ -115,6 +161,18 @@ function inspectPackage(root, input) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
   }
   return checks;
+}
+
+function readJsonFile(root, relative, maximumBytes) {
+  const selected = resolveContainedPath(root, relative, { type: "file" });
+  if (!selected.ok || selected.stat.size > maximumBytes) {
+    throw new Error(`unsafe or oversized JSON file: ${relative}`);
+  }
+  const value = JSON.parse(fs.readFileSync(selected.path, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`JSON file must contain an object: ${relative}`);
+  }
+  return value;
 }
 
 function verifyManifest(root) {

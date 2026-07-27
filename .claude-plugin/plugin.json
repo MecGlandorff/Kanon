@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "kanon",
+  "displayName": "Kanon",
+  "version": "0.4.0-rc.1",
+  "description": "Evidence-backed repository orientation and continuity with advisory notice.",
+  "author": {
+    "name": "mecglandorff",
+    "url": "https://github.com/MecGlandorff"
+  },
+  "homepage": "https://github.com/MecGlandorff/Kanon#readme",
+  "repository": "https://github.com/MecGlandorff/Kanon",
+  "license": "MIT",
+  "keywords": [
+    "repository",
+    "continuity",
+    "codex",
+    "claude"
+  ],
+  "skills": "./skills/"
+}

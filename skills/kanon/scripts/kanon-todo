@@ -3,11 +3,11 @@ set -euo pipefail
 
 COMMAND="todo"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../runtime/bin/kanon.js"
+LOCAL_KANON="$SCRIPT_DIR/../../../runtime/bin/kanon.js"
 
 if [[ ! -f "$LOCAL_KANON" ]]; then
   echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
-  echo "Reinstall the complete self-contained Kanon skill." >&2
+  echo "Reinstall the complete self-contained Kanon plugin." >&2
   exit 127
 fi
 

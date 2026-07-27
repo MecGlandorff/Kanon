@@ -73,10 +73,11 @@ Read `references/evidence-policy.md` before resolving conflicting claims,
 
 ## Runtime contract
 
-The Bash and PowerShell wrappers call the self-contained runtime under
-`runtime/`. Copying the complete `skills/kanon/` directory is sufficient with
-Node.js major 20, 22, 24, or 25. Wrappers never fall back to a global `kanon`
-executable.
+The Bash and PowerShell wrappers call the single shared runtime at the plugin
+root under `runtime/`. Install the complete Kanon plugin root, including its
+host manifest, `skills/`, and `runtime/`, with Node.js major 20, 22, 24, or 25.
+Copying only `skills/kanon/` is incomplete. Wrappers never fall back to a
+global `kanon` executable.
 
 Containment checks reject repository-controlled links and reparse points.
 Same-user concurrent path replacement between validation and use remains a

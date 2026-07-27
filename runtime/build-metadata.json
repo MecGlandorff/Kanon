@@ -1,0 +1,36 @@
+{
+  "schema": "kanon-build-metadata-v1",
+  "package_name": "@mecglandorff/kanon",
+  "package_version": "0.4.0-rc.1",
+  "plugin_name": "kanon",
+  "runtime": {
+    "format": "esm",
+    "runtime_dependencies": 0
+  },
+  "public_capabilities": {
+    "skills": [
+      "kanon"
+    ],
+    "hosts": {
+      "codex-cli": {
+        "mode": "notice",
+        "enforcement": false,
+        "hook_status": "Unknown"
+      },
+      "claude-code": {
+        "mode": "notice",
+        "enforcement": false,
+        "hook_status": "Unknown"
+      }
+    },
+    "notice": {
+      "advisory": true,
+      "blocks": false,
+      "rewrites": false,
+      "approves": false,
+      "suppresses": false,
+      "forces_reading": false,
+      "claims_understanding": false
+    }
+  }
+}

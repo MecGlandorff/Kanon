@@ -1,0 +1,30 @@
+{
+  "name": "kanon",
+  "version": "0.4.0-rc.1",
+  "description": "Evidence-backed repository orientation and continuity with advisory notice.",
+  "author": {
+    "name": "mecglandorff",
+    "url": "https://github.com/MecGlandorff"
+  },
+  "homepage": "https://github.com/MecGlandorff/Kanon#readme",
+  "repository": "https://github.com/MecGlandorff/Kanon",
+  "license": "MIT",
+  "keywords": [
+    "repository",
+    "continuity",
+    "codex",
+    "claude"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Kanon",
+    "shortDescription": "Evidence-backed repository continuity.",
+    "longDescription": "Inspect bounded repository evidence without executing repository-controlled code. Notice mode is advisory and non-enforcing.",
+    "developerName": "mecglandorff",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Use Kanon to brief this repository from bounded evidence."
+    ]
+  }
+}

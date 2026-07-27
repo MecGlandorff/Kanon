@@ -1,21 +1,22 @@
 # Kanon agent skill
 
-This npm package is a distribution container for the self-contained Kanon
-agent skill. It is not a JavaScript library and does not install a global
-terminal command.
+This npm package is a distribution container for the Kanon dual-host plugin.
+It is not a JavaScript library and does not install a global terminal command.
 
 ## Install
 
-Install or download the package, then copy the complete `skills/kanon/`
-directory into the skills directory used by Codex or Claude Code. Node.js
+Install or download the package, then install the complete package root as a
+plugin for Codex CLI or Claude Code. The package contains separate host
+manifests, shared `skills/` and `hooks/`, and one shared `runtime/`. Node.js
 major 20, 22, 24, or 25 is required when the agent invokes the bundled
-wrappers.
+wrappers or advisory hook.
 
-The copied directory includes:
+The plugin includes:
 
-- `SKILL.md` with the agent workflow;
+- separate Codex and Claude manifests;
+- `skills/kanon/SKILL.md` with the current compatibility workflow;
 - Bash and PowerShell wrapper scripts;
-- the self-contained, bounded runtime;
+- one self-contained, bounded ESM runtime;
 - evidence, output, and security policies.
 
 The wrappers must be invoked by the agent from the repository being inspected.
@@ -23,6 +24,10 @@ No package scripts or public JavaScript API are advertised by this artifact.
 Only brief, verify, ask, resume, refresh, and TODO wrappers are included.
 Repository-derived content is untrusted data, and declared command candidates
 require inspection plus explicit user approval before execution.
+
+Both hosts are in advisory notice mode. Enforcement is false, and unavailable
+host introspection remains Unknown. The notice does not deny, rewrite, approve,
+suppress, or imply that repository context was read or understood.
 
 Project source, development commands, and evaluation disclosures are available
 in the [Kanon repository](https://github.com/MecGlandorff/Kanon).

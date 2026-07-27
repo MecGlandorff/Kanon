@@ -5,7 +5,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   collectRuntimeDependencies,
-  PUBLIC_COMMANDS
+  embeddedBuildMetadata,
+  PUBLIC_COMMANDS,
+  V1_RUNTIME_ARTIFACTS
 } from "./lib/artifact-files.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -14,15 +16,28 @@ const checkOnly = process.argv.includes("--check");
 const commands = PUBLIC_COMMANDS;
 const artifacts = [];
 
-artifacts.push(copyArtifact("bin/kanon.js", "skills/kanon/runtime/bin/kanon.js", 0o755));
+artifacts.push(copyArtifact("bin/kanon.js", "runtime/bin/kanon.js", 0o755));
 for (const sourceRelative of collectRuntimeDependencies(root)) {
   artifacts.push(
     copyArtifact(
       sourceRelative,
-      `skills/kanon/runtime/${sourceRelative}`
+      `runtime/${sourceRelative}`
     )
   );
 }
+for (const [sourceRelative, targetRelative] of V1_RUNTIME_ARTIFACTS) {
+  artifacts.push(copyArtifact(sourceRelative, targetRelative));
+}
+artifacts.push({
+  target: path.join(root, "runtime", "build-metadata.json"),
+  relative: "runtime/build-metadata.json",
+  contents: `${JSON.stringify(
+    embeddedBuildMetadata(readPackageJson()),
+    null,
+    2
+  )}\n`,
+  mode: 0o644
+});
 
 for (const command of commands) {
   artifacts.push({
@@ -42,6 +57,7 @@ for (const command of commands) {
 const mismatches = [];
 const expected = new Set(artifacts.map((artifact) => artifact.relative));
 const generatedFiles = [
+  ...listJavaScriptFiles("runtime"),
   ...listJavaScriptFiles("skills/kanon/runtime"),
   ...listWrapperFiles()
 ];
@@ -73,7 +89,7 @@ if (checkOnly && mismatches.length) {
   );
   process.exitCode = 1;
 } else if (!checkOnly) {
-  removeEmptyDirectories(path.join(skillRoot, "runtime", "src"));
+  removeEmptyDirectories(path.join(skillRoot, "runtime"));
   process.stdout.write(`Synchronized ${artifacts.length} Kanon skill artifact(s).\n`);
 }
 
@@ -89,6 +105,9 @@ function copyArtifact(sourceRelative, targetRelative, mode = 0o644) {
 function listJavaScriptFiles(relativeDirectory) {
   const files = [];
   const directory = path.join(root, relativeDirectory);
+  if (!fs.existsSync(directory)) {
+    return files;
+  }
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const relative = `${relativeDirectory}/${entry.name}`;
     if (entry.isDirectory()) {
@@ -110,17 +129,32 @@ function listWrapperFiles() {
 }
 
 function removeEmptyDirectories(directory) {
+  if (!fs.existsSync(directory)) {
+    return;
+  }
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       removeEmptyDirectories(path.join(directory, entry.name));
     }
   }
   if (
-    directory !== path.join(skillRoot, "runtime", "src") &&
     fs.readdirSync(directory).length === 0
   ) {
     fs.rmdirSync(directory);
   }
+}
+
+function readPackageJson() {
+  const filePath = path.join(root, "package.json");
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile() || stat.size > 256 * 1024) {
+    throw new Error("package.json is unavailable or exceeds 256 KiB.");
+  }
+  const value = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("package.json must contain a JSON object.");
+  }
+  return value;
 }
 
 function readFile(filePath) {
@@ -137,11 +171,11 @@ set -euo pipefail
 
 COMMAND="${command}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../runtime/bin/kanon.js"
+LOCAL_KANON="$SCRIPT_DIR/../../../runtime/bin/kanon.js"
 
 if [[ ! -f "$LOCAL_KANON" ]]; then
   echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
-  echo "Reinstall the complete self-contained Kanon skill." >&2
+  echo "Reinstall the complete self-contained Kanon plugin." >&2
   exit 127
 fi
 
@@ -164,11 +198,11 @@ function powershellWrapper(command) {
   return `$ErrorActionPreference = "Stop"
 
 $KanonCommand = "${command}"
-$LocalKanon = Join-Path $PSScriptRoot "../runtime/bin/kanon.js"
+$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/kanon.js"
 
 if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
   [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
-  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon skill.")
+  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon plugin.")
   exit 127
 }
 

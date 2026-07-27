@@ -47,9 +47,10 @@ security evaluation, and allowed claim language are specified in
 
 ## Use
 
-Copy the complete `skills/kanon/` directory into your agent's skills directory.
-Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25 are
-supported.
+Install the complete package root as a plugin for Codex CLI or Claude Code.
+The package has separate host manifests, shared skills, and one shared ESM
+runtime. Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25
+are supported.
 
 Starting with v0.4, the
 [`@mecglandorff/kanon`](https://www.npmjs.com/package/@mecglandorff/kanon)
@@ -113,9 +114,11 @@ snapshots/      historical state
 hard retention limits. Reaching a limit produces a warning rather than
 unbounded growth.
 
-`skills/kanon/` is the supported integration artifact. Its Bash and PowerShell
-wrappers call the bundled runtime from the repository being inspected; they are
-agent hooks, not a global terminal package.
+The complete package root is the supported integration artifact. Its Bash and
+PowerShell wrappers call the shared root runtime from the repository being
+inspected; they are agent hooks, not a global terminal package. Codex CLI and
+Claude Code are both in advisory notice mode: enforcement is false, and the
+notice never claims that repository context was read or understood.
 
 ## Development
 

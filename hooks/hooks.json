@@ -1,0 +1,18 @@
+{
+  "description": "Advisory Kanon notice. This hook never denies, rewrites, approves, or suppresses a host operation.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=require('node:path'),u=require('node:url'),r=process.env.PLUGIN_ROOT||process.env.CLAUDE_PLUGIN_ROOT||'';import(u.pathToFileURL(p.join(r,'runtime','adapters','notice-hook.js')).href).catch(()=>{})\"",
+            "timeout": 5,
+            "statusMessage": "Kanon advisory notice (non-enforcing)"
+          }
+        ]
+      }
+    ]
+  }
+}
