@@ -9,7 +9,7 @@ import {
   parseExecutionOptions,
   readObservations,
   removeScratch,
-  runProgram,
+  runProgramAsync,
   sha256,
   summarizeProcess,
   writeReport
@@ -48,44 +48,73 @@ const report = {
   disposition: "no-go"
 };
 let scratch = null;
+let interruptedSignal = null;
+const interruption = new AbortController();
+const signalHandlers = new Map(
+  ["SIGINT", "SIGTERM", "SIGHUP"].map((signal) => [
+    signal,
+    () => handleInterruption(signal)
+  ])
+);
+for (const [signal, handler] of signalHandlers) {
+  process.on(signal, handler);
+}
 
 try {
-  const version = runProgram("claude", ["--version"]);
+  const version = await runHostProgram("claude", ["--version"]);
   report.claimed_surface.cli_version = version.status === 0
     ? version.stdout.trim().slice(0, 160)
     : null;
   report.setup.push({ name: "claude-version", process: summarizeProcess(version) });
 
-  const auth = runProgram("claude", ["auth", "status"]);
+  const auth = await runHostProgram("claude", ["auth", "status"]);
   report.setup.push({ name: "authentication", process: summarizeProcess(auth) });
   const authenticated = parseAuthentication(auth.stdout);
   if (auth.status !== 0 || authenticated !== true) {
     report.unknown.push("Claude Code authentication was not directly available for a host run.");
   } else {
     scratch = createScratch("kanon-guard-claude-");
-    runProbeCases();
+    await runProbeCases();
   }
 } catch (error) {
-  report.unknown.push(`Runner setup failed (${errorIdentifier(error)}).`);
+  if (error?.code !== "EINTERRUPTED") {
+    report.unknown.push(`Runner setup failed (${errorIdentifier(error)}).`);
+  }
 } finally {
   if (scratch) {
     try {
       removeScratch(scratch);
       report.cleanup.push({ name: "scratch-remove", removed: true });
+      report.criteria.scratch_cleanup = "proven";
     } catch (error) {
       report.cleanup.push({
         name: "scratch-remove",
         removed: false,
         reason: errorIdentifier(error)
       });
+      report.criteria.scratch_cleanup = "unknown";
+      report.unknown.push(
+        "Disposable Claude scratch cleanup could not be directly verified."
+      );
     }
+  } else {
+    report.criteria.scratch_cleanup = "not-run";
   }
+  report.criteria.execution_completed = interruptedSignal
+    ? "unknown"
+    : "proven";
   finalizeReport();
   writeReport(reportPath, report);
   process.stdout.write(`${JSON.stringify({ disposition: report.disposition, report: reportPath })}\n`);
+  for (const [signal, handler] of signalHandlers) {
+    process.off(signal, handler);
+  }
+  if (interruptedSignal) {
+    process.exitCode = signalExitCode(interruptedSignal);
+  }
 }
 
-function runProbeCases() {
+async function runProbeCases() {
   const environment = {
     ...process.env,
     KANON_GUARD_SPIKE_EVIDENCE_FILE: scratch.evidence,
@@ -93,11 +122,11 @@ function runProbeCases() {
   };
   const workspaceHash = sha256(scratch.workspace);
   const shellMarker = path.join(scratch.workspace, "kanon-guard-spike-deny-shell.txt");
-  const shellDeny = invoke("shell-deny", environment, shellPrompt(shellMarker, "KANON_GUARD_SPIKE_DENY"));
+  const shellDeny = await invoke("shell-deny", environment, shellPrompt(shellMarker, "KANON_GUARD_SPIKE_DENY"));
   report.attempts.push(withSideEffect(shellDeny, shellMarker));
 
   const writeMarker = path.join(scratch.workspace, "kanon-guard-spike-deny-write.txt");
-  const writeDeny = invoke(
+  const writeDeny = await invoke(
     "write-deny",
     environment,
     writePrompt(writeMarker),
@@ -107,7 +136,7 @@ function runProbeCases() {
 
   const editMarker = path.join(scratch.workspace, "kanon-guard-spike-deny-edit.txt");
   fs.writeFileSync(editMarker, "ORIGINAL\n", "utf8");
-  const editDeny = invoke(
+  const editDeny = await invoke(
     "edit-deny",
     environment,
     editPrompt(editMarker),
@@ -120,7 +149,7 @@ function runProbeCases() {
 
   const original = path.join(scratch.workspace, "kanon-guard-spike-original.txt");
   const rewritten = path.join(scratch.workspace, "kanon-guard-spike-rewrite-output.txt");
-  const rewrite = invoke("shell-rewrite", environment, shellPrompt(original, "KANON_GUARD_SPIKE_REWRITE"));
+  const rewrite = await invoke("shell-rewrite", environment, shellPrompt(original, "KANON_GUARD_SPIKE_REWRITE"));
   report.attempts.push({
     ...rewrite.summary,
     original_side_effect_exists: fs.existsSync(original),
@@ -131,7 +160,7 @@ function runProbeCases() {
   });
 
   const disabledMarker = path.join(scratch.workspace, "kanon-guard-spike-disabled.txt");
-  const disabled = invoke("hooks-disabled", environment, shellPrompt(disabledMarker, "KANON_GUARD_SPIKE_DISABLED"), { safeMode: true });
+  const disabled = await invoke("hooks-disabled", environment, shellPrompt(disabledMarker, "KANON_GUARD_SPIKE_DISABLED"), { safeMode: true });
   report.attempts.push(withSideEffect(disabled, disabledMarker));
 
   const shellEvent = matching(shellDeny.events, "Bash", "deny");
@@ -173,7 +202,7 @@ function runProbeCases() {
     report.unknown.push("Claude Code output did not directly expose a resumable session identifier.");
   } else {
     const resumeMarker = path.join(scratch.workspace, "kanon-guard-spike-resume.txt");
-    const resume = invoke("resume-deny", environment, shellPrompt(resumeMarker, "KANON_GUARD_SPIKE_DENY"), { session });
+    const resume = await invoke("resume-deny", environment, shellPrompt(resumeMarker, "KANON_GUARD_SPIKE_DENY"), { session });
     report.attempts.push(withSideEffect(resume, resumeMarker));
     const resumeEvent = matching(resume.events, "Bash", "deny");
     report.criteria.resume = status(
@@ -181,7 +210,7 @@ function runProbeCases() {
         resumeEvent.session_id?.sha256 === shellEvent?.session_id?.sha256 &&
         !fs.existsSync(resumeMarker)
     );
-    const compact = invoke("compaction-attempt", environment, "/compact", { session });
+    const compact = await invoke("compaction-attempt", environment, "/compact", { session });
     report.attempts.push(compact.summary);
     report.criteria.compaction = status(
       compact.events.some(
@@ -194,7 +223,7 @@ function runProbeCases() {
   report.unknown.push("Claude Code exposes no separately inspectable per-plugin hook-trust state in this non-interactive plugin-dir probe.");
 }
 
-function invoke(name, environment, prompt, options = {}) {
+async function invoke(name, environment, prompt, options = {}) {
   const before = readObservations(scratch.evidence).length;
   const args = [
     "--print",
@@ -212,7 +241,7 @@ function invoke(name, environment, prompt, options = {}) {
   if (options.session) args.push("--resume", options.session);
   if (options.safeMode) args.push("--safe-mode");
   args.push(prompt);
-  const raw = runProgram("claude", args, {
+  const raw = await runHostProgram("claude", args, {
     cwd: scratch.workspace,
     env: environment,
     timeoutMs: 180_000
@@ -321,6 +350,36 @@ function errorIdentifier(error) {
   return `${code}:${sha256(String(error?.message || error)).slice(0, 16)}`;
 }
 
+async function runHostProgram(command, args, options = {}) {
+  const result = await runProgramAsync(command, args, {
+    ...options,
+    signal: interruption.signal
+  });
+  if (interruptedSignal) {
+    const error = new Error(`Runner interrupted by ${interruptedSignal}.`);
+    error.code = "EINTERRUPTED";
+    throw error;
+  }
+  return result;
+}
+
+function handleInterruption(signal) {
+  if (interruptedSignal) return;
+  interruptedSignal = signal;
+  report.unknown.push(
+    `Runner received ${signal}; the interrupted host observation is Unknown.`
+  );
+  interruption.abort();
+}
+
+function signalExitCode(signal) {
+  return {
+    SIGHUP: 129,
+    SIGINT: 130,
+    SIGTERM: 143
+  }[signal] || 1;
+}
+
 function finalizeReport() {
   const required = [
     "discovery",
@@ -331,7 +390,9 @@ function finalizeReport() {
     "resume",
     "compaction",
     "disabled_hooks",
-    "trusted_hook"
+    "trusted_hook",
+    "scratch_cleanup",
+    "execution_completed"
   ];
   const likelyCriteria = Object.entries(report.criteria)
     .filter(([, value]) => value === "likely")

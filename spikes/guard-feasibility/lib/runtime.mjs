@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFile } from "node:child_process";
 
 export function parseExecutionOptions(argv, usage) {
   const options = { execute: false, report: null };
@@ -60,24 +60,97 @@ export function removeScratch(scratch) {
   fs.rmSync(scratch.root, { recursive: true, force: false });
 }
 
-export function runProgram(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    cwd: options.cwd,
-    encoding: "utf8",
-    env: options.env || process.env,
-    timeout: options.timeoutMs || 120_000,
-    maxBuffer: 8 * 1024 * 1024,
-    windowsHide: true
+export function runProgramAsync(command, args, options = {}) {
+  return new Promise((resolve) => {
+    const timeoutMs = options.timeoutMs || 120_000;
+    const signal = options.signal;
+    if (signal?.aborted) {
+      resolve({
+        status: null,
+        signal: null,
+        timed_out: false,
+        overflowed: false,
+        error_code: "ABORT_ERR",
+        stdout: "",
+        stderr: ""
+      });
+      return;
+    }
+
+    let timedOut = false;
+    let aborted = false;
+    let killTimer = null;
+    let timeout = null;
+    let child;
+    const stop = (reason) => {
+      if (!child || child.exitCode !== null || child.signalCode !== null) return;
+      if (reason === "timeout") timedOut = true;
+      if (reason === "abort") aborted = true;
+      child.kill("SIGTERM");
+      killTimer = setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGKILL");
+        }
+      }, 2_000);
+      killTimer.unref();
+    };
+    const abort = () => stop("abort");
+
+    try {
+      child = execFile(
+        command,
+        args,
+        {
+          cwd: options.cwd,
+          encoding: "utf8",
+          env: options.env || process.env,
+          maxBuffer: 8 * 1024 * 1024,
+          windowsHide: true
+        },
+        (error, stdout, stderr) => {
+          if (timeout) clearTimeout(timeout);
+          if (killTimer) clearTimeout(killTimer);
+          signal?.removeEventListener("abort", abort);
+          const errorCode = aborted
+            ? "ABORT_ERR"
+            : timedOut
+              ? "ETIMEDOUT"
+              : typeof error?.code === "string"
+                ? error.code
+                : null;
+          resolve({
+            status: error
+              ? Number.isInteger(error.code)
+                ? error.code
+                : null
+              : 0,
+            signal: error?.signal || child.signalCode || null,
+            timed_out: timedOut,
+            overflowed:
+              error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+            error_code: errorCode,
+            stdout: String(stdout || ""),
+            stderr: String(stderr || "")
+          });
+        }
+      );
+      signal?.addEventListener("abort", abort, { once: true });
+      timeout = setTimeout(() => stop("timeout"), timeoutMs);
+      timeout.unref();
+    } catch (error) {
+      signal?.removeEventListener("abort", abort);
+      resolve({
+        status: null,
+        signal: null,
+        timed_out: false,
+        overflowed: false,
+        error_code:
+          typeof error?.code === "string" ? error.code : "SPAWN_ERROR",
+        stdout: "",
+        stderr: ""
+      });
+    }
   });
-  return {
-    status: result.status,
-    signal: result.signal,
-    timed_out: result.error?.code === "ETIMEDOUT",
-    overflowed: result.error?.code === "ENOBUFS",
-    error_code: result.error?.code || null,
-    stdout: String(result.stdout || ""),
-    stderr: String(result.stderr || "")
-  };
 }
 
 export function summarizeProcess(result) {

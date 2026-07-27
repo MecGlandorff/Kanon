@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -161,7 +163,7 @@ test("host fixtures keep separate manifests and lifecycle hooks", () => {
     "utf8"
   ));
   const marketplace = JSON.parse(fs.readFileSync(
-    path.join(repoRoot, "spikes/guard-feasibility/codex-cli/marketplace/marketplace.json"),
+    path.join(repoRoot, "spikes/guard-feasibility/codex-cli/marketplace/.agents/plugins/marketplace.json"),
     "utf8"
   ));
   const codexManifest = JSON.parse(fs.readFileSync(codexPlugin, "utf8"));
@@ -235,6 +237,285 @@ test("spike report writes reject a symbolic-link target", (t) => {
   assert.equal(fs.readFileSync(source, "utf8"), "outside\n");
 });
 
+test(
+  "Codex runner rolls back its exact plugin state after SIGINT",
+  { skip: process.platform === "win32", timeout: 20_000 },
+  async (t) => {
+    const fixture = makeTemporaryDirectory(t, "kanon-guard-runner-");
+    const bin = path.join(fixture, "bin");
+    const state = path.join(fixture, "state");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(state);
+    const fakeCodex = path.join(bin, "codex");
+    fs.writeFileSync(
+      fakeCodex,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+
+const args = process.argv.slice(2);
+const stateRoot = process.env.KANON_FAKE_CODEX_STATE;
+const stateFile = (name) => path.join(stateRoot, name);
+const touch = (name) => fs.writeFileSync(stateFile(name), "owned\\n");
+const remove = (name) => {
+  if (process.env.KANON_FAKE_REMOVE_FAIL === "1") {
+    process.exitCode = 1;
+    return;
+  }
+  fs.rmSync(stateFile(name), { force: true });
+};
+const list = (name) => process.stdout.write(
+  fs.existsSync(stateFile(name))
+    ? JSON.stringify([{ name: "kanon-guard-spike-codex" }]) + "\\n"
+    : "[]\\n"
+);
+
+if (args[0] === "--version") {
+  process.stdout.write("codex-cli 0.0.0-fake\\n");
+} else if (args[0] === "login" && args[1] === "status") {
+  process.stderr.write("Logged in using fake credentials\\n");
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "list") {
+  list("marketplace");
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "add") {
+  touch("marketplace");
+  process.stdout.write("{}\\n");
+} else if (args[0] === "plugin" && args[1] === "marketplace" && args[2] === "remove") {
+  remove("marketplace");
+  process.stdout.write("{}\\n");
+} else if (args[0] === "plugin" && args[1] === "list") {
+  list("plugin");
+} else if (args[0] === "plugin" && args[1] === "add") {
+  touch("plugin");
+  process.stdout.write("{}\\n");
+} else if (args[0] === "plugin" && args[1] === "remove") {
+  remove("plugin");
+  process.stdout.write("{}\\n");
+} else if (args[0] === "exec") {
+  touch("exec-started");
+  setInterval(() => {}, 1_000);
+} else {
+  process.exitCode = 2;
+}
+`,
+      { mode: 0o755 }
+    );
+
+    const report = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.signal-test-${randomUUID()}.json`
+    );
+    fs.mkdirSync(path.dirname(report), { recursive: true });
+    t.after(() => fs.rmSync(report, { force: true }));
+    const runner = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "codex-cli",
+      "run.mjs"
+    );
+    const child = spawn(
+      process.execPath,
+      [runner, "--execute", "--report", report],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_FAKE_CODEX_STATE: state,
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        stdio: ["ignore", "pipe", "pipe"]
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    });
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+    });
+
+    await waitForFile(path.join(state, "exec-started"), 10_000);
+    assert.equal(fs.existsSync(path.join(state, "marketplace")), true);
+    assert.equal(fs.existsSync(path.join(state, "plugin")), true);
+    child.kill("SIGINT");
+    const exit = await completion;
+
+    assert.deepEqual(exit, { code: 130, signal: null }, stderr);
+    assert.equal(fs.existsSync(path.join(state, "marketplace")), false);
+    assert.equal(fs.existsSync(path.join(state, "plugin")), false);
+    const result = JSON.parse(fs.readFileSync(report, "utf8"));
+    assert.equal(result.disposition, "no-go");
+    assert.equal(result.criteria.lifecycle_cleanup, "proven");
+    assert.equal(result.criteria.scratch_cleanup, "proven");
+    assert.equal(result.criteria.execution_completed, "unknown");
+    assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
+    assert.match(stdout, /"disposition":"no-go"/);
+
+    fs.rmSync(path.join(state, "exec-started"), { force: true });
+    const failedReport = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.signal-cleanup-failure-${randomUUID()}.json`
+    );
+    t.after(() => fs.rmSync(failedReport, { force: true }));
+    const failedChild = spawn(
+      process.execPath,
+      [runner, "--execute", "--report", failedReport],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_FAKE_CODEX_STATE: state,
+          KANON_FAKE_REMOVE_FAIL: "1",
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        stdio: ["ignore", "ignore", "pipe"]
+      }
+    );
+    let failedStderr = "";
+    failedChild.stderr.on("data", (chunk) => {
+      failedStderr += chunk;
+    });
+    const failedCompletion = new Promise((resolve, reject) => {
+      failedChild.once("error", reject);
+      failedChild.once("close", (code, signal) =>
+        resolve({ code, signal })
+      );
+    });
+    t.after(() => {
+      if (failedChild.exitCode === null && failedChild.signalCode === null) {
+        failedChild.kill("SIGKILL");
+      }
+    });
+
+    await waitForFile(path.join(state, "exec-started"), 10_000);
+    failedChild.kill("SIGINT");
+    const failedExit = await failedCompletion;
+
+    assert.deepEqual(failedExit, { code: 130, signal: null }, failedStderr);
+    const failedResult = JSON.parse(fs.readFileSync(failedReport, "utf8"));
+    assert.equal(failedResult.disposition, "no-go");
+    assert.equal(failedResult.criteria.lifecycle_cleanup, "unknown");
+    assert.ok(
+      failedResult.unknown.some((entry) =>
+        entry.includes("cleanup could not be directly verified")
+      )
+    );
+    assert.equal(fs.existsSync(path.join(state, "marketplace")), true);
+    assert.equal(fs.existsSync(path.join(state, "plugin")), true);
+  }
+);
+
+test(
+  "Claude runner removes its scratch evidence after SIGINT",
+  { skip: process.platform === "win32", timeout: 15_000 },
+  async (t) => {
+    const fixture = makeTemporaryDirectory(t, "kanon-guard-claude-runner-");
+    const bin = path.join(fixture, "bin");
+    const state = path.join(fixture, "state");
+    fs.mkdirSync(bin);
+    fs.mkdirSync(state);
+    const fakeClaude = path.join(bin, "claude");
+    fs.writeFileSync(
+      fakeClaude,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+
+const args = process.argv.slice(2);
+const stateRoot = process.env.KANON_FAKE_CLAUDE_STATE;
+if (args[0] === "--version") {
+  process.stdout.write("0.0.0-fake (Claude Code)\\n");
+} else if (args[0] === "auth" && args[1] === "status") {
+  process.stdout.write(JSON.stringify({ loggedIn: true }) + "\\n");
+} else if (args[0] === "--print") {
+  fs.writeFileSync(path.join(stateRoot, "scratch-cwd"), process.cwd());
+  fs.writeFileSync(path.join(stateRoot, "exec-started"), "started\\n");
+  setInterval(() => {}, 1_000);
+} else {
+  process.exitCode = 2;
+}
+`,
+      { mode: 0o755 }
+    );
+
+    const report = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "results",
+      `.claude-signal-test-${randomUUID()}.json`
+    );
+    fs.mkdirSync(path.dirname(report), { recursive: true });
+    t.after(() => fs.rmSync(report, { force: true }));
+    const runner = path.join(
+      repoRoot,
+      "spikes",
+      "guard-feasibility",
+      "claude-code",
+      "run.mjs"
+    );
+    const child = spawn(
+      process.execPath,
+      [runner, "--execute", "--report", report],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          KANON_FAKE_CLAUDE_STATE: state,
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`
+        },
+        stdio: ["ignore", "ignore", "pipe"]
+      }
+    );
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", (code, signal) => resolve({ code, signal }));
+    });
+    t.after(() => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+    });
+
+    await waitForFile(path.join(state, "exec-started"), 8_000);
+    const scratchCwd = fs.readFileSync(
+      path.join(state, "scratch-cwd"),
+      "utf8"
+    );
+    assert.equal(fs.existsSync(scratchCwd), true);
+    child.kill("SIGINT");
+    const exit = await completion;
+
+    assert.deepEqual(exit, { code: 130, signal: null }, stderr);
+    assert.equal(fs.existsSync(scratchCwd), false);
+    const result = JSON.parse(fs.readFileSync(report, "utf8"));
+    assert.equal(result.disposition, "no-go");
+    assert.equal(result.criteria.scratch_cleanup, "proven");
+    assert.equal(result.criteria.execution_completed, "unknown");
+    assert.ok(result.unknown.some((entry) => entry.includes("SIGINT")));
+  }
+);
+
 function hookInput(command) {
   return {
     session_id: "session-fixture",
@@ -257,4 +538,13 @@ function makeTemporaryDirectory(t, prefix) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
+}
+
+async function waitForFile(file, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (fs.existsSync(file)) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for ${path.basename(file)}.`);
 }

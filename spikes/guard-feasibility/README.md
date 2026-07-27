@@ -63,10 +63,12 @@ inputs are observed without changing the tool call.
 The host runners are intentionally opt-in and require `--execute`; static
 tests never invoke a host CLI or model. Running a host probe can use the
 currently authenticated coding-agent account and, for Codex, temporarily adds
-and removes the disposable local marketplace. Both hosts may persist the
-session metadata needed for the explicit resume check. The runners must
-therefore be reviewed before execution and their reports must be treated as the
-only runtime evidence.
+and removes the disposable local marketplace. The Codex runner owns that exact
+name only after an absence preflight, handles catchable termination signals,
+and verifies that both plugin and marketplace entries are absent before its
+result can pass. Both hosts may persist the session metadata needed for the
+explicit resume check. The runners must therefore be reviewed before execution
+and their reports must be treated as the only runtime evidence.
 
 ## Result discipline
 
