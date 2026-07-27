@@ -1,0 +1,126 @@
+{
+  "schema": "kanon-guard-feasibility-report-v2",
+  "follow_up": "run-a2-persisted-trust-compaction-preflight",
+  "host": "codex-cli",
+  "generated_at": "2026-07-27T21:40:17.373Z",
+  "claimed_surface": {
+    "cli": "codex documented status and plugin-list commands",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "non-interactive read-only preflight",
+    "permission_contract": "no model call, no hook-trust bypass, no plugin mutation, and no interactive host flow",
+    "max_model_attempts": 0,
+    "timeout_ms_per_command": 30000,
+    "max_output_bytes_per_stream": 8388608,
+    "cli_version": "codex-cli 0.145.0"
+  },
+  "known": [
+    "Directly proven on this named surface: authentication, documented_state_preflight, host_state_unchanged, scratch_cleanup, execution_completed."
+  ],
+  "likely": [],
+  "unknown": [
+    "Persisted hook execution remains Unknown: official host behavior requires interactive /hooks review of the exact hook hash, and this read-only follow-up did not open an interactive flow.",
+    "Actual compaction remains Unknown: the documented /compact command is interactive and was not sent as literal text through codex exec.",
+    "This zero-model Run A.2 preflight intentionally stops before the separately authorized interactive launcher; it does not itself create persisted trust.",
+    "Hard Guard is not claimable on this surface; direct proof is missing for: persisted_trusted_hook, actual_compaction."
+  ],
+  "stale_or_suspicious": [],
+  "suggested": [
+    "Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go."
+  ],
+  "setup": [
+    {
+      "name": "trusted-executable-resolution",
+      "resolved_outside_repository": true,
+      "ambient_environment_inherited": false
+    },
+    {
+      "name": "codex-version",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "f9eb0c462cdded1fb971b33c647ff1b8b491dfe962a1506026e07a06f634f651",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 18,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "authentication",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "logged_in": true
+    },
+    {
+      "name": "marketplace-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true
+    },
+    {
+      "name": "plugin-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true,
+      "unrelated_installed_plugins_present": true
+    }
+  ],
+  "attempts": [],
+  "criteria": {
+    "authentication": "proven",
+    "documented_state_preflight": "proven",
+    "persisted_trusted_hook": "unknown",
+    "actual_compaction": "unknown",
+    "host_state_unchanged": "proven",
+    "scratch_cleanup": "proven",
+    "execution_completed": "proven"
+  },
+  "cleanup": [
+    {
+      "name": "scratch-remove",
+      "removed": true
+    }
+  ],
+  "disposition": "no-go",
+  "preflight_and_rollback": {
+    "preflight": "Resolve a trusted executable, reduce authentication to a boolean, and verify the exact disposable marketplace and plugin names are absent.",
+    "proposed_changes": "Install only the exact disposable marketplace and plugin, then use interactive /hooks and /compact in a fresh scratch workspace.",
+    "documented_rollback": "Remove the exact plugin and marketplace, verify both names are absent, and remove runner-owned scratch state.",
+    "rollback_gap": "Current CLI help and official host documentation expose no command to remove a persisted hook-hash trust decision without inspecting undocumented internals.",
+    "automated_action": "not-run"
+  },
+  "manual_verification": [
+    "Run A.2 authorization accepts the bounded exact-hash trust residue and at most two authenticated model turns.",
+    "Re-run this read-only preflight and require both exact disposable names to be absent.",
+    "Add only the repository's disposable kanon-guard-spike-codex marketplace and plugin using the documented plugin commands.",
+    "Open a fresh interactive Codex workspace with workspace-write sandboxing, web search and apps disabled, and the hardened runner's minimum environment.",
+    "Use /hooks to review and trust only the exact disposable hook hash; do not use --dangerously-bypass-hook-trust.",
+    "Run one fixed marked tool-denial turn and verify the exact scratch marker remains absent.",
+    "Use /compact in that same interactive session and verify the documented compaction lifecycle event in the disposable evidence sink.",
+    "Exit after those two turns, remove the exact plugin and marketplace, verify both names are absent, and remove only the fresh scratch directory.",
+    "Treat the persisted hook-hash trust record as residual user state unless the host documents a supported removal command."
+  ]
+}

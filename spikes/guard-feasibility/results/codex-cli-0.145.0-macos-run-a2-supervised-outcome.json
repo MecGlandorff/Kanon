@@ -1,0 +1,119 @@
+{
+  "schema": "kanon-guard-feasibility-run-a2-outcome-v1",
+  "run": "run-a2-final-supervised-codex-persisted-trust-real-compaction",
+  "host": "codex-cli",
+  "generated_date": "2026-07-27",
+  "provenance": {
+    "baseline_commit": "17707f3e65dfb2ef309391d363590210199b9d56",
+    "source_commit": "08de9290db031b49119f1dd33522db65573f2e48",
+    "source_sha256": "66cdf5bfa4def30bb76da3d4dc503825e35fb1a4ca0a693a44514ba7b3caed8a",
+    "fixture_sha256": "c0f6d3ef18f5d17673ac5970d6938e36310988ee2cfcb3ce7d9c98d0fa80290c"
+  },
+  "evidence_reports": [
+    {
+      "identity": "run-a2-zero-model-preflight",
+      "filename": "codex-cli-0.145.0-macos-run-a2-persisted-trust-compaction-preflight.json",
+      "sha256": "05e354743e58ec902602f19de29d415a8ac25a21fc68a59b23f73c744768b693"
+    },
+    {
+      "identity": "run-a2-hardened-launcher",
+      "filename": "codex-cli-0.145.0-macos-run-a2-supervised-persisted-trust-real-compaction.json",
+      "sha256": "cb9fb5ad3973f7f7f305a29cf93c378d594a22547f05d2a3e9c3e47f08295b2d"
+    },
+    {
+      "identity": "run-a2-zero-model-post-cleanup",
+      "filename": "codex-cli-0.145.0-macos-run-a2-post-cleanup.json",
+      "sha256": "067810ce08aa022ebbe385cc3e1065fcf689f33a015cda63dd6ddc74d39b4537"
+    }
+  ],
+  "claimed_surface": {
+    "cli_version": "codex-cli 0.145.0",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "supervised local TUI",
+    "tool": "Bash",
+    "fixture": "kanon-guard-spike-codex@kanon-guard-spike-codex",
+    "installed_artifact_proof": false,
+    "cross_platform_proof": false,
+    "production_guard_proof": false
+  },
+  "direct_observations": {
+    "authentication_proven": true,
+    "exact_names_absent_before_install": true,
+    "exact_fixture_identity_verified": true,
+    "exact_installed_identity_verified": true,
+    "interactive_session_opened": true,
+    "unexpected_project_trust_prompt_observed": true,
+    "project_trust_declined": true,
+    "project_trust_persisted_by_run": false,
+    "hooks_ui_reached": false,
+    "exact_hook_definition_reviewed": false,
+    "exact_hook_hash_trusted": false,
+    "denial_probe_submitted": false,
+    "matching_pretooluse_observed": false,
+    "deny_response_observed": false,
+    "exact_marker_absent": true,
+    "real_compact_invoked": false,
+    "compact_lifecycle_observed": false,
+    "model_turns_submitted": 0,
+    "third_model_turn_submitted": false,
+    "exact_plugin_remove_succeeded": true,
+    "exact_marketplace_remove_succeeded": true,
+    "exact_plugin_absence_verified": true,
+    "exact_marketplace_absence_verified": true,
+    "launcher_scratch_removed": true,
+    "post_cleanup_absence_verified": true,
+    "cleanup_completed_before_wrapper_interrupt": true,
+    "report_emitted_before_wrapper_interrupt": true,
+    "launcher_wrapper_terminal_exit_normal": false,
+    "undocumented_state_inspected_or_modified": false
+  },
+  "criteria": {
+    "authentication": "proven",
+    "documented_state_preflight": "proven",
+    "fixture_identity": "proven",
+    "installed_identity": "proven",
+    "safe_launch_arguments": "proven",
+    "session_ui_configuration": "unknown",
+    "persisted_exact_hash_trust": "unknown",
+    "pretooluse_denial": "unknown",
+    "marker_absence": "proven",
+    "actual_compaction": "unknown",
+    "model_turn_bound": "proven",
+    "documented_cleanup": "proven",
+    "scratch_cleanup": "proven"
+  },
+  "known": [
+    "The fresh preflight proved authentication and exact-name absence with zero model calls and no host-state mutation.",
+    "The launcher used the committed source and fixture identities, installed only the exact disposable marketplace and plugin, and verified that installed identity.",
+    "The TUI presented a project-directory trust decision before the required status and hook review; that additional persistent state was outside authorization and was declined.",
+    "No model turn was submitted, the fixed denial marker remained absent, and real compaction was not invoked.",
+    "The exact plugin and marketplace removal commands succeeded, both exact names were absent in valid documented list output, the launcher scratch root was removed, and a later zero-model post-cleanup check again proved both names absent."
+  ],
+  "likely": [],
+  "unknown": [
+    "Persisted execution after interactive review and trust of the exact disposable hook hash remains Unknown.",
+    "A matching PreToolUse deny response remains Unknown because the fixed denial probe was not submitted.",
+    "Real compact lifecycle behavior remains Unknown because the interactive /compact command was not invoked.",
+    "The complete in-session UI configuration remains Unknown because /status was not reached.",
+    "Any Codex version, operating system, architecture, terminal surface, tool, fixture, installed artifact, or production Guard behavior outside the named surface remains Unknown."
+  ],
+  "stale_or_suspicious": [
+    "The launcher report's bounded_model_usage.observed_sequence field is a fixed intended-sequence label, not a runtime observation. It is superseded for this run by the directly observed model_turns_submitted value of zero in this additive outcome report.",
+    "The launcher report marks execution_completed proven before report emission, but the wrapper process later required a terminal interrupt because the supervision input stream remained active. The final wrapper exit was not normal."
+  ],
+  "accepted_residual_user_state": {
+    "ordinary_session_records_left_untouched": true,
+    "exact_hook_hash_trust_created_by_run_a2": false,
+    "possible_preexisting_or_host_internal_exact_hash_trust_residue": "unknown-not-inspected",
+    "project_directory_trust_created_by_run_a2": false
+  },
+  "residual_risks": [
+    "Codex exposes no documented session-only include-list for installed local plugins, so unrelated persistent plugin state was left untouched.",
+    "The hardened launcher did not pre-seed scratch-directory trust through a session-only setting and therefore encountered the additional trust gate.",
+    "After cleanup and report emission, the launcher wrapper required a terminal interrupt because its supervision input stream remained active; cleanup and report creation had already completed.",
+    "This no-go supplies no hard-Guard proof and must not be promoted to another host or surface."
+  ],
+  "required_decision_before_run_b": "Either explicitly accept Codex CLI hard Guard as no-go and select a documented notice-mode revision to the frozen stable promise, or do not begin Run B. Guard mode cannot be selected from this evidence.",
+  "disposition": "no-go"
+}

@@ -35,6 +35,22 @@ const codexFollowUpPath = path.join(
   resultsRoot,
   "codex-cli-0.145.0-macos-run-a1-follow-up-persisted-trust-compaction-preflight.json"
 );
+const codexRunA2PreflightPath = path.join(
+  resultsRoot,
+  "codex-cli-0.145.0-macos-run-a2-persisted-trust-compaction-preflight.json"
+);
+const codexRunA2LauncherPath = path.join(
+  resultsRoot,
+  "codex-cli-0.145.0-macos-run-a2-supervised-persisted-trust-real-compaction.json"
+);
+const codexRunA2PostCleanupPath = path.join(
+  resultsRoot,
+  "codex-cli-0.145.0-macos-run-a2-post-cleanup.json"
+);
+const codexRunA2OutcomePath = path.join(
+  resultsRoot,
+  "codex-cli-0.145.0-macos-run-a2-supervised-outcome.json"
+);
 const resultDocument = fs.readFileSync(
   path.join(repoRoot, "docs", "v1-guard-feasibility.md"),
   "utf8"
@@ -44,11 +60,31 @@ const claudeText = fs.readFileSync(claudePath, "utf8");
 const claudeFollowUpText = fs.readFileSync(claudeFollowUpPath, "utf8");
 const claudeFollowUp2Text = fs.readFileSync(claudeFollowUp2Path, "utf8");
 const codexFollowUpText = fs.readFileSync(codexFollowUpPath, "utf8");
+const codexRunA2PreflightText = fs.readFileSync(
+  codexRunA2PreflightPath,
+  "utf8"
+);
+const codexRunA2LauncherText = fs.readFileSync(
+  codexRunA2LauncherPath,
+  "utf8"
+);
+const codexRunA2PostCleanupText = fs.readFileSync(
+  codexRunA2PostCleanupPath,
+  "utf8"
+);
+const codexRunA2OutcomeText = fs.readFileSync(
+  codexRunA2OutcomePath,
+  "utf8"
+);
 const codex = JSON.parse(codexText);
 const claude = JSON.parse(claudeText);
 const claudeFollowUp = JSON.parse(claudeFollowUpText);
 const claudeFollowUp2 = JSON.parse(claudeFollowUp2Text);
 const codexFollowUp = JSON.parse(codexFollowUpText);
+const codexRunA2Preflight = JSON.parse(codexRunA2PreflightText);
+const codexRunA2Launcher = JSON.parse(codexRunA2LauncherText);
+const codexRunA2PostCleanup = JSON.parse(codexRunA2PostCleanupText);
+const codexRunA2Outcome = JSON.parse(codexRunA2OutcomeText);
 
 test("final Guard reports are hash-bound and retain no raw host payloads", () => {
   for (const [file, contents] of [
@@ -289,6 +325,176 @@ test("Run A.1 follow-up reports are additive, redacted, and hash-bound", () => {
     resultDocument,
     /launching the TUI directly from a broad shell environment is not approved/
   );
+});
+
+test("Run A.2 reports are additive, sanitized, and hash-bound", () => {
+  for (const [file, contents] of [
+    [codexRunA2PreflightPath, codexRunA2PreflightText],
+    [codexRunA2LauncherPath, codexRunA2LauncherText],
+    [codexRunA2PostCleanupPath, codexRunA2PostCleanupText],
+    [codexRunA2OutcomePath, codexRunA2OutcomeText]
+  ]) {
+    const digest = crypto
+      .createHash("sha256")
+      .update(contents)
+      .digest("hex");
+    assert.match(resultDocument, new RegExp(digest));
+    assert.doesNotMatch(contents, new RegExp(escapeRegExp(repoRoot)));
+    assert.doesNotMatch(contents, /KANON_GUARD_SPIKE/);
+    assert.doesNotMatch(contents, /"stdout":|"stderr":/);
+    assert.doesNotMatch(
+      contents,
+      /email|organization(?:Id|_id)|credential|access[_-]?token/i
+    );
+    assert.match(path.basename(file), /codex-cli-0\.145\.0-macos-run-a2/);
+  }
+
+  assert.equal(
+    codexRunA2Outcome.evidence_reports[0].sha256,
+    crypto.createHash("sha256").update(codexRunA2PreflightText).digest("hex")
+  );
+  assert.equal(
+    codexRunA2Outcome.evidence_reports[1].sha256,
+    crypto.createHash("sha256").update(codexRunA2LauncherText).digest("hex")
+  );
+  assert.equal(
+    codexRunA2Outcome.evidence_reports[2].sha256,
+    crypto
+      .createHash("sha256")
+      .update(codexRunA2PostCleanupText)
+      .digest("hex")
+  );
+});
+
+test("Run A.2 stops safely at unauthorized directory trust and retains no-go", () => {
+  assert.equal(codexRunA2Preflight.claimed_surface.max_model_attempts, 0);
+  assert.deepEqual(codexRunA2Preflight.attempts, []);
+  assert.equal(codexRunA2Preflight.criteria.authentication, "proven");
+  assert.equal(
+    codexRunA2Preflight.criteria.documented_state_preflight,
+    "proven"
+  );
+  assert.equal(codexRunA2Preflight.criteria.host_state_unchanged, "proven");
+
+  assert.equal(
+    codexRunA2Launcher.provenance.source_commit,
+    "08de9290db031b49119f1dd33522db65573f2e48"
+  );
+  assert.equal(
+    codexRunA2Launcher.claimed_surface.cli_version,
+    "codex-cli 0.145.0"
+  );
+  assert.equal(codexRunA2Launcher.fixture.exact_identity_verified, true);
+  assert.deepEqual(codexRunA2Launcher.criteria, {
+    source_binding: "proven",
+    authentication: "proven",
+    documented_state_preflight: "proven",
+    fixture_identity: "proven",
+    installed_identity: "proven",
+    session_configuration: "unknown",
+    persisted_exact_hash_trust: "unknown",
+    pretooluse_denial: "unknown",
+    marker_absence: "proven",
+    actual_compaction: "unknown",
+    execution_bounds: "unknown",
+    documented_cleanup: "proven",
+    scratch_cleanup: "proven",
+    execution_completed: "proven"
+  });
+  assert.equal(codexRunA2Launcher.interactive.observation_count, 0);
+  assert.deepEqual(codexRunA2Launcher.interactive.observations, []);
+  assert.equal(codexRunA2Launcher.interactive.marker_absent, true);
+  assert.equal(codexRunA2Launcher.disposition, "no-go");
+  for (const name of [
+    "plugin-remove",
+    "marketplace-remove",
+    "plugin-cleanup-verification",
+    "marketplace-cleanup-verification"
+  ]) {
+    const cleanup = codexRunA2Launcher.cleanup.find(
+      (entry) => entry.name === name
+    );
+    assert.equal(cleanup.process.status, 0);
+  }
+  assert.equal(
+    codexRunA2Launcher.cleanup.find(
+      (entry) => entry.name === "plugin-cleanup-verification"
+    ).exact_name_absent,
+    true
+  );
+  assert.equal(
+    codexRunA2Launcher.cleanup.find(
+      (entry) => entry.name === "marketplace-cleanup-verification"
+    ).exact_name_absent,
+    true
+  );
+  assert.equal(codexRunA2Launcher.cleanup.at(-1).removed, true);
+
+  assert.equal(
+    codexRunA2Outcome.direct_observations.unexpected_project_trust_prompt_observed,
+    true
+  );
+  assert.equal(codexRunA2Outcome.direct_observations.project_trust_declined, true);
+  assert.equal(
+    codexRunA2Outcome.direct_observations.project_trust_persisted_by_run,
+    false
+  );
+  assert.equal(codexRunA2Outcome.direct_observations.model_turns_submitted, 0);
+  assert.equal(codexRunA2Outcome.direct_observations.hooks_ui_reached, false);
+  assert.equal(
+    codexRunA2Outcome.direct_observations.denial_probe_submitted,
+    false
+  );
+  assert.equal(
+    codexRunA2Outcome.direct_observations.real_compact_invoked,
+    false
+  );
+  assert.equal(codexRunA2Outcome.criteria.persisted_exact_hash_trust, "unknown");
+  assert.equal(codexRunA2Outcome.criteria.pretooluse_denial, "unknown");
+  assert.equal(codexRunA2Outcome.criteria.marker_absence, "proven");
+  assert.equal(codexRunA2Outcome.criteria.actual_compaction, "unknown");
+  assert.equal(codexRunA2Outcome.criteria.documented_cleanup, "proven");
+  assert.equal(
+    codexRunA2Outcome.direct_observations.cleanup_completed_before_wrapper_interrupt,
+    true
+  );
+  assert.equal(
+    codexRunA2Outcome.direct_observations.report_emitted_before_wrapper_interrupt,
+    true
+  );
+  assert.equal(
+    codexRunA2Outcome.direct_observations.launcher_wrapper_terminal_exit_normal,
+    false
+  );
+  assert.equal(codexRunA2Outcome.disposition, "no-go");
+  assert.ok(
+    codexRunA2Outcome.stale_or_suspicious.some((entry) =>
+      entry.includes("intended-sequence label")
+    )
+  );
+});
+
+test("Run A.2 post-cleanup independently proves exact-name absence", () => {
+  assert.equal(codexRunA2PostCleanup.claimed_surface.max_model_attempts, 0);
+  assert.deepEqual(codexRunA2PostCleanup.attempts, []);
+  assert.equal(
+    codexRunA2PostCleanup.criteria.documented_state_preflight,
+    "proven"
+  );
+  assert.equal(codexRunA2PostCleanup.criteria.host_state_unchanged, "proven");
+  assert.equal(codexRunA2PostCleanup.criteria.scratch_cleanup, "proven");
+  for (const name of ["marketplace-preflight", "plugin-preflight"]) {
+    const check = codexRunA2PostCleanup.setup.find(
+      (entry) => entry.name === name
+    );
+    assert.equal(check.output_valid_json, true);
+    assert.equal(check.exact_name_absent, true);
+  }
+  assert.match(
+    codexRunA2Outcome.required_decision_before_run_b,
+    /select a documented notice-mode revision/
+  );
+  assert.match(resultDocument, /Run A\.2 ends here regardless of\s+outcome/);
 });
 
 test("slice 3 selects neither Guard nor notice and stops before slice 4", () => {

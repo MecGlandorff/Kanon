@@ -425,3 +425,180 @@ must explicitly choose one of these paths:
    and revise the stable promise.
 
 Neither choice is made by this document.
+
+## Run A.2 final supervised Codex verification
+
+**Date:** 2026-07-27.
+
+**Decision: no-go. Hard stop after Run A.2.**
+
+Run A.2 exercised only Codex CLI. It did not work on Claude Code, select
+notice mode, revise the stable promise, implement receipts or production
+Guard, create product manifests, or begin product slice 4.
+
+### Provenance and additive reports
+
+The safe interactive launcher and its regressions were committed before any
+Codex plugin-state mutation:
+
+- source commit
+  `08de9290db031b49119f1dd33522db65573f2e48`, whose parent is the required
+  Run A.1 commit
+  `17707f3e65dfb2ef309391d363590210199b9d56`;
+- source-bundle SHA-256
+  `66cdf5bfa4def30bb76da3d4dc503825e35fb1a4ca0a693a44514ba7b3caed8a`;
+- committed disposable-fixture SHA-256
+  `c0f6d3ef18f5d17673ac5970d6938e36310988ee2cfcb3ce7d9c98d0fa80290c`.
+
+Run A.2 added four reports without replacing any Run A or Run A.1 evidence:
+
+- [zero-model preflight](../spikes/guard-feasibility/results/codex-cli-0.145.0-macos-run-a2-persisted-trust-compaction-preflight.json),
+  SHA-256
+  `05e354743e58ec902602f19de29d415a8ac25a21fc68a59b23f73c744768b693`;
+- [hardened launcher report](../spikes/guard-feasibility/results/codex-cli-0.145.0-macos-run-a2-supervised-persisted-trust-real-compaction.json),
+  SHA-256
+  `cb9fb5ad3973f7f7f305a29cf93c378d594a22547f05d2a3e9c3e47f08295b2d`;
+- [zero-model post-cleanup check](../spikes/guard-feasibility/results/codex-cli-0.145.0-macos-run-a2-post-cleanup.json),
+  SHA-256
+  `067810ce08aa022ebbe385cc3e1065fcf689f33a015cda63dd6ddc74d39b4537`;
+- [final supervised outcome](../spikes/guard-feasibility/results/codex-cli-0.145.0-macos-run-a2-supervised-outcome.json),
+  SHA-256
+  `456be74f897b3a30cf8828db96ca8db639432f51765423dadf5a79724b5dbfc9`.
+
+The final supervised outcome binds the other three reports, the source commit,
+the source SHA-256, and the fixture SHA-256. Reports retain only bounded
+sanitized process status, fixed identities, lifecycle summaries, booleans, and
+hashes. They retain no raw prompt, model output, authentication output,
+credential, session identifier, or filesystem path.
+
+### Hardened launcher boundary
+
+The launcher had no caller-controlled prompt, marketplace, plugin, workspace,
+model, or extra-flag surface. It:
+
+- resolved and used the canonical Codex executable outside the repository;
+- reused the minimum child environment and added only fixed terminal and
+  runner-owned evidence values;
+- created one fresh scratch workspace outside the repository;
+- fixed the sandbox to `workspace-write` and approvals to user-reviewed
+  `on-request`;
+- disabled web search, command network access, apps/connectors, configured MCP
+  servers, memories, multi-agent behavior, browser/computer-use, plugin
+  sharing, dependency discovery, analytics, and update checks for the
+  process;
+- used neither dangerous bypass;
+- verified the committed fixture hashes and the documented installed
+  marketplace/plugin identity; and
+- bounded the intended interactive work to one denial turn followed by one
+  real `/compact` operation, with no third model turn.
+
+Codex exposes no documented session-only include-list for installed local
+plugins. Run A.2 therefore left unrelated persistent plugin state untouched
+and records that limitation as residual risk.
+
+### Direct runtime outcome
+
+The fresh preflight proved authentication and exact-name absence through valid
+documented JSON. It made zero model calls, changed no host plugin state, and
+removed its scratch directory.
+
+The launcher then added only the exact committed marketplace and
+`kanon-guard-spike-codex@kanon-guard-spike-codex`, and verified the installed
+identity. On opening the TUI, Codex presented a project-directory trust
+decision before the required `/status` and `/hooks` review. Persisting trust
+for the disposable scratch directory was an additional user-state change not
+covered by the authorization. The supervisor declined it instead of guessing
+or broadening authority.
+
+Consequently:
+
+- `/status` and `/hooks` were not reached;
+- no hook definition or hash was trusted;
+- the denial probe was not submitted;
+- no `PreToolUse` observation or deny response occurred;
+- the exact marker was directly absent, but absence alone is not denial proof;
+- `/compact` was not invoked and no compact lifecycle event occurred;
+- zero model turns were submitted; and
+- no third model turn occurred.
+
+The launcher report contains a fixed
+`bounded_model_usage.observed_sequence` intended-sequence label. That label is
+not a runtime observation and is stale for this stopped run. The additive final
+outcome supersedes it with the directly observed count of zero submitted model
+turns.
+
+### Evidence classification
+
+#### Known
+
+- Codex reported `codex-cli 0.145.0` on macOS arm64.
+- Authentication, source binding, fixture identity, exact-name preflight, and
+  installed identity were directly proven.
+- The extra project-directory trust prompt appeared and was declined.
+- Run A.2 created no project-directory trust and never reached exact hook-hash
+  trust.
+- Zero model turns were submitted.
+- The exact marker remained absent.
+- Exact plugin removal and marketplace removal both exited successfully.
+- Valid documented list output showed both exact names absent during launcher
+  cleanup and again in a separate zero-model post-cleanup check.
+- Launcher scratch removal succeeded, and a direct existence check found the
+  exact launcher-owned root absent.
+- No undocumented Codex state was inspected, edited, translated, or deleted.
+
+#### Likely
+
+- None. An absent marker without a matching tool-hook observation is not
+  promoted.
+
+#### Unknown
+
+- Persisted execution after review and trust of the exact disposable hook
+  hash.
+- A matching `PreToolUse` deny response and its causal relationship to marker
+  absence.
+- Real `/compact` lifecycle behavior.
+- Complete in-session configuration display, because `/status` was not
+  reached.
+- Any other Codex version, operating system, architecture, terminal surface,
+  tool, fixture, installed artifact, or production Guard behavior.
+
+#### Stale / suspicious
+
+- The launcher report's intended-sequence label is not actual model-usage
+  evidence for this stopped run.
+- Documentation and the older trust-bypass result remain design and historical
+  evidence; neither supplies the missing Run A.2 persisted-trust or compact
+  observations.
+
+### Cleanup, usage, and residual state
+
+The exact disposable plugin and marketplace were removed and separately proven
+absent. The launcher-owned scratch root and both read-only runner scratch roots
+were removed. Cleanup is complete for the documented state created by Run A.2.
+
+The interactive surface was opened once. It submitted zero model turns, so the
+bounded model-turn usage was `0 / 2`; the denial turn, compact operation, and
+third turn were all absent.
+
+Ordinary host session records remain untouched as authorized. Run A.2 did not
+create an exact-hook-hash trust decision because `/hooks` was never reached.
+Whether any pre-existing or host-internal matching residue exists remains
+Unknown and was not inspected. No project-directory trust was created.
+
+After cleanup and report emission, the launcher wrapper required a terminal
+interrupt because its supervision input stream remained active. The report and
+all documented cleanup checks had already completed. This is retained as a
+launcher residual risk, not hidden as normal exit.
+
+### Decision required before Run B
+
+Codex CLI hard Guard remains no-go. Before Run B, the user must make exactly
+this product decision:
+
+1. explicitly accept the Codex CLI hard-Guard no-go and select a documented
+   `notice`-mode revision to the frozen stable promise; or
+2. do not begin Run B.
+
+`guard` cannot be selected from this evidence. Run A.2 ends here regardless of
+outcome.
