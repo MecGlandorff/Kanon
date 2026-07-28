@@ -345,7 +345,7 @@ added around a trust check.
 | Total public launch/wrapper lines | 3,012 | 838 | -2,174 |
 | Runtime plus launch/wrapper lines | 26,750 | 24,024 | -2,726 |
 | Test JavaScript files | 16 | 16 | 0 |
-| Test JavaScript lines | 10,447 | 10,643 | +196 |
+| Test JavaScript lines | 10,447 | 10,650 | +203 |
 | Stable public skills | 6 | 6 | 0 |
 | Compatibility routes | 6 | 6 | 0 |
 | Runtime dependencies | 0 | 0 | 0 |

@@ -192,6 +192,13 @@ test("shipped compatibility closure contains only explicit write consumers", () 
     ...collectRuntimeDependencies(repoRoot)
   ]);
   assert.equal(closure.size, 54);
+  if (process.platform !== "win32") {
+    assert.notEqual(
+      fs.statSync(path.join(repoRoot, "bin", "kanon-write.js")).mode & 0o111,
+      0,
+      "the canonical write bin must remain executable"
+    );
+  }
   for (const required of [
     "bin/kanon-write.js",
     "src/analyze.js",
