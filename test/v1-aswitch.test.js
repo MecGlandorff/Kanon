@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { invokeClaudeSkill } from "../src/v1/adapters/claude.js";
 import { invokeCodexSkill } from "../src/v1/adapters/codex.js";
 import { runStableCli } from "../src/v1/cli.js";
@@ -16,6 +17,10 @@ import {
 const NOW = Date.parse("2026-07-28T19:30:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
 const PACKAGE_VERSION = "0.4.0-rc.1";
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".."
+);
 
 test("aswitch asks for a target and offers exactly three bounded modes", async () => {
   const root = makeFixture({ "README.md": "# Fixture\n" });
@@ -36,6 +41,64 @@ test("aswitch asks for a target and offers exactly three bounded modes", async (
   assert.equal(result.report.payload_options[1].recommended, true);
   assert.equal(result.report.payload_options[2].experimental, true);
   assert.equal(result.report.payload_options[2].availability, "Unknown");
+});
+
+test("full-history remains experimental and unavailable without a qualifying source", async () => {
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  const before = snapshotTree(root);
+  const result = await invokeCodexSkill(
+    invocation(root, request({
+      target_host: "claude-code",
+      payload_mode: "full-history"
+    })),
+    context(fixedGitRunner())
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.report.stage, "ModeUnavailable");
+  assert.equal(result.report.status, "Unknown");
+  assert.equal(result.report.read_only, true);
+  assert.equal(result.report.authorization, false);
+  assert.equal(result.report.automatic_launch, false);
+  assert.equal(result.report.preview, null);
+  assert.equal(result.report.selected_mode, "full-history");
+  assert.equal(result.report.payload_options[2].experimental, true);
+  assert.equal(result.report.payload_options[2].availability, "Unknown");
+  assert.match(
+    result.report.diagnostic,
+    /separately acknowledged qualifying source/
+  );
+  assert.deepEqual(snapshotTree(root), before);
+
+  const sentinel = "SECRET_ARCHIVE_SENTINEL";
+  const injected = await invokeClaudeSkill(
+    invocation(root, {
+      ...request({
+        target_host: "codex-cli",
+        payload_mode: "full-history"
+      }),
+      history_archive: sentinel
+    }),
+    context(fixedGitRunner())
+  );
+  assert.equal(injected.ok, false);
+  assert.doesNotMatch(JSON.stringify(injected), new RegExp(sentinel));
+
+  for (const relative of [
+    "src/v1/core/handoff.js",
+    "src/v1/skills/aswitch.js",
+    "runtime/core/handoff.js",
+    "runtime/skills/aswitch.js"
+  ]) {
+    const source = fs.readFileSync(
+      path.join(repoRoot, relative),
+      "utf8"
+    );
+    assert.doesNotMatch(
+      source,
+      /CODEX_HOME|CLAUDE_CONFIG_DIR|history\.jsonl|projects\/<project>|thread\/read/
+    );
+  }
 });
 
 test("last-plan preview gates one external write and returns only a manual fallback", async () => {

@@ -64,6 +64,12 @@ unverified. Receiving validation treats a known checksum, canonical-root,
 commit, or complete change-set mismatch as Stale and an unavailable comparison
 as Unknown.
 
+Full-history has no source reader in the shipped artifact. Never discover a
+source by reading Codex or Claude user-state paths. A later user-supplied or
+documented export remains a separate untrusted attachment, requires its own
+risk acknowledgement, and must not be merged into a compacted handoff, fixed
+bootstrap instruction, or process arguments.
+
 ## Git observation
 
 Every Git invocation disables optional locks, terminal prompts, system/global

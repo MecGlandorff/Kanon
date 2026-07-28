@@ -5,7 +5,7 @@ classifications where applicable. Repository-derived strings are marked
 `trust: "repository-untrusted"` in structured evidence and rendered as inert
 data.
 
-## Stable reports through slice 11
+## Stable reports through slice 13
 
 - Orient: canonical repository, instruction-first bounded evidence, Git
   observation, limitations, and a minimal context receipt.
@@ -24,6 +24,8 @@ data.
   write requires the matching caller assertion of explicit approval. Receive
   validates schema, checksum, canonical root, commit, and complete Git
   change-set fingerprint before classifying `Current`, `Stale`, or `Unknown`.
+  Terminal launch and full-history remain unavailable. Full-history is visibly
+  experimental and accepts no archive content.
 
 All six use `kanon-stable-skill-result-v1`, consult the shared exact-version
 deprecation checker, and preserve unavailable evidence as Unknown.

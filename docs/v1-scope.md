@@ -2,10 +2,9 @@
 
 **Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
 receipt-only amendments, additive Run B recovery status through product
-slice 8, and accepted Run C status through slice 12. Slice 12 is an honest
-beta-adapter deferral, not an implementation claim. This file is not a release
-claim. Run C may complete slice 13; this record does not claim that slice is
-complete.
+slice 8, and accepted Run C status through slice 13. Slices 12 and 13 are
+honest capability deferrals, not implementation claims. This file is not a
+release claim. Run C hard-stops before slice 14.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
 including its explicitly authorized 2026-07-28 amendment. This companion
@@ -218,6 +217,30 @@ operating system and terminal surface remains `Unknown`. The stable manual
 fallback is unchanged, and the artifact contains no terminal-launch module,
 manifest claim, automatic process path, ownership, or supervision behavior.
 
+### Run C slice 13 feasibility-gate status
+
+Full-history archive remains experimental and unavailable. The user supplied
+no transcript or archive path and no source-specific risk acknowledgement.
+Official Claude Code documentation describes an interactive
+`/export [filename]`, but no export was invoked or supplied. Official Codex
+app-server documentation describes a history read API, but no app-server
+connection, history read, or exported archive was supplied. Documentation is
+design input, not an archive or installed-host runtime proof.
+
+Bounded local help checks on the trusted Codex CLI `0.145.0` and Claude Code
+`2.1.219` executables made no model call and retained only sanitized booleans.
+Codex top-level help mentioned app-server; neither top-level help mentioned
+export. The missing term remains non-observation and creates no negative host
+conclusion.
+
+The stable `aswitch` surface visibly returns `ModeUnavailable`, `Unknown`
+availability, and an experimental label for Full-history. It creates no
+preview or file and accepts no archive content. No host state was read,
+translated, or enumerated. A future qualifying archive must remain a separate
+untrusted attachment, require a separate risk acknowledgement, and never be
+merged into the compacted handoff, bootstrap instruction, or process
+arguments.
+
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
@@ -253,7 +276,7 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status through Run C slice 12
+## Evidence status through Run C slice 13
 
 ### Known
 
@@ -284,6 +307,8 @@ fail safely to the manual handoff.
   ownership, supervision, or raw-history access.
 - Slice 12 ships no beta launch adapter. Installed-artifact conformance proves
   the launch surface is absent while the stable manual fallback remains.
+- Slice 13 creates no history archive and ships no transcript parser or host
+  state reader. Full-history remains visibly experimental and unavailable.
 
 ### Likely
 
@@ -307,6 +332,9 @@ fail safely to the manual handoff.
 - Both launch directions on the observed macOS/Apple Terminal parent surface,
   and all other operating-system/terminal tuples, remain `Unknown` because no
   safe terminal automation and argument contract received direct proof.
+- Codex and Claude full-history sources remain independently `Unknown` because
+  no qualifying archive was supplied or produced. Current documentation is not
+  installed-runtime or archive evidence.
 
 ### Stale / suspicious
 
@@ -323,10 +351,14 @@ fail safely to the manual handoff.
   are superseded by Run C slices 10 and 11.
 - Any inference that installed CLIs or `TERM_PROGRAM` prove a beta launch
   adapter is suspicious and rejected.
+- Earlier Run C status text that slice 13 was unimplemented is superseded only
+  by its explicit experimental/unavailable feasibility result; it is not a
+  full-history implementation.
 
 ### Suggested
 
 - Keep automatic lifecycle notice, hard Guard, and any enforcing or
   hook-driven receipt lifecycle outside public v1 until separately proven and
   authorized.
-- Complete Run C only through slice 13 and hard-stop before slice 14.
+- Hard-stop Run C before slice 14. A later run may reconsider full-history only
+  with a qualifying source and separate source-specific risk acknowledgement.

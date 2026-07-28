@@ -299,3 +299,35 @@ test("Run C slice 12 defers every unproven beta launch tuple", () => {
   assert.match(runC, /Claude Code \| Codex CLI[\s\S]*`Unknown` — deferred/);
   assert.match(runC, /No P0 or P1 remains for slice 12/);
 });
+
+test("Run C slice 13 defers full-history without a qualifying archive", () => {
+  assert.match(scope, /Run C slice 13 feasibility-gate status/);
+  assert.match(runC, /Slice 13 — full-history feasibility gate/);
+  for (const text of [scope, runC]) {
+    const normalized = text.replace(/\s+/g, " ");
+    assert.match(normalized, /Full-history[^.]*experimental/i);
+    assert.match(
+      normalized,
+      /no (?:transcript|qualifying history archive)/i
+    );
+    assert.match(
+      normalized,
+      /no (?:Claude )?export was (?:invoked or )?supplied/i
+    );
+    assert.match(normalized, /no app-server connection/i);
+    assert.match(normalized, /non-observation/i);
+    assert.match(normalized, /separate untrusted attachment/i);
+    assert.match(
+      normalized,
+      /separate (?:source-specific )?risk acknowledgement/i
+    );
+    assert.match(
+      normalized,
+      /Documentation (?:is design input, not an archive or installed-host runtime proof|does not prove installed runtime behavior)/i
+    );
+  }
+  assert.match(runC, /Codex CLI[\s\S]*`Unknown` \/ unavailable/);
+  assert.match(runC, /Claude Code[\s\S]*`Unknown` \/ unavailable/);
+  assert.match(runC, /No P0 or P1 remains for slice 13/);
+  assert.match(runC, /stops here before slice 14/);
+});

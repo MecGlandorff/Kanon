@@ -1,9 +1,9 @@
 # Kanon v1 Run C implementation record
 
-**Status:** Run C is in progress on `release/v.1.0.0`. Product slices 9 through
-12 are accepted; slice 13 remains unimplemented in this record. Slice 12 is an
-honest beta-adapter deferral, not an implementation claim. This is not a
-release claim and does not authorize slice 14.
+**Status:** Run C is complete through product slice 13 on
+`release/v.1.0.0`. Slices 12 and 13 are honest capability deferrals, not
+implementation claims. This is not a release claim. Run C hard-stops before
+slice 14.
 
 The authoritative contract is [`V_1design.md`](../V_1design.md), including
 the user-authorized 2026-07-28 receipt-only amendment. Historical Guard
@@ -319,3 +319,77 @@ capability metadata remain unchanged.
 No P0 or P1 remains for slice 12. A beta adapter requires a separately selected
 source/target/OS/terminal tuple, a directly testable safe launch contract, and
 fresh explicit approval before any live launch.
+
+## Slice 13 — full-history feasibility gate
+
+### Accepted result: experimental and unavailable
+
+No qualifying history archive was available during Run C:
+
+- The user supplied no transcript, archive path, provenance record, or
+  source-specific risk acknowledgement.
+- Current official Claude Code documentation describes `/export [filename]`
+  as a plain-text export of the current conversation. No Claude export was
+  invoked or supplied in this run.
+- Current official Codex app-server documentation describes `thread/read`
+  with `includeTurns` as a documented conversation-history read API. It is
+  not an archive supplied to this run, and no app-server connection or history
+  read was attempted.
+- Bounded local `--help` observations for the trusted Codex CLI `0.145.0` and
+  Claude Code `2.1.219` executables both exited successfully without a model
+  call. Codex top-level help mentioned `app-server`; neither top-level help
+  output mentioned `export`. That absence is non-observation, not proof that a
+  host lacks an interactive export.
+
+Only sanitized booleans from the local help checks were retained, and their
+temporary scratch state was removed. Kanon did not read, parse, translate,
+copy, or enumerate Codex or Claude user-state files.
+
+The shipped `aswitch` result therefore keeps Full-history archive visibly
+`experimental`, with availability `Unknown` and stage `ModeUnavailable`.
+Selecting it produces no preview, handoff, archive, process launch, or
+repository/plugin-data mutation. Extra archive-like request fields fail the
+exact request schema and their contents are not reflected in output.
+
+Any future qualifying archive must be a separate untrusted attachment. It
+requires a separate source-specific risk acknowledgement and must never be
+merged into the compacted handoff, injected into the fixed bootstrap
+instruction, placed in process arguments, or treated as imperative
+instructions. A checksum would establish integrity only, not authorship or
+trust.
+
+### Independent host result
+
+| Source host | Documented design input | Run C source | Result |
+| --- | --- | --- | --- |
+| Codex CLI | App-server history read API | No supplied or produced archive | `Unknown` / unavailable |
+| Claude Code | Interactive `/export [filename]` | No supplied or produced export | `Unknown` / unavailable |
+
+Documentation does not prove installed runtime behavior, and one host's
+contract is no evidence for the other.
+
+### Correction loop and validation evidence
+
+Principal review rejected using documentation as the missing archive, parsing
+known transcript storage, treating top-level help non-observation as absence,
+or exporting a session without the separate risk acknowledgement. The result
+adds no parser, transcript reader, archive writer, host-state path, bootstrap
+injection, or public capability claim.
+
+- Focused full-history, scope, public-skill, plugin, and aswitch tests:
+  43 tests, 42 passed, 1 PowerShell availability check skipped, 0 failed.
+- Strict checked JavaScript passed with zero diagnostics. The canonical
+  generator synchronized 112 artifacts and the subsequent check passed.
+- Full `npm run validate`: 208 tests, 206 passed, 2 platform proofs skipped,
+  0 failed.
+- Both manifest validators, package allowlisting, JavaScript syntax, JSON
+  parsing, and `git diff --check` passed.
+- Focused runtime coverage proves that a full-history request fails safely as
+  `ModeUnavailable`. The exact installed artifact retains the manual handoff
+  and contains no terminal-launch or full-history runtime module. It contains
+  131 allowlisted files; conformance passed 38 of 38 checks with SHA-256
+  `6d719fb08ce6204310024dbcabb9341dd5738051f69bf4711bdc939484aab980`.
+
+No P0 or P1 remains for slice 13. Full-history stays experimental and
+unavailable until a later, separately authorized run receives a qualifying
+source and risk acknowledgement. Run C stops here before slice 14.

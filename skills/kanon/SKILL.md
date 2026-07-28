@@ -54,7 +54,9 @@ report; it does not execute a plan step, manage agents, persist a second
 project memory, or claim completion. Aswitch requires a preview-bound caller
 assertion of explicit approval before writing one bounded external handoff. It
 never launches a process; receiving validation keeps known mismatches Stale
-and unavailable comparisons Unknown.
+and unavailable comparisons Unknown. Full-history remains experimental and
+unavailable: no transcript reader ships, and a later qualifying archive must
+stay a separate untrusted attachment with its own risk acknowledgement.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove
