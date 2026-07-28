@@ -272,3 +272,30 @@ test("Run C slice 11 exposes consented handoff without launch or ownership", () 
     /aswitch[^.\n]*(?:automatically launches|claims repository ownership|grants execution authority)/i
   );
 });
+
+test("Run C slice 12 defers every unproven beta launch tuple", () => {
+  assert.match(scope, /Run C slice 12 proof-gate status/);
+  assert.match(runC, /Slice 12 — beta terminal-launch proof gate/);
+  for (const text of [scope, runC]) {
+    assert.match(text, /No beta terminal-launch adapter ships/);
+    assert.match(text, /Codex CLI\s+`0\.145\.0`/);
+    assert.match(text, /Claude Code\s+`2\.1\.219`/);
+    assert.match(text, /Apple[_ ]Terminal/);
+    assert.match(
+      text,
+      /version (?:call|response)[^.]*does\s+not\s+prove/i
+    );
+    assert.match(
+      text,
+      /No\s+live\s+launch\s+was\s+(?:separately\s+)?authorized/i
+    );
+    assert.match(text, /manual fallback/);
+    assert.doesNotMatch(
+      text,
+      /TERM_PROGRAM[^.\n]*(?:proves?|establishes?) (?:a )?(?:safe )?(?:launch|automation)/i
+    );
+  }
+  assert.match(runC, /Codex CLI \| Claude Code[\s\S]*`Unknown` — deferred/);
+  assert.match(runC, /Claude Code \| Codex CLI[\s\S]*`Unknown` — deferred/);
+  assert.match(runC, /No P0 or P1 remains for slice 12/);
+});

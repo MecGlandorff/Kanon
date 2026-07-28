@@ -2,9 +2,10 @@
 
 **Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
 receipt-only amendments, additive Run B recovery status through product
-slice 8, and accepted Run C implementation status through slice 11. This file
-is not a release claim. Run C may implement slices 12 and 13; this record does
-not claim that those slices are complete.
+slice 8, and accepted Run C status through slice 12. Slice 12 is an honest
+beta-adapter deferral, not an implementation claim. This file is not a release
+claim. Run C may complete slice 13; this record does not claim that slice is
+complete.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
 including its explicitly authorized 2026-07-28 amendment. This companion
@@ -197,6 +198,26 @@ path, never raw handoff content. The transfer deletes no source history, stops
 no source agent, claims no repository ownership, and grants no authorization
 or enforcement.
 
+### Run C slice 12 proof-gate status
+
+No beta terminal-launch adapter ships. A 2026-07-28 bounded read-only
+diagnostic directly observed macOS arm64, an `Apple_Terminal` parent-process
+label, trusted absolute repository-external resolution of Codex CLI `0.145.0`
+and Claude Code `2.1.219`, and successful no-model `--version` calls. Temporary
+scratch state was removed.
+
+Those facts do not establish an automatic-launch capability. The terminal
+label is not a proven automation API, executable discovery is not a terminal
+argument boundary, and a version call does not prove target startup, approval
+presentation, or handoff acceptance. No live launch was separately authorized.
+The first source-to-target tuple and beta opt-in policy also remain undecided.
+
+Codex-to-Claude and Claude-to-Codex on the observed macOS/Apple Terminal
+surface therefore remain independently `Unknown` and deferred. Every other
+operating system and terminal surface remains `Unknown`. The stable manual
+fallback is unchanged, and the artifact contains no terminal-launch module,
+manifest claim, automatic process path, ownership, or supervision behavior.
+
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
@@ -232,7 +253,7 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status through Run C slice 11
+## Evidence status through Run C slice 12
 
 ### Known
 
@@ -261,6 +282,8 @@ fail safely to the manual handoff.
 - Slice 11 exposes one bounded consent-driven handoff state machine through
   equivalent Codex and Claude adapters. It implements no automatic launch,
   ownership, supervision, or raw-history access.
+- Slice 12 ships no beta launch adapter. Installed-artifact conformance proves
+  the launch surface is absent while the stable manual fallback remains.
 
 ### Likely
 
@@ -281,6 +304,9 @@ fail safely to the manual handoff.
   design.
 - Windows ACL privacy equivalence for a user-selected handoff destination is
   unavailable to the portable runtime and remains `Unknown`.
+- Both launch directions on the observed macOS/Apple Terminal parent surface,
+  and all other operating-system/terminal tuples, remain `Unknown` because no
+  safe terminal automation and argument contract received direct proof.
 
 ### Stale / suspicious
 
@@ -295,10 +321,12 @@ fail safely to the manual handoff.
   by slice 9's bounded, conditional plugin-data persistence.
 - Statements above or in the Run B record that `steer` or `aswitch` are absent
   are superseded by Run C slices 10 and 11.
+- Any inference that installed CLIs or `TERM_PROGRAM` prove a beta launch
+  adapter is suspicious and rejected.
 
 ### Suggested
 
 - Keep automatic lifecycle notice, hard Guard, and any enforcing or
   hook-driven receipt lifecycle outside public v1 until separately proven and
   authorized.
-- Continue Run C only through slices 12 and 13 and hard-stop before slice 14.
+- Complete Run C only through slice 13 and hard-stop before slice 14.

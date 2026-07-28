@@ -1,8 +1,9 @@
 # Kanon v1 Run C implementation record
 
 **Status:** Run C is in progress on `release/v.1.0.0`. Product slices 9 through
-11 are accepted; slices 12 and 13 remain unimplemented in this record. This is
-not a release claim and does not authorize slice 14.
+12 are accepted; slice 13 remains unimplemented in this record. Slice 12 is an
+honest beta-adapter deferral, not an implementation claim. This is not a
+release claim and does not authorize slice 14.
 
 The authoritative contract is [`V_1design.md`](../V_1design.md), including
 the user-authorized 2026-07-28 receipt-only amendment. Historical Guard
@@ -260,3 +261,61 @@ approval-mismatched destinations fail closed without a repository write.
 Same-user replacement between destination validation and atomic rename remains
 a residual race where portable descriptor-relative traversal is unavailable.
 The checksum detects change, not authorship. No P0 or P1 remains for slice 11.
+
+## Slice 12 — beta terminal-launch proof gate
+
+### Accepted result: deferred
+
+No beta terminal-launch adapter ships. The stable `aswitch` manual fallback
+remains available and does not depend on terminal automation.
+
+A bounded read-only diagnostic on 2026-07-28 reused the hardened Guard-spike
+executable resolver and minimum environment. It directly observed:
+
+- `darwin` on `arm64`;
+- the sanitized parent-process label `TERM_PROGRAM=Apple_Terminal`;
+- trusted absolute executable resolution outside the repository for Codex CLI
+  `0.145.0` and Claude Code `2.1.219`; and
+- successful bounded `--version` calls with no model turn.
+
+The temporary diagnostic scratch directory was removed. It created no
+repository state, did not inspect host session internals, and performed no
+terminal launch.
+
+These observations do not prove a launch adapter. A parent-process terminal
+label is not a documented automation surface, a resolved host executable does
+not prove a safe terminal argument boundary, and a version response does not
+prove destination startup, approval presentation, or handoff acceptance. No
+live launch was separately authorized for this slice, and the frozen design's
+source-to-target priority and beta opt-in decisions remain `Unknown`.
+
+| Source | Target | Platform hint | Result |
+| --- | --- | --- | --- |
+| Codex CLI | Claude Code | macOS arm64 / Apple Terminal parent label | `Unknown` — deferred |
+| Claude Code | Codex CLI | macOS arm64 / Apple Terminal parent label | `Unknown` — deferred |
+
+Every other operating system and terminal surface remains independently
+`Unknown`. No result transfers between directions, hosts, systems, or terminal
+surfaces.
+
+### Correction loop and validation evidence
+
+Principal review rejected three wishful inferences: installed binaries are not
+launch proof, `TERM_PROGRAM` is not an executable/argument contract, and a
+manual handoff approval is not approval to start an external process. Adding
+an unproven adapter would have expanded the attack surface and public claim
+without direct runtime evidence, so the production artifact, manifests, and
+capability metadata remain unchanged.
+
+- Focused scope and no-adapter contract tests passed.
+- Strict checked JavaScript and generated synchronization remained unchanged
+  and passed.
+- The full validation, both manifest validators, package allowlist,
+  installed-artifact conformance, syntax and JSON checks, and
+  `git diff --check` passed.
+- Installed-artifact conformance continues to prove that terminal-launch
+  surfaces are absent and the manual `aswitch` wrapper remains functional.
+
+No P0 or P1 remains for slice 12. A beta adapter requires a separately selected
+source/target/OS/terminal tuple, a directly testable safe launch contract, and
+fresh explicit approval before any live launch.
