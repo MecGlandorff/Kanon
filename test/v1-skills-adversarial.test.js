@@ -5,6 +5,9 @@ import test from "node:test";
 import { invokeClaudeSkill } from "../src/v1/adapters/claude.js";
 import { invokeCodexSkill } from "../src/v1/adapters/codex.js";
 import {
+  normalizeAdapterInvocationContext
+} from "../src/v1/adapters/shared.js";
+import {
   isContextReceipt
 } from "../src/v1/core/receipt.js";
 import {
@@ -841,6 +844,160 @@ test("malformed roots and adapter values fail closed after deprecation lookup", 
   assert.equal(hostileTime.report.ok, true);
 });
 
+test("getter-bearing, proxy-like, cyclic, deep, and unexpected adapter inputs fail closed", async () => {
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  let getterCalls = 0;
+  const getterBearing = {};
+  Object.defineProperty(getterBearing, "schema", {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error("getter must not run");
+    }
+  });
+  let proxyTrapCalls = 0;
+  const proxyLike = new Proxy(
+    invocation("status", root),
+    {
+      getPrototypeOf() {
+        proxyTrapCalls += 1;
+        throw new Error("proxy trap must not run");
+      }
+    }
+  );
+  const cyclic = invocation("status", root);
+  cyclic.unexpected = cyclic;
+  let deep = "leaf";
+  for (let index = 0; index < 2_048; index += 1) {
+    deep = { nested: deep };
+  }
+  const deeplyNested = invocation("status", root, {
+    unexpected: deep
+  });
+
+  for (const value of [
+    getterBearing,
+    proxyLike,
+    cyclic,
+    deeplyNested,
+    Object.create(null)
+  ]) {
+    const result = await invokeCodexSkill(value, stableContext());
+    assert.equal(result.ok, false);
+    assert.equal(result.status, "Unknown");
+    assert.equal(result.report.enforcement, false);
+  }
+  assert.equal(getterCalls, 0);
+  assert.equal(proxyTrapCalls, 0);
+
+  assert.deepEqual(
+    normalizeAdapterInvocationContext(getterBearing),
+    {}
+  );
+  assert.deepEqual(
+    normalizeAdapterInvocationContext(proxyLike),
+    {}
+  );
+  assert.equal(getterCalls, 0);
+  assert.equal(proxyTrapCalls, 0);
+});
+
+test("all six stable read or preview workflows preserve repository and Git index bytes and mtimes", async (t) => {
+  const root = makeFixture({
+    "README.md": "# Read-only fixture\n",
+    "package.json": JSON.stringify({
+      name: "read-only-fixture",
+      scripts: {
+        attack:
+          "node -e \"require('node:fs').writeFileSync('EXECUTED','bad')\""
+      }
+    })
+  });
+  const initialized = initializeGit(root);
+  if (initialized.status !== 0) {
+    t.skip("Git is unavailable for the stable read-only workflow proof.");
+    return;
+  }
+  const marker = path.join(root, "EXECUTED");
+  const index = path.join(root, ".git", "index");
+  const before = snapshotFileIdentities(root);
+  const beforeIndex = fileIdentity(index);
+  const context = stableContext();
+  delete context.git_runner;
+  const task = "prove stable read workflows are non-mutating";
+  const oriented = await invokeCodexSkill(
+    invocation("orient", root, { task }),
+    context
+  );
+  const invocations = [
+    () => invokeClaudeSkill(
+      invocation("resume", root, { task }),
+      context
+    ),
+    () => invokeCodexSkill(
+      invocation("verify", root, {
+        task,
+        target: "README.md",
+        receipt: oriented.report.receipt
+      }),
+      context
+    ),
+    () => invokeClaudeSkill(
+      invocation("status", root, {
+        receipt: oriented.report.receipt
+      }),
+      context
+    ),
+    () => invokeCodexSkill(
+      invocation("steer", root, {
+        steer_state: {
+          schema: "kanon-steer-request-v1",
+          phase: "understand",
+          desired_outcome: "Preserve repository state.",
+          completion_criteria: ["The read-only proof passes."],
+          constraints: ["Do not execute repository code."],
+          user_decisions: [],
+          evidence_references: ["README.md"],
+          unknowns: [],
+          next_slice: {
+            objective: "Inspect one bounded read-only slice.",
+            boundaries: ["No repository writes"]
+          },
+          required_verification: ["Compare bytes and mtimes."],
+          stop_or_redirect_reasons: []
+        }
+      }),
+      context
+    ),
+    () => invokeClaudeSkill(
+      invocation("aswitch", root, {
+        aswitch_request: {
+          schema: "kanon-aswitch-request-v1",
+          operation: "preview",
+          target_host: null,
+          payload_mode: null,
+          destination_root: null,
+          last_plan: null,
+          compacted: null,
+          approval: null
+        }
+      }),
+      context
+    )
+  ];
+  assert.equal(oriented.report.repository_read_only, true);
+  assert.equal(oriented.report.read_only, true);
+  assert.deepEqual(snapshotFileIdentities(root), before);
+  assert.deepEqual(fileIdentity(index), beforeIndex);
+  for (const invoke of invocations) {
+    const result = await invoke();
+    assert.equal(result.report.read_only, true);
+    assert.deepEqual(snapshotFileIdentities(root), before);
+    assert.deepEqual(fileIdentity(index), beforeIndex);
+  }
+  assert.equal(fs.existsSync(marker), false);
+});
+
 test("status preserves installed facts when repository root evidence is invalid", async () => {
   const result = await invokeCodexSkill(
     invocation("status", "bad\0root"),
@@ -930,4 +1087,32 @@ function gitSuccess(stdout) {
     timeout: false,
     overflow: false
   };
+}
+
+/**
+ * @param {string} root
+ * @returns {Record<string, ReturnType<typeof fileIdentity>>}
+ */
+function snapshotFileIdentities(root) {
+  /** @type {Record<string, ReturnType<typeof fileIdentity>>} */
+  const output = {};
+  visit(root, "");
+  return output;
+
+  /**
+   * @param {string} directory
+   * @param {string} prefix
+   * @returns {void}
+   */
+  function visit(directory, prefix) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolute, relative);
+      } else if (entry.isFile()) {
+        output[relative] = fileIdentity(absolute);
+      }
+    }
+  }
 }

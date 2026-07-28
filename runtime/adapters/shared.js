@@ -1,3 +1,5 @@
+import { isPlainRecord } from "../core/trust.js";
+
 /**
  * @typedef {{
  *   host_session?: unknown,
@@ -16,12 +18,7 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  * @returns {value is Record<string, unknown>}
  */
 export function isRecord(value) {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  return isPlainRecord(value);
 }
 
 /**
@@ -95,9 +92,3 @@ function isRegistryTransport(value) {
 function isGitRunner(value) {
   return typeof value === "function";
 }
-
-/**
- * @param {unknown} value
- * @param {number} maximum
- * @returns {value is string}
- */

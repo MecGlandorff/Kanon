@@ -303,6 +303,16 @@ test("package builder uses an exact production allowlist", () => {
     ),
     false
   );
+  for (const forbidden of [
+    "package-lock.json",
+    "tsconfig.json"
+  ]) {
+    assert.equal(actual.includes(forbidden), false);
+  }
+  assert.equal(
+    actual.some((file) => /(?:launcher|transcript-reader)/i.test(file)),
+    false
+  );
   for (const disposableHook of [
     "spikes/guard-feasibility/codex-cli/marketplace/plugins/kanon-guard-spike-codex/hooks/hooks.json",
     "spikes/guard-feasibility/claude-code/plugin/hooks/hooks.json"
@@ -330,6 +340,99 @@ test("package builder uses an exact production allowlist", () => {
     shippedText,
     /(?:^|["'`/])\.kanon\/(?:RECEIPT|receipt)/m
   );
+  const packagedReadme = fs.readFileSync(
+    path.join(output, "README.md"),
+    "utf8"
+  );
+  assert.match(
+    packagedReadme,
+    /orient.*resume.*verify.*status.*steer.*aswitch/s
+  );
+  assert.match(packagedReadme, /no\s+production lifecycle hook/i);
+  assert.match(packagedReadme, /no automatic lifecycle notice/i);
+  assert.match(
+    packagedReadme,
+    /Native Codex and Claude plugin-data wiring is unproven[\s\S]*Unknown/
+  );
+  assert.match(packagedReadme, /never launches a host/);
+  assert.doesNotMatch(packagedReadme, /shared `skills\/` and `hooks\/`/);
+  assert.doesNotMatch(packagedReadme, /four read skills/);
+  const runtimeText = actual
+    .filter((file) =>
+      /^(?:runtime\/.*\.js|\.codex-plugin\/.*\.json|\.claude-plugin\/.*\.json)$/.test(
+        file
+      )
+    )
+    .map((file) => fs.readFileSync(path.join(output, file), "utf8"))
+    .join("\n");
+  assert.doesNotMatch(
+    runtimeText,
+    /CODEX_HOME|CLAUDE_CONFIG_DIR|history\.jsonl|(?:^|[\\/])\.codex[\\/]sessions|(?:^|[\\/])\.claude[\\/]projects/m
+  );
+});
+
+test("declared CI proof covers validation and installed conformance on all supported operating systems", () => {
+  const workflow = fs.readFileSync(
+    path.join(repoRoot, ".github", "workflows", "ci.yml"),
+    "utf8"
+  );
+  for (const operatingSystem of [
+    "ubuntu-latest",
+    "windows-latest",
+    "macos-latest"
+  ]) {
+    assert.match(workflow, new RegExp(`- ${operatingSystem}`));
+  }
+  assert.match(
+    workflow,
+    /Run mandatory validation matrix[\s\S]*npm run validate/
+  );
+  assert.match(
+    workflow,
+    /Exercise Ubuntu artifact[\s\S]*ci-artifact\.js conform/
+  );
+  assert.match(
+    workflow,
+    /cross-platform-conformance:[\s\S]*windows-latest[\s\S]*macos-latest[\s\S]*ci-artifact\.js conform/
+  );
+});
+
+test("Run D.1 records every stable invariant without transferring platform or host evidence", () => {
+  const record = fs.readFileSync(
+    path.join(repoRoot, "docs", "v1-run-d1.md"),
+    "utf8"
+  );
+  for (const surface of [
+    "orient",
+    "resume",
+    "verify",
+    "status",
+    "steer",
+    "aswitch",
+    "compatibility routes",
+    "deprecation checking",
+    "receipt persistence",
+    "plugin-data storage",
+    "handoff storage",
+    "Git observation",
+    "generated wrappers",
+    "installed artifact"
+  ]) {
+    assert.match(
+      record,
+      new RegExp(`\\| ${surface.replace("-", "\\-")} \\|`, "i")
+    );
+  }
+  assert.match(
+    record,
+    /Synthetic adapter context is test evidence\s+only/
+  );
+  assert.match(record, /Native Windows and Ubuntu results remain Unknown/);
+  assert.match(
+    record,
+    /Guard, automatic lifecycle notice, terminal launch adapters,\s+and full-history transfer remain outside/
+  );
+  assert.match(record, /Hard-stop before slice 16|does not authorize slice 16/i);
 });
 
 test("embedded metadata validator rejects extra, malformed, and hostile fields", () => {

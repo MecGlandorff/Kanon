@@ -1,3 +1,5 @@
+import { types } from "node:util";
+
 const UNSAFE_CONTROLS =
   /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
 const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
@@ -14,12 +16,22 @@ const ANSI_SEQUENCE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
  * @returns {value is Record<string, unknown>}
  */
 export function isPlainRecord(value) {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  try {
+    if (
+      !value ||
+      typeof value !== "object" ||
+      Array.isArray(value) ||
+      types.isProxy(value) ||
+      Object.getPrototypeOf(value) !== Object.prototype
+    ) {
+      return false;
+    }
+    return Object.values(
+      Object.getOwnPropertyDescriptors(value)
+    ).every((descriptor) => "value" in descriptor);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -28,12 +40,16 @@ export function isPlainRecord(value) {
  * @returns {boolean}
  */
 export function hasExactKeys(value, keys) {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index])
-  );
+  try {
+    const actual = Object.keys(value).sort();
+    const expected = [...keys].sort();
+    return (
+      actual.length === expected.length &&
+      actual.every((key, index) => key === expected[index])
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**

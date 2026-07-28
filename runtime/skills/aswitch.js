@@ -167,7 +167,8 @@ export function runAswitch(input, context) {
     plan.plan,
     plan.content_sha256,
     destination.root,
-    destination.path
+    destination.path,
+    destination.identity_sha256
   );
   if (selected.operation === "preview") {
     return {

@@ -148,6 +148,7 @@ const MODES = Object.freeze([
  *     status: "Known",
  *     root: string,
  *     path: string,
+ *     identity_sha256: string,
  *     provenance: "caller-selected-canonical-external-root",
  *     trust: "caller-untrusted",
  *     privacy: {
@@ -550,16 +551,19 @@ export function buildHandoffPlan(input) {
  * @param {string} contentSha256
  * @param {string} destinationRoot
  * @param {string} destinationPath
+ * @param {string} destinationIdentitySha256
  * @returns {HandoffPreview}
  */
 export function buildHandoffPreview(
   plan,
   contentSha256,
   destinationRoot,
-  destinationPath
+  destinationPath,
+  destinationIdentitySha256
 ) {
   const bound = {
     content_sha256: contentSha256,
+    destination_identity_sha256: destinationIdentitySha256,
     destination_path: destinationPath,
     plan
   };
@@ -571,6 +575,7 @@ export function buildHandoffPreview(
       status: "Known",
       root: destinationRoot,
       path: destinationPath,
+      identity_sha256: destinationIdentitySha256,
       provenance: "caller-selected-canonical-external-root",
       trust: "caller-untrusted",
       privacy: {
@@ -916,6 +921,7 @@ function isHandoffPreview(value) {
     isHandoffPlan(value.plan) &&
     isPlainRecord(value.destination) &&
     hasExactKeys(value.destination, [
+      "identity_sha256",
       "path",
       "privacy",
       "provenance",
@@ -924,6 +930,8 @@ function isHandoffPreview(value) {
       "trust"
     ]) &&
     value.destination.status === "Known" &&
+    typeof value.destination.identity_sha256 === "string" &&
+    SHA256.test(value.destination.identity_sha256) &&
     safePathText(value.destination.root) &&
     safePathText(value.destination.path) &&
     value.destination.provenance ===
@@ -948,6 +956,8 @@ function isHandoffPreview(value) {
   ) {
     const bound = {
       content_sha256: value.content_sha256,
+      destination_identity_sha256:
+        value.destination.identity_sha256,
       destination_path: value.destination.path,
       plan: value.plan
     };

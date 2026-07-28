@@ -84,8 +84,8 @@ jobs:
       - name: Verify generated skill
         run: npm run check:skill
 
-      - name: Run mandatory matrix
-        run: npm test
+      - name: Run mandatory validation matrix
+        run: npm run validate
 
       - name: Check whitespace
         run: git diff --check

@@ -235,6 +235,42 @@ function inspectPackage(root, input) {
       ),
       "unimplemented terminal-launch and full-history surfaces are absent"
     ));
+    checks.push(result(
+      !all.some((file) =>
+        /^(?:docs|eval|spikes|src|test|node_modules)\//.test(file) ||
+        /(?:^|\/)(?:tsconfig\.json|package-lock\.json)$/.test(file) ||
+        /(?:launcher|transcript-reader)/i.test(file)
+      ),
+      "development tools, Guard spikes, launchers, and transcript readers are absent"
+    ));
+    const runtimeSurface = all
+      .filter((file) =>
+        /^(?:runtime\/.*\.js|\.codex-plugin\/.*\.json|\.claude-plugin\/.*\.json)$/.test(
+          file
+        )
+      )
+      .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+      .join("\n");
+    checks.push(result(
+      !/CODEX_HOME|CLAUDE_CONFIG_DIR|history\.jsonl|(?:^|[\\/])\.codex[\\/]sessions|(?:^|[\\/])\.claude[\\/]projects/m.test(
+        runtimeSurface
+      ),
+      "runtime contains no undocumented Codex or Claude state access"
+    ));
+    const readme = fs.readFileSync(
+      path.join(root, "README.md"),
+      "utf8"
+    );
+    checks.push(result(
+      /orient.*resume.*verify.*status.*steer.*aswitch/s.test(readme) &&
+      /no\s+production lifecycle hook/i.test(readme) &&
+      /no automatic lifecycle notice/i.test(readme) &&
+      /Native Codex and Claude plugin-data wiring is unproven[\s\S]*Unknown/.test(
+        readme
+      ) &&
+      /never launches a host/.test(readme),
+      "installed README matches the six-skill explicit-only capability contract"
+    ));
   } catch (error) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
   }

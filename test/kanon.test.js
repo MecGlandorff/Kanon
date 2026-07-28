@@ -22,6 +22,8 @@ import {
 import { runCli } from "../src/cli.js";
 import {
   captureCli,
+  fileIdentity,
+  initializeGit,
   makeFixture,
   readJson,
   writeFixtureFile
@@ -459,6 +461,39 @@ test("PowerShell wrapper canonicalizes a symlinked cwd before Node lookup", (t) 
   assert.equal(fs.existsSync(marker), false);
 });
 
+test("every compatibility read workflow preserves repository and Git index bytes and mtimes", async (t) => {
+  const root = makeFixture({
+    "README.md": "# Compatibility read fixture\n",
+    "package.json": JSON.stringify({
+      name: "compatibility-read-fixture",
+      scripts: {
+        attack:
+          "node -e \"require('node:fs').writeFileSync('EXECUTED','bad')\""
+      }
+    })
+  });
+  const initialized = initializeGit(root);
+  if (initialized.status !== 0) {
+    t.skip("Git is unavailable for the compatibility read-only proof.");
+    return;
+  }
+  const marker = path.join(root, "EXECUTED");
+  const index = path.join(root, ".git", "index");
+  const before = snapshotFileIdentities(root);
+  const beforeIndex = fileIdentity(index);
+  for (const argv of [
+    ["brief", "--json", "--root", root],
+    ["ask", "what does this repository do?", "--json", "--root", root],
+    ["resume", "--json", "--root", root],
+    ["verify", "README.md", "--json", "--root", root]
+  ]) {
+    await captureCli(runCli, argv);
+    assert.deepEqual(snapshotFileIdentities(root), before);
+    assert.deepEqual(fileIdentity(index), beforeIndex);
+  }
+  assert.equal(fs.existsSync(marker), false);
+});
+
 test("generated skill artifact is synchronized and self-contained", () => {
   const result = spawnSync(
     process.execPath,
@@ -531,3 +566,21 @@ test("rendered public outputs identify repository content as data", () => {
     assert.doesNotMatch(output, /\u001b|\u202e/);
   }
 });
+
+function snapshotFileIdentities(root) {
+  const output = {};
+  visit(root, "");
+  return output;
+
+  function visit(directory, prefix) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolute, relative);
+      } else if (entry.isFile()) {
+        output[relative] = fileIdentity(absolute);
+      }
+    }
+  }
+}

@@ -174,6 +174,14 @@ test("last-plan preview gates one external write and returns only a manual fallb
     written.report.manual_launch.raw_handoff_content_in_arguments,
     false
   );
+  assert.deepEqual(written.report.manual_launch.arguments, [
+    {
+      value:
+        `Use Kanon's fixed aswitch receiving bootstrap for this handoff path: ${written.report.write.path}`,
+      provenance: "kanon-fixed-bootstrap-plus-safe-handoff-path",
+      trust: "kanon-generated"
+    }
+  ]);
   assert.equal(written.report.write.source_history_deleted, false);
   assert.equal(written.report.write.source_agent_stopped, false);
   assert.equal(written.report.write.repository_ownership_claimed, false);
@@ -189,6 +197,79 @@ test("last-plan preview gates one external write and returns only a manual fallb
     false
   );
   assert.deepEqual(snapshotTree(root), before);
+});
+
+test("approval is rebound after root, Git, payload, destination, or change-set changes", async () => {
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  const otherRoot = makeFixture({ "README.md": "# Other fixture\n" });
+  const destination = privateDirectory("kanon-aswitch-rebind-");
+  const otherDestination = privateDirectory(
+    "kanon-aswitch-rebind-other-"
+  );
+  const previewRequest = request({
+    target_host: "claude-code",
+    payload_mode: "last-plan",
+    destination_root: destination,
+    last_plan: steerRequest()
+  });
+  const preview = await invokeCodexSkill(
+    invocation(root, previewRequest),
+    context(fixedGitRunner())
+  );
+  const oldApproval = approval(
+    preview.report.preview.preview_sha256
+  );
+  const changedPayload = {
+    ...steerRequest(),
+    desired_outcome: "A different bounded outcome"
+  };
+  const attempts = [
+    {
+      root: otherRoot,
+      request: previewRequest,
+      runner: fixedGitRunner()
+    },
+    {
+      root,
+      request: previewRequest,
+      runner: fixedGitRunner({ head: "c".repeat(40) })
+    },
+    {
+      root,
+      request: {
+        ...previewRequest,
+        last_plan: changedPayload
+      },
+      runner: fixedGitRunner()
+    },
+    {
+      root,
+      request: {
+        ...previewRequest,
+        destination_root: otherDestination
+      },
+      runner: fixedGitRunner()
+    },
+    {
+      root,
+      request: previewRequest,
+      runner: fixedGitRunner({ status: " M src/changed.js\0" })
+    }
+  ];
+  for (const attempt of attempts) {
+    const result = await invokeCodexSkill(
+      invocation(attempt.root, {
+        ...attempt.request,
+        operation: "write",
+        approval: oldApproval
+      }),
+      context(attempt.runner)
+    );
+    assert.equal(result.ok, false);
+    assert.equal(result.report.stage, "ApprovalUnavailable");
+  }
+  assert.equal(fs.readdirSync(destination).length, 0);
+  assert.equal(fs.readdirSync(otherDestination).length, 0);
 });
 
 test("receiving validation distinguishes Current, Stale, and Unknown", async () => {
@@ -245,6 +326,19 @@ test("receiving validation distinguishes Current, Stale, and Unknown", async () 
   assert.equal(checksumStale.report.classification, "Stale");
   fs.writeFileSync(handoffPath, original);
 
+  const wrongFilename = path.join(
+    destination,
+    `kanon-agent-handoff-${"0".repeat(64)}.json`
+  );
+  fs.writeFileSync(wrongFilename, original, { mode: 0o600 });
+  const filenameStale = await invokeClaudeSkill(
+    invocation(root, receiveRequest(wrongFilename)),
+    context(git)
+  );
+  assert.equal(filenameStale.ok, false);
+  assert.equal(filenameStale.report.classification, "Stale");
+  assert.match(filenameStale.report.diagnostic, /filename/);
+
   const otherRoot = makeFixture({ "README.md": "# Other\n" });
   const rootStale = await invokeClaudeSkill(
     invocation(otherRoot, receiveRequest(handoffPath)),
@@ -275,6 +369,25 @@ test("receiving validation distinguishes Current, Stale, and Unknown", async () 
   assert.equal(unknown.report.classification, "Unknown");
   assert.equal(unknown.report.comparisons.recorded_commit, "Unknown");
   assert.equal(unknown.report.comparisons.change_set, "Unknown");
+
+  const truncatedStatus = Array.from(
+    { length: 65 },
+    (_unused, index) =>
+      ` M src/file-${String(index).padStart(2, "0")}.js\0`
+  ).join("");
+  const truncated = await invokeClaudeSkill(
+    invocation(root, receiveRequest(handoffPath)),
+    context(fixedGitRunner({ status: truncatedStatus }))
+  );
+  assert.equal(truncated.report.classification, "Unknown");
+  assert.equal(truncated.report.comparisons.change_set, "Unknown");
+
+  const sensitive = await invokeClaudeSkill(
+    invocation(root, receiveRequest(handoffPath)),
+    context(fixedGitRunner({ status: "?? .env\0" }))
+  );
+  assert.equal(sensitive.report.classification, "Unknown");
+  assert.equal(sensitive.report.comparisons.change_set, "Unknown");
 
   const wrongHost = await invokeCodexSkill(
     invocation(root, receiveRequest(handoffPath)),
@@ -356,7 +469,7 @@ test("compacted handoff keeps claims untrusted and live changed files separate",
   assert.equal(nested.report.payload_options[0].availability, "Unknown");
 });
 
-test("handoff writes reject repository overlap and linked destinations", async (t) => {
+test("handoff writes reject repository overlap, links, replacement, and exhausted budgets", async (t) => {
   const root = makeFixture({ "README.md": "# Fixture\n" });
   const overlap = await invokeCodexSkill(
     invocation(root, request({
@@ -385,24 +498,76 @@ test("handoff writes reject repository overlap and linked destinations", async (
 
   if (!canSymlink()) {
     t.diagnostic("Symbolic links are unavailable; linked cases skipped.");
-    return;
-  }
-  const parent = privateDirectory("kanon-aswitch-link-parent-");
-  const real = privateDirectory("kanon-aswitch-link-real-");
-  const linkedRoot = path.join(parent, "linked");
-  fs.symlinkSync(real, linkedRoot, "dir");
-  const linked = await invokeCodexSkill(
-    invocation(root, request({
+  } else {
+    const parent = privateDirectory("kanon-aswitch-link-parent-");
+    const real = privateDirectory("kanon-aswitch-link-real-");
+    const linkedRoot = path.join(parent, "linked");
+    fs.symlinkSync(real, linkedRoot, "dir");
+    const linked = await invokeCodexSkill(
+      invocation(root, request({
+        target_host: "claude-code",
+        payload_mode: "last-plan",
+        destination_root: linkedRoot,
+        last_plan: steerRequest()
+      })),
+      context(fixedGitRunner())
+    );
+    assert.equal(linked.ok, false);
+
+    const ancestorParent = privateDirectory(
+      "kanon-aswitch-ancestor-parent-"
+    );
+    const ancestorReal = privateDirectory(
+      "kanon-aswitch-ancestor-real-"
+    );
+    const ancestorLink = path.join(ancestorParent, "linked");
+    fs.symlinkSync(ancestorReal, ancestorLink, "dir");
+    fs.mkdirSync(path.join(ancestorReal, "child"), { mode: 0o700 });
+    const ancestorLinked = await invokeCodexSkill(
+      invocation(root, request({
+        target_host: "claude-code",
+        payload_mode: "last-plan",
+        destination_root: path.join(ancestorLink, "child"),
+        last_plan: steerRequest()
+      })),
+      context(fixedGitRunner())
+    );
+    assert.equal(ancestorLinked.ok, false);
+
+    const destination = privateDirectory("kanon-aswitch-link-file-");
+    const previewRequest = request({
       target_host: "claude-code",
       payload_mode: "last-plan",
-      destination_root: linkedRoot,
+      destination_root: destination,
       last_plan: steerRequest()
-    })),
-    context(fixedGitRunner())
-  );
-  assert.equal(linked.ok, false);
+    });
+    const preview = await invokeCodexSkill(
+      invocation(root, previewRequest),
+      context(fixedGitRunner())
+    );
+    const outside = path.join(
+      privateDirectory("kanon-aswitch-outside-"),
+      "outside.json"
+    );
+    fs.writeFileSync(outside, "untouched\n");
+    fs.symlinkSync(
+      outside,
+      preview.report.preview.destination.path,
+      "file"
+    );
+    const write = await invokeCodexSkill(
+      invocation(root, {
+        ...previewRequest,
+        operation: "write",
+        approval: approval(preview.report.preview.preview_sha256)
+      }),
+      context(fixedGitRunner())
+    );
+    assert.equal(write.ok, false);
+    assert.equal(fs.readFileSync(outside, "utf8"), "untouched\n");
+  }
 
-  const destination = privateDirectory("kanon-aswitch-link-file-");
+  const destination = privateDirectory("kanon-aswitch-hard-link-");
   const previewRequest = request({
     target_host: "claude-code",
     payload_mode: "last-plan",
@@ -414,12 +579,12 @@ test("handoff writes reject repository overlap and linked destinations", async (
     context(fixedGitRunner())
   );
   const outside = path.join(
-    privateDirectory("kanon-aswitch-outside-"),
+    privateDirectory("kanon-aswitch-hard-link-outside-"),
     "outside.json"
   );
   fs.writeFileSync(outside, "untouched\n");
-  fs.symlinkSync(outside, preview.report.preview.destination.path, "file");
-  const write = await invokeCodexSkill(
+  fs.linkSync(outside, preview.report.preview.destination.path);
+  const hardLinked = await invokeCodexSkill(
     invocation(root, {
       ...previewRequest,
       operation: "write",
@@ -427,8 +592,37 @@ test("handoff writes reject repository overlap and linked destinations", async (
     }),
     context(fixedGitRunner())
   );
-  assert.equal(write.ok, false);
+  assert.equal(hardLinked.ok, false);
   assert.equal(fs.readFileSync(outside, "utf8"), "untouched\n");
+
+  fs.unlinkSync(preview.report.preview.destination.path);
+  const replacedDestination =
+    privateDirectory("kanon-aswitch-replaced-");
+  const replacedPreviewRequest = {
+    ...previewRequest,
+    destination_root: replacedDestination
+  };
+  const replacedPreview = await invokeCodexSkill(
+    invocation(root, replacedPreviewRequest),
+    context(fixedGitRunner())
+  );
+  const movedDestination = `${replacedDestination}-moved`;
+  fs.renameSync(replacedDestination, movedDestination);
+  fs.mkdirSync(replacedDestination, { mode: 0o700 });
+  const replaced = await invokeCodexSkill(
+    invocation(root, {
+      ...replacedPreviewRequest,
+      operation: "write",
+      approval: approval(
+        replacedPreview.report.preview.preview_sha256
+      )
+    }),
+    context(fixedGitRunner())
+  );
+  assert.equal(replaced.ok, false);
+  assert.equal(replaced.report.stage, "ApprovalUnavailable");
+  assert.equal(fs.readdirSync(replacedDestination).length, 0);
+  assert.equal(fs.readdirSync(movedDestination).length, 0);
 
   const fullDestination = privateDirectory("kanon-aswitch-capacity-");
   for (let index = 0; index < 8; index += 1) {
@@ -452,6 +646,49 @@ test("handoff writes reject repository overlap and linked destinations", async (
   );
   assert.equal(overCapacity.ok, false);
   assert.equal(fs.readdirSync(fullDestination).length, 8);
+
+  const byteDestination = privateDirectory(
+    "kanon-aswitch-byte-budget-"
+  );
+  fs.writeFileSync(
+    path.join(
+      byteDestination,
+      `kanon-agent-handoff-${"1".repeat(64)}.json`
+    ),
+    Buffer.alloc(64 * 1024 + 1),
+    { mode: 0o600 }
+  );
+  const overBytes = await invokeCodexSkill(
+    invocation(root, request({
+      target_host: "claude-code",
+      payload_mode: "last-plan",
+      destination_root: byteDestination,
+      last_plan: steerRequest()
+    })),
+    context(fixedGitRunner())
+  );
+  assert.equal(overBytes.ok, false);
+
+  const entryDestination = privateDirectory(
+    "kanon-aswitch-entry-budget-"
+  );
+  for (let index = 0; index < 257; index += 1) {
+    fs.writeFileSync(
+      path.join(entryDestination, `unrelated-${index}.txt`),
+      ""
+    );
+  }
+  const overEntries = await invokeCodexSkill(
+    invocation(root, request({
+      target_host: "claude-code",
+      payload_mode: "last-plan",
+      destination_root: entryDestination,
+      last_plan: steerRequest()
+    })),
+    context(fixedGitRunner())
+  );
+  assert.equal(overEntries.ok, false);
+  assert.equal(fs.readdirSync(entryDestination).length, 257);
 });
 
 test("aswitch CLI accepts only one bounded request on stdin", async () => {

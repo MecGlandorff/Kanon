@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -12,6 +13,8 @@ import {
 
 const MAX_HANDOFF_BYTES = 64 * 1024;
 const MAX_HANDOFF_FILES = 8;
+const MAX_HANDOFF_DIRECTORY_BYTES =
+  MAX_HANDOFF_BYTES * MAX_HANDOFF_FILES;
 const MAX_DIRECTORY_ENTRIES = 256;
 const HANDOFF_FILE = /^kanon-agent-handoff-([0-9a-f]{64})\.json$/;
 const UNSAFE_PATH_CONTROLS =
@@ -22,7 +25,12 @@ const UNSAFE_PATH_CONTROLS =
  *   ok: true,
  *   root: string,
  *   path: string,
- *   file: string
+ *   file: string,
+ *   identity: {
+ *     device: number,
+ *     inode: number
+ *   },
+ *   identity_sha256: string
  * } | {
  *   ok: false,
  *   status: "Unknown",
@@ -74,12 +82,38 @@ export function resolveHandoffDestination(
   if (!hasBoundedCapacity(selected.root, file)) {
     return destinationFailure();
   }
+  let identity;
+  try {
+    const stat = fs.lstatSync(selected.root);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      return destinationFailure();
+    }
+    identity = {
+      device: stat.dev,
+      inode: stat.ino
+    };
+  } catch {
+    return destinationFailure();
+  }
   return {
     ok: true,
     root: selected.root,
     path: path.join(selected.root, file),
-    file
+    file,
+    identity,
+    identity_sha256: sha256DirectoryIdentity(identity)
   };
+}
+
+/**
+ * @param {{device: number, inode: number}} identity
+ * @returns {string}
+ */
+function sha256DirectoryIdentity(identity) {
+  return crypto
+    .createHash("sha256")
+    .update(`${identity.device}\0${identity.inode}`)
+    .digest("hex");
 }
 
 /**
@@ -96,6 +130,7 @@ function hasBoundedCapacity(root, selectedFile) {
     directory = fs.opendirSync(root);
     let entries = 0;
     let matching = 0;
+    let matchingBytes = 0;
     let selectedExists = false;
     for (;;) {
       const entry = directory.readSync();
@@ -117,8 +152,13 @@ function hasBoundedCapacity(root, selectedFile) {
       if (
         !item.isFile() ||
         item.isSymbolicLink() ||
-        item.nlink !== 1
+        item.nlink !== 1 ||
+        item.size > MAX_HANDOFF_BYTES
       ) {
+        return false;
+      }
+      matchingBytes += item.size;
+      if (matchingBytes > MAX_HANDOFF_DIRECTORY_BYTES) {
         return false;
       }
       if (entry.name === selectedFile) {
@@ -152,7 +192,8 @@ export function writeHandoffText(destination, text) {
   if (
     !destination.ok ||
     typeof text !== "string" ||
-    Buffer.byteLength(text, "utf8") > MAX_HANDOFF_BYTES
+    Buffer.byteLength(text, "utf8") > MAX_HANDOFF_BYTES ||
+    !unchangedDestination(destination)
   ) {
     return destinationFailure();
   }
@@ -163,6 +204,35 @@ export function writeHandoffText(destination, text) {
     MAX_HANDOFF_BYTES
   );
   return written.ok ? { ok: true } : destinationFailure();
+}
+
+/**
+ * Rebind the approved path to the same directory identity immediately before
+ * the atomic write. A same-user replacement after this check remains a
+ * documented concurrency residual.
+ *
+ * @param {Extract<HandoffDestinationResult, {ok: true}>} destination
+ * @returns {boolean}
+ */
+function unchangedDestination(destination) {
+  try {
+    if (
+      path.join(destination.root, destination.file) !== destination.path ||
+      !Number.isSafeInteger(destination.identity.device) ||
+      !Number.isSafeInteger(destination.identity.inode)
+    ) {
+      return false;
+    }
+    const stat = fs.lstatSync(destination.root);
+    return (
+      stat.isDirectory() &&
+      !stat.isSymbolicLink() &&
+      stat.dev === destination.identity.device &&
+      stat.ino === destination.identity.inode
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
