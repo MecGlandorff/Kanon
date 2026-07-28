@@ -1,9 +1,10 @@
 # Kanon v1 scope and compatibility freeze
 
-**Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice
-amendment and additive Run B recovery status through product slice 8. This
-file is not a release claim and does not authorize slice 9, Guard, `steer`, or
-`aswitch`.
+**Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
+receipt-only amendments, and additive Run B recovery status through product
+slice 8. This file is not a release claim. Run C may implement slices 9
+through 13 within the receipt-only boundary; this record does not claim that
+work is complete.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
 including its explicitly authorized 2026-07-28 amendment. This companion
@@ -96,6 +97,30 @@ Guard or receipt persistence, or transfer evidence between hosts or
 platforms. Automatic lifecycle notice and hard Guard remain future,
 host-specific experimental work.
 
+### Run C receipt-only amendment
+
+**Decision date:** 2026-07-28.
+
+The user authorizes slice 9 only as a bounded, non-enforcing receipt
+subsystem. Receipts may persist only in hardened plugin data outside the
+inspected repository and may be evaluated only during explicit Kanon
+invocations. They are local continuity evidence, never security credentials,
+authorization tokens, mutation permissions, or proof that repository context
+was understood.
+
+Explicit `orient` may issue or replace a receipt. Explicit `status` and
+`verify` may inspect it. A directly observed root, task, or evidence mismatch
+may be `Stale`; unavailable session, compaction, lifecycle, or host evidence
+remains `Unknown`. Recovery is an explicit `orient` refresh. If safe plugin
+data is unavailable, Kanon keeps the returned in-memory result or reports
+`Unknown`; it never falls back to repository files or undocumented host state.
+
+This amendment supersedes only the Run B receipt-persistence exclusion. It
+does not revise either hard-Guard no-go, authorize automatic notice or hooks,
+relax the hostile-environment boundary, or permit blocking, approval, denial,
+rewrite, interception, emergency bypass, or evidence transfer between hosts
+or platforms.
+
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
@@ -173,10 +198,14 @@ fail safely to the manual handoff.
   are superseded by the additive slice 8 implementation record.
 - Pre-recovery Run B claims that the shared production hook had no open P1 are
   superseded by the 2026-07-28 amendment and recovery certification.
+- Run B's prohibition on receipt persistence is superseded only by the
+  receipt-only amendment above; its Guard, hook, and enforcement exclusions
+  remain current.
 
 ### Suggested
 
-- Keep automatic lifecycle notice, hard Guard, and any broader receipt
-  lifecycle outside public v1 until separately proven and authorized.
-- Before Run C, require a clean slice 8 commit and an explicit sequencing
-  decision about skipping or reframing the now-out-of-scope product slice 9.
+- Keep automatic lifecycle notice, hard Guard, and any enforcing or
+  hook-driven receipt lifecycle outside public v1 until separately proven and
+  authorized.
+- Implement Run C only from the exact clean precondition commit and hard-stop
+  before slice 14.

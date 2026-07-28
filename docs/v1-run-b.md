@@ -524,3 +524,16 @@ The user required this fresh slice 8 session because the prior TUI
 unexpectedly displayed a different low/fast model after slice 7. The fresh
 session header was independently confirmed as `gpt-5.6-sol` with `max`
 reasoning before slice 8.
+
+### Run C authorization postscript
+
+On 2026-07-28 the user satisfied the sequencing decision above by authorizing
+slice 9 only as a bounded, receipt-only, non-enforcing subsystem. The
+authorization permits persistence solely in hardened plugin data and
+evaluation solely during explicit Kanon invocations. It does not authorize a
+hook, Guard, automatic lifecycle notice, mutation interception, approval,
+denial, rewrite, emergency bypass, or repository-state fallback.
+
+This postscript does not rewrite Run B evidence or claim Run C completion. The
+Run B recovery commit, validations, capability matrix, and residuals remain
+historical facts for slices 4 through 8.

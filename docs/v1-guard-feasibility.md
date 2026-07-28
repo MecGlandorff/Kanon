@@ -677,3 +677,30 @@ direct-exec capability is not evidence for Codex or for another platform, and
 the Codex command-string behavior is not promoted beyond its named version and
 surface. Explicit notice does not claim that repository evidence was read or
 understood.
+
+## Run C receipt-only product amendment
+
+**Date:** 2026-07-28.
+
+**Status:** additive product-contract amendment. This section does not alter
+any Run A, A.1, or A.2 report, hash, observation, classification,
+host-specific no-go decision, or hard stop.
+
+The user authorizes a receipt-only slice 9 that is independent of Guard and
+automatic lifecycle hooks. Receipts may persist only as bounded, versioned,
+runtime-validated continuity evidence in hardened plugin data outside the
+inspected repository. They may be evaluated only during explicit Kanon
+invocations and can never block, approve, authorize, intercept, deny, rewrite,
+or permit mutation.
+
+Known matching observations may be `Current`. A directly observed root, task,
+or evidence mismatch may be `Stale`. Unavailable session, compaction,
+lifecycle, or host evidence remains `Unknown`. If safe plugin data is
+unavailable, the receipt remains in-memory or its persistence status is
+`Unknown`; there is no repository-file or undocumented-host-state fallback.
+Recovery is an explicit `orient` refresh.
+
+This amendment leaves both hard-Guard decisions at no-go, both stable hosts in
+explicit-only `notice` mode with `enforcement: false`, and the production
+artifact without a lifecycle hook. Guard and automatic lifecycle notice remain
+future host-and-platform-specific experimental work.

@@ -150,3 +150,52 @@ test("authoritative design and Run B record visibly supersede the reopened P1", 
     /defer slice 9 entirely or to authorize a narrow contract amendment for a\s+receipt-only, non-enforcing lifecycle/
   );
 });
+
+test("authorized Run C amendment separates advisory receipts from Guard", () => {
+  const feasibility = fs.readFileSync(
+    path.join(repoRoot, "docs", "v1-guard-feasibility.md"),
+    "utf8"
+  );
+  assert.match(design, /Authorized receipt-only amendment/);
+  assert.match(
+    design,
+    /may persist versioned receipts only in hardened plugin data outside\s+the inspected repository/
+  );
+  assert.match(
+    design,
+    /may evaluate them only during an explicit Kanon\s+invocation/
+  );
+  assert.match(
+    design,
+    /never blocks, approves, authorizes, intercepts,\s+denies, rewrites, or permits mutation/
+  );
+  assert.match(
+    design,
+    /Unavailable session, compaction,\s+lifecycle, or host evidence remains `Unknown`/
+  );
+  assert.match(
+    design,
+    /Implement the bounded receipt-only, non-enforcing lifecycle authorized by/
+  );
+  assert.match(scope, /Run C receipt-only amendment/);
+  assert.match(
+    scope,
+    /never falls back to repository files or undocumented host state/
+  );
+  assert.match(feasibility, /Run C receipt-only product amendment/);
+  assert.match(
+    feasibility,
+    /leaves both hard-Guard decisions at no-go/
+  );
+  assert.match(runB, /Run C authorization postscript/);
+  assert.match(
+    runB,
+    /does not rewrite Run B evidence or claim Run C completion/
+  );
+  for (const text of [design, scope, feasibility, runB]) {
+    assert.doesNotMatch(
+      text,
+      /receipt-only[^.\n]*(?:blocks?|approves?|authorizes?|denies?|rewrites?) mutation/i
+    );
+  }
+});

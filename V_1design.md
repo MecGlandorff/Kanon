@@ -81,9 +81,45 @@ Affected production clauses now require:
   proven, host-specific experimental work.
 
 Non-goals are a hostile-environment relaxation, a replacement shell or
-launcher, platform-specific stable hooks, Guard, receipt persistence,
-mutation interception, or any claim that explicit notice proves reading or
-understanding.
+launcher, platform-specific stable hooks, Guard, Guard-coupled receipt
+persistence, mutation interception, or any claim that explicit notice proves
+reading or understanding.
+
+## Authorized receipt-only amendment
+
+**Decision date:** 2026-07-28.
+
+This amendment changes only the receipt boundary. It supersedes the
+receipt-persistence non-goal in the lifecycle-notice amendment, the
+Guard-feasibility wording that coupled every production receipt to proven
+hooks, and product slice 9 only to the extent necessary to permit a bounded
+advisory receipt subsystem.
+
+Stable v1 may persist versioned receipts only in hardened plugin data outside
+the inspected repository and may evaluate them only during an explicit Kanon
+invocation. A receipt is local continuity evidence, not a security credential
+or authorization token. It never blocks, approves, authorizes, intercepts,
+denies, rewrites, or permits mutation. No hook, automatic execution,
+enforcement path, or emergency bypass is authorized.
+
+Known matching root, task, evidence, and available host observations may
+classify a receipt as `Current`. A directly observed root, task, or evidence
+mismatch may classify it as `Stale`. Unavailable session, compaction,
+lifecycle, or host evidence remains `Unknown`; it never becomes a negative or
+safety conclusion. Recovery is an explicit `orient` refresh.
+
+Receipt storage must be minimal, bounded, versioned, runtime-validated,
+no-follow, and atomic where the platform exposes those primitives. It stores
+hashes, bounded identifiers, timestamps, and provenance rather than repository
+prose, commands, branch subjects, prompts, secrets, or imperative
+instructions. If a safe plugin-data root is unavailable, Kanon returns the
+in-memory receipt or `Unknown` and never falls back to repository files or
+undocumented host state. Same-user concurrent replacement remains a disclosed
+filesystem residual rather than an enforcement claim.
+
+This amendment does not revise either host's hard-Guard no-go, add automatic
+lifecycle notice, transfer evidence between hosts or platforms, weaken the
+hostile-environment boundary, or authorize any Guard mode.
 
 ## Scope
 
@@ -380,13 +416,33 @@ After the spike:
 - if they cannot, expose `notice` and revise the stable product promise before
   further Guard work.
 
-Do not build production receipts against assumed hook semantics.
+Do not build Guard-coupled or enforcement receipts against assumed hook
+semantics. The authorized 2026-07-28 receipt-only amendment permits only the
+separate advisory subsystem defined above.
 
 The 2026-07-28 amendment records the completed stable-v1 branch of this
 decision: both initial hosts remain hard-Guard no-go, stable notice is explicit
 skill/status output only, and no production lifecycle hook ships.
 
-### Receipt behavior
+### Advisory receipt-only behavior
+
+For the stable non-enforcing surface:
+
+1. Explicit `orient` may issue or replace a bounded receipt.
+2. Explicit `status` and `verify` may inspect it.
+3. `resume` remains read-only unless a separate public contract expressly
+   authorizes a plugin-data update.
+4. Directly observed root, task, or evidence mismatches may be `Stale`.
+5. Missing session, compaction, lifecycle, or host evidence remains
+   `Unknown`.
+6. Recovery is an explicit `orient` refresh.
+7. Safe plugin data is the only persistence location; otherwise the result is
+   in-memory or `Unknown`.
+
+This behavior is continuity evidence only and has no mutation or authorization
+effect.
+
+### Guard receipt behavior
 
 For a proven Guard surface:
 
@@ -623,7 +679,9 @@ redesigned before evaluation.
 6. Implement and test exact-version deprecation status.
 7. Integrate repo-continuity into the shared continuity engine.
 8. Deliver `orient`, `resume`, `verify`, and `status` as vertical slices.
-9. Implement receipts and Guard only against proven hook behavior.
+9. Implement the bounded receipt-only, non-enforcing lifecycle authorized by
+   the 2026-07-28 amendment. Guard remains unimplemented unless separately
+   proven and authorized.
 10. Deliver thin `steer`.
 11. Deliver `$kanon:aswitch` with last-plan-only as the default, a compacted
     handoff, receiving-side staleness validation, and a manual fallback.
