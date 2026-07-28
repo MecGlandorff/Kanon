@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import { isRecord } from "../adapters/shared.js";
+import {
+  atomicWritePluginDataText,
+  readPluginDataText,
+  resolveExternalPluginDataRoot
+} from "../core/plugin-data.js";
 
 const CACHE_FILE = "deprecation-status-v1.json";
 const CACHE_SCHEMA = "kanon-deprecation-cache-v1";
@@ -183,32 +186,20 @@ export function endDeprecationSession(pluginDataRoot, hostSession) {
  * }}
  */
 function resolveCacheScope(pluginDataRoot, hostSession) {
-  if (
-    typeof pluginDataRoot !== "string" ||
-    pluginDataRoot.length === 0 ||
-    pluginDataRoot.length > 8_192 ||
-    !path.isAbsolute(pluginDataRoot) ||
-    !isHostSession(hostSession)
-  ) {
+  if (!isHostSession(hostSession)) {
     return cacheFailure();
   }
   try {
-    const selected = fs.lstatSync(pluginDataRoot);
-    if (!selected.isDirectory() || selected.isSymbolicLink()) {
-      return cacheFailure();
-    }
-    const root = fs.realpathSync(pluginDataRoot);
-    const workingRoot = fs.realpathSync(process.cwd());
-    if (
-      root === path.parse(root).root ||
-      containsPath(root, workingRoot) ||
-      containsPath(workingRoot, root)
-    ) {
+    const selected = resolveExternalPluginDataRoot(
+      pluginDataRoot,
+      process.cwd()
+    );
+    if (!selected.ok) {
       return cacheFailure();
     }
     return {
       ok: true,
-      root,
+      root: selected.root,
       sessionKey: crypto
         .createHash("sha256")
         .update(`${hostSession.host}\0${hostSession.id}`, "utf8")
@@ -246,25 +237,27 @@ function isHostSession(value) {
  * }}
  */
 function readDocument(root) {
-  const file = path.join(root, CACHE_FILE);
+  const loaded = readPluginDataText(
+    root,
+    CACHE_FILE,
+    MAX_CACHE_BYTES
+  );
+  if (!loaded.ok) {
+    return cacheFailure();
+  }
+  if (!loaded.found) {
+    return {
+      ok: true,
+      value: { schema: CACHE_SCHEMA, entries: [] }
+    };
+  }
   try {
-    const selected = fs.lstatSync(file);
-    if (
-      !selected.isFile() ||
-      selected.isSymbolicLink() ||
-      selected.nlink !== 1 ||
-      selected.size > MAX_CACHE_BYTES
-    ) {
-      return cacheFailure();
-    }
-    const value = JSON.parse(fs.readFileSync(file, "utf8"));
+    const value = JSON.parse(loaded.text);
     return isCacheDocument(value)
       ? { ok: true, value }
       : cacheFailure();
-  } catch (error) {
-    return isMissingFile(error)
-      ? { ok: true, value: { schema: CACHE_SCHEMA, entries: [] } }
-      : cacheFailure();
+  } catch {
+    return cacheFailure();
   }
 }
 
@@ -277,57 +270,13 @@ function writeDocument(root, document) {
   if (!isCacheDocument(document)) {
     return cacheFailure();
   }
-  const serialized = `${JSON.stringify(document)}\n`;
-  if (Buffer.byteLength(serialized) > MAX_CACHE_BYTES) {
-    return cacheFailure();
-  }
-  const target = path.join(root, CACHE_FILE);
-  const temporary = path.join(
+  const written = atomicWritePluginDataText(
     root,
-    `.deprecation-status-${process.pid}-${crypto.randomUUID()}.tmp`
+    CACHE_FILE,
+    `${JSON.stringify(document)}\n`,
+    MAX_CACHE_BYTES
   );
-  let descriptor;
-  try {
-    descriptor = fs.openSync(
-      temporary,
-      fs.constants.O_CREAT |
-        fs.constants.O_EXCL |
-        fs.constants.O_WRONLY |
-        (fs.constants.O_NOFOLLOW || 0),
-      0o600
-    );
-    fs.writeFileSync(descriptor, serialized, "utf8");
-    fs.fsyncSync(descriptor);
-    fs.closeSync(descriptor);
-    descriptor = undefined;
-    if (fs.existsSync(target)) {
-      const selected = fs.lstatSync(target);
-      if (
-        !selected.isFile() ||
-        selected.isSymbolicLink() ||
-        selected.nlink !== 1
-      ) {
-        fs.unlinkSync(temporary);
-        return cacheFailure();
-      }
-    }
-    fs.renameSync(temporary, target);
-    return { ok: true };
-  } catch {
-    if (descriptor !== undefined) {
-      try {
-        fs.closeSync(descriptor);
-      } catch {
-        // Best-effort cleanup of this process's private descriptor.
-      }
-    }
-    try {
-      fs.unlinkSync(temporary);
-    } catch {
-      // The temporary file may not have been created.
-    }
-    return cacheFailure();
-  }
+  return written.ok ? { ok: true } : cacheFailure();
 }
 
 /**
@@ -391,21 +340,6 @@ function isCacheEntry(value) {
 }
 
 /**
- * @param {string} parent
- * @param {string} child
- * @returns {boolean}
- */
-function containsPath(parent, child) {
-  const relative = path.relative(parent, child);
-  return (
-    relative === "" ||
-    (!path.isAbsolute(relative) &&
-      relative !== ".." &&
-      !relative.startsWith(`..${path.sep}`))
-  );
-}
-
-/**
  * @param {unknown} value
  * @returns {value is number}
  */
@@ -436,17 +370,6 @@ function boundedString(value, maximum) {
     typeof value === "string" &&
     value.length > 0 &&
     value.length <= maximum
-  );
-}
-
-/**
- * @param {unknown} error
- * @returns {boolean}
- */
-function isMissingFile(error) {
-  return (
-    isRecord(error) &&
-    error.code === "ENOENT"
   );
 }
 

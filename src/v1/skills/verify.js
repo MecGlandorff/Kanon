@@ -6,6 +6,9 @@ import {
   verifyContextReceipt
 } from "../core/receipt.js";
 import {
+  readContextReceiptStore
+} from "../core/receipt-store.js";
+import {
   isPlainRecord,
   repositoryIdentifier,
   repositoryValue,
@@ -29,9 +32,10 @@ const MAX_GENERATED_PAIRS = 64;
  *   receipt?: unknown
  * }} VerifyInput
  * @typedef {{
- *   host_session?: unknown,
  *   git_runner?: import("../repository/git.js").GitRunner,
- *   now?: number
+ *   now?: number,
+ *   plugin_data_root?: unknown,
+ *   receipt_host_evidence?: unknown
  * }} VerifyContext
  * @typedef {{
  *   status: "Known" | "Stale" | "Unknown",
@@ -79,6 +83,7 @@ const MAX_GENERATED_PAIRS = 64;
  *   ok: true,
  *   status: "Known" | "Stale" | "Unknown",
  *   read_only: true,
+ *   repository_read_only: true,
  *   enforcement: false,
  *   trust_boundary: string,
  *   live: NonNullable<ReturnType<typeof publicInspection>>,
@@ -87,12 +92,22 @@ const MAX_GENERATED_PAIRS = 64;
  *   generated_artifacts: GeneratedVerification,
  *   declared_validation: ValidationVerification,
  *   receipt: import("../core/receipt.js").ReceiptVerification,
+ *   receipt_source: {
+ *     status: "Known",
+ *     medium: "explicit-input" | "plugin-data",
+ *     diagnostic: string
+ *   } | {
+ *     status: "Unknown",
+ *     medium: "unavailable",
+ *     diagnostic: string
+ *   },
  *   diagnostics: string[]
  * } | {
  *   schema: "kanon-verify-report-v1",
  *   ok: false,
  *   status: "Unknown",
  *   read_only: true,
+ *   repository_read_only: true,
  *   enforcement: false,
  *   trust_boundary: string,
  *   diagnostic: string,
@@ -158,12 +173,20 @@ export function runVerify(input, context = {}) {
     handoff: persisted.handoff,
     ...(context.now === undefined ? {} : { now: context.now })
   });
-  const receipt = verifyContextReceipt(input.receipt, {
+  const now = context.now === undefined ? Date.now() : context.now;
+  const receiptSelection = selectReceipt(
+    input.receipt,
+    context.plugin_data_root,
+    inspection.root,
+    now
+  );
+  const receipt = verifyContextReceipt(receiptSelection.receipt, {
     root: inspection.root,
     task: inspection.task,
     evidence_sha256: inspection.evidence_fingerprint,
     evidence_complete: inspection.evidence_complete,
-    host_session: context.host_session
+    host_evidence: context.receipt_host_evidence,
+    now
   });
   const status = aggregateStatus([
     documentation.status,
@@ -178,6 +201,7 @@ export function runVerify(input, context = {}) {
     ok: true,
     status,
     read_only: true,
+    repository_read_only: true,
     enforcement: false,
     trust_boundary: REPOSITORY_TRUST_BOUNDARY,
     live: visible,
@@ -186,6 +210,7 @@ export function runVerify(input, context = {}) {
     generated_artifacts: generatedArtifacts,
     declared_validation: declaredValidation,
     receipt,
+    receipt_source: receiptSelection.source,
     diagnostics: Array.from(
       new Set([
         ...inspection.coverage.diagnostics,
@@ -196,7 +221,10 @@ export function runVerify(input, context = {}) {
         ...(persisted.handoff_warning === null
           ? []
           : [persisted.handoff_warning]),
-        ...continuity.diagnostics
+        ...continuity.diagnostics,
+        ...(receiptSelection.source.status === "Unknown"
+          ? [receiptSelection.source.diagnostic]
+          : [])
       ])
     ).slice(0, 16)
   };
@@ -581,9 +609,76 @@ function unavailableVerify(diagnostic, diagnostics) {
     ok: false,
     status: "Unknown",
     read_only: true,
+    repository_read_only: true,
     enforcement: false,
     trust_boundary: REPOSITORY_TRUST_BOUNDARY,
     diagnostic,
     diagnostics
+  };
+}
+
+/**
+ * Prefer an explicitly supplied receipt. Otherwise read only the fixed,
+ * bounded plugin-data store; never fall back to repository state.
+ *
+ * @param {unknown} explicitReceipt
+ * @param {unknown} pluginDataRoot
+ * @param {string} repositoryRoot
+ * @param {number} now
+ * @returns {{
+ *   receipt: unknown,
+ *   source: {
+ *     status: "Known",
+ *     medium: "explicit-input" | "plugin-data",
+ *     diagnostic: string
+ *   } | {
+ *     status: "Unknown",
+ *     medium: "unavailable",
+ *     diagnostic: string
+ *   }
+ * }}
+ */
+function selectReceipt(
+  explicitReceipt,
+  pluginDataRoot,
+  repositoryRoot,
+  now
+) {
+  if (explicitReceipt !== undefined) {
+    return {
+      receipt: explicitReceipt,
+      source: {
+        status: /** @type {"Known"} */ ("Known"),
+        medium: /** @type {"explicit-input"} */ ("explicit-input"),
+        diagnostic:
+          "Receipt input was supplied explicitly and remains untrusted until validation."
+      }
+    };
+  }
+  const stored = readContextReceiptStore(
+    pluginDataRoot,
+    repositoryRoot,
+    now
+  );
+  if (stored.ok && stored.found) {
+    return {
+      receipt: stored.receipt,
+      source: {
+        status: /** @type {"Known"} */ ("Known"),
+        medium: /** @type {"plugin-data"} */ ("plugin-data"),
+        diagnostic:
+          "A bounded receipt was loaded from validated plugin data."
+      }
+    };
+  }
+  return {
+    receipt: undefined,
+    source: {
+      status: /** @type {"Unknown"} */ ("Unknown"),
+      medium: /** @type {"unavailable"} */ ("unavailable"),
+      diagnostic: stored.ok
+        ? stored.diagnostic
+        : "Safe plugin-data receipt storage was unavailable."
+    }
   };
 }

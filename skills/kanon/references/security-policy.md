@@ -2,7 +2,8 @@
 
 Kanon does not execute repository code. Read workflows do not intentionally
 write the selected repository; only explicit refresh and TODO mutations write
-bounded files under `.kanon/`.
+bounded files under `.kanon/`. Explicit orient may replace advisory receipt
+data only in a validated plugin-data directory outside the repository.
 
 ## AI trust boundary
 
@@ -39,6 +40,12 @@ same-user process from replacing an ancestor concurrently. Kanon reduces this
 risk with no-follow file opens and identity checks, but directory
 file-descriptor-relative traversal is not portable in the supported Node.js
 runtime. This race is a residual threat.
+
+Receipt data is versioned, fixed-size, hash-based, retained for a bounded
+window, and atomically replaced with no-follow handling where available. It
+contains no repository prose, commands, prompts, secrets, or imperative
+instructions. If safe plugin data is unavailable, receipt persistence remains
+Unknown and there is no repository or undocumented host-state fallback.
 
 ## Git observation
 

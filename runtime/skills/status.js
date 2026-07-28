@@ -3,6 +3,9 @@ import {
 } from "../core/build-metadata.js";
 import { inspectReceiptStatus } from "../core/receipt.js";
 import {
+  readContextReceiptStore
+} from "../core/receipt-store.js";
+import {
   isPlainRecord,
   repositoryIdentifier,
   sanitizeDisplayText
@@ -18,13 +21,16 @@ import { REPOSITORY_TRUST_BOUNDARY } from "./orient.js";
  * }} StatusInput
  * @typedef {{
  *   host: StatusHost,
- *   deprecation_status?: unknown
+ *   deprecation_status?: unknown,
+ *   now?: number,
+ *   plugin_data_root?: unknown
  * }} StatusContext
  * @typedef {{
  *   schema: "kanon-status-report-v1",
  *   ok: true,
  *   status: "Known" | "Unknown",
  *   read_only: true,
+ *   repository_read_only: true,
  *   enforcement: false,
  *   trust_boundary: string,
  *   repository_root: {
@@ -72,6 +78,15 @@ import { REPOSITORY_TRUST_BOUNDARY } from "./orient.js";
  *     future_requirement: "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
  *   } | null,
  *   receipt: ReturnType<typeof inspectReceiptStatus>,
+ *   receipt_source: {
+ *     status: "Known",
+ *     medium: "explicit-input" | "plugin-data",
+ *     diagnostic: string
+ *   } | {
+ *     status: "Unknown",
+ *     medium: "unavailable",
+ *     diagnostic: string
+ *   },
  *   diagnostics: string[]
  * }} StatusReport
  */
@@ -83,12 +98,23 @@ import { REPOSITORY_TRUST_BOUNDARY } from "./orient.js";
  */
 export function runStatus(input, context) {
   const root = canonicalizeRepositoryRoot(input.root);
+  const now = context.now === undefined ? Date.now() : context.now;
   const metadata = readEmbeddedBuildMetadata();
   const deprecationStatus = normalizeDeprecationStatus(
     context.deprecation_status
   );
+  const receiptSelection = root.ok
+    ? selectReceipt(
+        input.receipt,
+        context.plugin_data_root,
+        root.root,
+        now
+      )
+    : unavailableReceiptSource(
+        "Repository root was unavailable; plugin-data receipt scope could not be selected."
+      );
   const receipt = root.ok
-    ? inspectReceiptStatus(input.receipt, root.root)
+    ? inspectReceiptStatus(receiptSelection.receipt, root.root, now)
     : {
         status: /** @type {"Unknown"} */ ("Unknown"),
         freshness: /** @type {"Unknown"} */ ("Unknown"),
@@ -117,6 +143,9 @@ export function runStatus(input, context) {
     "Automatic lifecycle notice is unavailable. Any future host-specific lifecycle notice requires a separately proven executable, argument-vector, and environment boundary."
   );
   diagnostics.push(receipt.diagnostic);
+  if (receiptSelection.source.status === "Unknown") {
+    diagnostics.push(receiptSelection.source.diagnostic);
+  }
   return {
     schema: "kanon-status-report-v1",
     ok: true,
@@ -128,6 +157,7 @@ export function runStatus(input, context) {
         ? "Known"
         : "Unknown",
     read_only: true,
+    repository_read_only: true,
     enforcement: false,
     trust_boundary: REPOSITORY_TRUST_BOUNDARY,
     repository_root: root.ok
@@ -153,6 +183,7 @@ export function runStatus(input, context) {
       ? metadata.value.public_capabilities.notice
       : null,
     receipt,
+    receipt_source: receiptSelection.source,
     diagnostics: diagnostics
       .map((item) => sanitizeDisplayText(item, 512))
       .filter(Boolean)
@@ -175,4 +206,72 @@ function normalizeDeprecationStatus(value) {
   )
     ? value.status
     : "Unknown";
+}
+
+/**
+ * @param {unknown} explicitReceipt
+ * @param {unknown} pluginDataRoot
+ * @param {string} repositoryRoot
+ * @param {number} now
+ * @returns {{
+ *   receipt: unknown,
+ *   source: StatusReport["receipt_source"]
+ * }}
+ */
+function selectReceipt(
+  explicitReceipt,
+  pluginDataRoot,
+  repositoryRoot,
+  now
+) {
+  if (explicitReceipt !== undefined) {
+    return {
+      receipt: explicitReceipt,
+      source: {
+        status: "Known",
+        medium: "explicit-input",
+        diagnostic:
+          "Receipt input was supplied explicitly and remains untrusted until validation."
+      }
+    };
+  }
+  const stored = readContextReceiptStore(
+    pluginDataRoot,
+    repositoryRoot,
+    now
+  );
+  if (stored.ok && stored.found) {
+    return {
+      receipt: stored.receipt,
+      source: {
+        status: "Known",
+        medium: "plugin-data",
+        diagnostic:
+          "A bounded receipt was loaded from validated plugin data."
+      }
+    };
+  }
+  return unavailableReceiptSource(
+    stored.ok
+      ? stored.diagnostic
+      : "Safe plugin-data receipt storage was unavailable."
+  );
+}
+
+/**
+ * @param {string} diagnostic
+ * @returns {{
+ *   receipt: undefined,
+ *   source: Extract<StatusReport["receipt_source"], {status: "Unknown"}>
+ * }}
+ */
+function unavailableReceiptSource(diagnostic) {
+  return {
+    receipt: undefined,
+    source: {
+      status: "Unknown",
+      medium: "unavailable",
+      diagnostic
+    }
+  };
 }

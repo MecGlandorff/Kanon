@@ -47,6 +47,14 @@ export const IMPLEMENTED_PUBLIC_SKILLS = Object.freeze([
  *       claims_understanding: false,
  *       delivery: "explicit-skill-and-status-output",
  *       future_requirement: "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
+ *     },
+ *     receipts: {
+ *       role: "advisory-continuity-evidence",
+ *       enforcement: false,
+ *       evaluation: "explicit-kanon-invocation-only",
+ *       persistence: "validated-plugin-data-when-available",
+ *       repository_fallback: false,
+ *       unavailable_host_evidence: "Unknown"
  *     }
  *   }
  * }} BuildMetadata
@@ -139,7 +147,7 @@ function validRuntime(value) {
 function validCapabilities(value) {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ["hosts", "notice", "skills"]) ||
+    !hasExactKeys(value, ["hosts", "notice", "receipts", "skills"]) ||
     !Array.isArray(value.skills) ||
     value.skills.length !== IMPLEMENTED_PUBLIC_SKILLS.length ||
     value.skills.some(
@@ -149,11 +157,12 @@ function validCapabilities(value) {
     !hasExactKeys(value.hosts, ["claude-code", "codex-cli"]) ||
     !validHost(value.hosts["codex-cli"]) ||
     !validHost(value.hosts["claude-code"]) ||
-    !isRecord(value.notice)
+    !isRecord(value.notice) ||
+    !isRecord(value.receipts)
   ) {
     return false;
   }
-  return (
+  const validNotice = (
     hasExactKeys(value.notice, [
       "advisory",
       "approves",
@@ -177,6 +186,24 @@ function validCapabilities(value) {
       "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary" &&
     value.notice.rewrites === false &&
     value.notice.suppresses === false
+  );
+  return (
+    validNotice &&
+    hasExactKeys(value.receipts, [
+      "enforcement",
+      "evaluation",
+      "persistence",
+      "repository_fallback",
+      "role",
+      "unavailable_host_evidence"
+    ]) &&
+    value.receipts.role === "advisory-continuity-evidence" &&
+    value.receipts.enforcement === false &&
+    value.receipts.evaluation === "explicit-kanon-invocation-only" &&
+    value.receipts.persistence ===
+      "validated-plugin-data-when-available" &&
+    value.receipts.repository_fallback === false &&
+    value.receipts.unavailable_host_evidence === "Unknown"
   );
 }
 

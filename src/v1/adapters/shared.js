@@ -2,6 +2,7 @@
  * @typedef {{
  *   host_session?: unknown,
  *   plugin_data_root?: unknown,
+ *   receipt_host_evidence?: unknown,
  *   transport?: import("../registry/transport.js").RegistryTransport,
  *   now?: number,
  *   git_runner?: import("../repository/git.js").GitRunner
@@ -40,6 +41,7 @@ export function normalizeAdapterInvocationContext(value) {
     "host_session",
     "now",
     "plugin_data_root",
+    "receipt_host_evidence",
     "transport"
   ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
@@ -52,6 +54,9 @@ export function normalizeAdapterInvocationContext(value) {
     ...(value.plugin_data_root === undefined
       ? {}
       : { plugin_data_root: value.plugin_data_root }),
+    ...(value.receipt_host_evidence === undefined
+      ? {}
+      : { receipt_host_evidence: value.receipt_host_evidence }),
     ...(isRegistryTransport(value.transport)
       ? { transport: value.transport }
       : {}),

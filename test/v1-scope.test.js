@@ -20,6 +20,10 @@ const runB = fs.readFileSync(
   path.join(repoRoot, "docs", "v1-run-b.md"),
   "utf8"
 );
+const runC = fs.readFileSync(
+  path.join(repoRoot, "docs", "v1-run-c.md"),
+  "utf8"
+);
 
 test("v1 scope freeze names the complete stable skill surface", () => {
   for (const skill of [
@@ -198,4 +202,21 @@ test("authorized Run C amendment separates advisory receipts from Guard", () => 
       /receipt-only[^.\n]*(?:blocks?|approves?|authorizes?|denies?|rewrites?) mutation/i
     );
   }
+});
+
+test("Run C slice 9 record keeps receipt persistence bounded and non-enforcing", () => {
+  assert.match(scope, /Run C slice 9 implementation status/);
+  assert.match(runC, /kanon-context-receipt-v2/);
+  assert.match(runC, /kanon-context-receipt-store-v1/);
+  assert.match(runC, /capped at 16 KiB, eight\s+unique repository-root records, and 30 days/);
+  assert.match(
+    runC,
+    /Actual host persistence and `Current`\s+classification therefore remain `Unknown`/
+  );
+  assert.match(runC, /no production lifecycle hook/);
+  assert.match(runC, /No P0 or P1\s+remains for this slice/);
+  assert.doesNotMatch(
+    runC,
+    /receipt[^.\n]*(?:authorizes?|approves?|permits?|blocks?) mutation/i
+  );
 });

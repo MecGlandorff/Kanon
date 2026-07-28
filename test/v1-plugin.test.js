@@ -95,6 +95,17 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
         "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
     }
   );
+  assert.deepEqual(
+    buildMetadata.public_capabilities.receipts,
+    {
+      role: "advisory-continuity-evidence",
+      enforcement: false,
+      evaluation: "explicit-kanon-invocation-only",
+      persistence: "validated-plugin-data-when-available",
+      repository_fallback: false,
+      unavailable_host_evidence: "Unknown"
+    }
+  );
   const read = readEmbeddedBuildMetadata();
   assert.equal(read.ok, true);
   for (const skill of ["orient", "resume", "status", "verify"]) {
@@ -268,6 +279,8 @@ test("package builder uses an exact production allowlist", () => {
   assert.equal(actual.includes("runtime/core/notice.js"), false);
   assert.equal(actual.includes("runtime/package.json"), true);
   assert.equal(actual.includes("runtime/build-metadata.json"), true);
+  assert.equal(actual.includes("runtime/core/plugin-data.js"), true);
+  assert.equal(actual.includes("runtime/core/receipt-store.js"), true);
   assert.equal(
     actual.some((file) =>
       /^(?:docs|eval|src|test|spikes|node_modules)\//.test(file)
@@ -297,6 +310,10 @@ test("package builder uses an exact production allowlist", () => {
     shippedText,
     /dangerously-bypass-hook-trust|dangerously-skip-permissions/
   );
+  assert.doesNotMatch(
+    shippedText,
+    /(?:^|["'`/])\.kanon\/(?:RECEIPT|receipt)/m
+  );
 });
 
 test("embedded metadata validator rejects extra, malformed, and hostile fields", () => {
@@ -321,6 +338,16 @@ test("embedded metadata validator rejects extra, malformed, and hostile fields",
             enforcement: true,
             hook_status: "Known"
           }
+        }
+      }
+    },
+    {
+      ...buildMetadata,
+      public_capabilities: {
+        ...buildMetadata.public_capabilities,
+        receipts: {
+          ...buildMetadata.public_capabilities.receipts,
+          enforcement: true
         }
       }
     }

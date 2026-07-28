@@ -42,6 +42,14 @@
       "claims_understanding": false,
       "delivery": "explicit-skill-and-status-output",
       "future_requirement": "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
+    },
+    "receipts": {
+      "role": "advisory-continuity-evidence",
+      "enforcement": false,
+      "evaluation": "explicit-kanon-invocation-only",
+      "persistence": "validated-plugin-data-when-available",
+      "repository_fallback": false,
+      "unavailable_host_evidence": "Unknown"
     }
   }
 }

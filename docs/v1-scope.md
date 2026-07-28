@@ -1,10 +1,10 @@
 # Kanon v1 scope and compatibility freeze
 
 **Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
-receipt-only amendments, and additive Run B recovery status through product
-slice 8. This file is not a release claim. Run C may implement slices 9
-through 13 within the receipt-only boundary; this record does not claim that
-work is complete.
+receipt-only amendments, additive Run B recovery status through product
+slice 8, and accepted Run C implementation status through slice 9. This file
+is not a release claim. Run C may implement slices 10 through 13; this record
+does not claim that those slices are complete.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
 including its explicitly authorized 2026-07-28 amendment. This companion
@@ -121,6 +121,27 @@ relax the hostile-environment boundary, or permit blocking, approval, denial,
 rewrite, interception, emergency bypass, or evidence transfer between hosts
 or platforms.
 
+### Run C slice 9 implementation status
+
+The accepted receipt engine uses `kanon-context-receipt-v2` and a fixed
+`kanon-context-receipt-store-v1`. Explicit `orient` may replace at most one
+bounded hash-only receipt for the active root in validated plugin data;
+`status` and `verify` may read it only during explicit invocations, and
+`resume` remains read-only. The store is capped at 16 KiB, eight unique roots,
+and 30 days. Invalid regular state is recoverable only through explicit
+`orient`; linked state fails closed.
+
+The deterministic engine and both host adapter code paths are Known.
+Documented, safe plugin-data availability and complete session, compaction,
+lifecycle, and host observations on current wrapper invocations remain
+`Unknown`. Without those inputs, the receipt is returned in memory and cannot
+be classified `Current`. This limitation is not evidence that either host
+cannot expose the inputs in another documented surface.
+
+The implementation and validation record is
+[`v1-run-c.md`](v1-run-c.md). It does not expose `steer` or `aswitch`, add a
+hook, or begin slice 10.
+
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
@@ -156,7 +177,7 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status through Run B slice 8
+## Evidence status through Run C slice 9
 
 ### Known
 
@@ -175,6 +196,10 @@ fail safely to the manual handoff.
 - The slice 8 receipt contains only a versioned schema, `enforcement: false`,
   and SHA-256 bindings for root, task, evidence, and an available host session.
   It has no persistence or lifecycle behavior.
+- Slice 9 supersedes that internal receipt schema with a bounded v2 advisory
+  receipt and conditional plugin-data storage. Persistence and evaluation
+  occur only on explicit Kanon invocations, and the receipt has no
+  authorization or enforcement effect.
 
 ### Likely
 
@@ -186,8 +211,10 @@ fail safely to the manual handoff.
 
 - Unavailable host hook introspection remains `Unknown`; this is distinct from
   the Known absence of a shipped Kanon lifecycle-notice hook.
-- Host session, compaction, and plugin-data behavior needed by any future
-  experimental hard-Guard design remains unproven.
+- Safe plugin-data availability and complete session, compaction, lifecycle,
+  and host observations on the current Codex and Claude wrapper surfaces
+  remain unproven. This keeps actual host persistence and `Current`
+  classification `Unknown`.
 - The release-governance participants, beta-adapter opt-in policy, first
   adapter directions, and full-history shipment decision listed in the v1
   design.
@@ -201,11 +228,12 @@ fail safely to the manual handoff.
 - Run B's prohibition on receipt persistence is superseded only by the
   receipt-only amendment above; its Guard, hook, and enforcement exclusions
   remain current.
+- Slice 8 statements that the receipt is always in-memory are superseded only
+  by slice 9's bounded, conditional plugin-data persistence.
 
 ### Suggested
 
 - Keep automatic lifecycle notice, hard Guard, and any enforcing or
   hook-driven receipt lifecycle outside public v1 until separately proven and
   authorized.
-- Implement Run C only from the exact clean precondition commit and hard-stop
-  before slice 14.
+- Continue Run C only through slices 10 to 13 and hard-stop before slice 14.

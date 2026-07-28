@@ -11,8 +11,11 @@ wrapper.
 
 Status reports advisory notice mode and `enforcement: false` for both supported
 hosts. Unsupported or unobservable host and hook state remains Unknown. Status
-does not execute or modify repository-controlled code, persist receipts,
-upgrade Kanon, or imply that repository context was read or understood.
+does not execute or modify repository-controlled code, write receipts, upgrade
+Kanon, or imply that repository context was read or understood. During this
+explicit invocation it may inspect a bounded receipt from validated plugin
+data; task, evidence, session, compaction, and lifecycle freshness remains
+Unknown unless directly observed by the applicable skill.
 
 Every invocation consults the shared exact-installed-version deprecation
 checker; an unavailable registry or host observation remains Unknown.

@@ -68,7 +68,8 @@ test("the minimal receipt verifies current bindings and detects direct change", 
   const session = { host: "codex-cli", id: "bounded-session" };
   const context = {
     ...adapterContext([]),
-    host_session: session
+    host_session: session,
+    receipt_host_evidence: receiptHostEvidence("codex-cli")
   };
   const task = "verify README.md";
   const oriented = await invokeCodexSkill(
@@ -81,13 +82,18 @@ test("the minimal receipt verifies current bindings and detects direct change", 
   assert.deepEqual(Object.keys(receipt).sort(), [
     "enforcement",
     "evidence_sha256",
+    "host_evidence_sha256",
+    "issued_at",
+    "provenance",
     "root_sha256",
     "schema",
-    "session_sha256",
     "task_sha256"
   ]);
+  assert.equal(receipt.schema, "kanon-context-receipt-v2");
   assert.equal(receipt.enforcement, false);
-  assert.match(receipt.session_sha256, /^[0-9a-f]{64}$/);
+  assert.equal(receipt.provenance, "explicit-orient");
+  assert.equal(receipt.issued_at, NOW);
+  assert.match(receipt.host_evidence_sha256, /^[0-9a-f]{64}$/);
   assert.equal(fs.existsSync(path.join(root, ".kanon")), false);
 
   const verified = await invokeCodexSkill(
@@ -103,7 +109,7 @@ test("the minimal receipt verifies current bindings and detects direct change", 
     status: "Known",
     freshness: "Current",
     diagnostic:
-      "Receipt session, task, root, and evidence bindings match current observations."
+      "Receipt root, task, evidence, session, compaction, lifecycle, and host bindings match current observations."
   });
 
   fs.writeFileSync(
@@ -152,6 +158,7 @@ test("the receipt evidence binding includes observed Git state", async () => {
       host: "codex-cli",
       id: "git-binding-session"
     },
+    receipt_host_evidence: receiptHostEvidence("codex-cli"),
     git_runner: gitRunner
   };
   const task = "verify README.md";
@@ -357,7 +364,8 @@ test("declared-validation Unknown prevents an aggregate Known claim", async () =
     host_session: {
       host: "codex-cli",
       id: "declared-validation-session"
-    }
+    },
+    receipt_host_evidence: receiptHostEvidence("codex-cli")
   };
   const oriented = await invokeCodexSkill(
     stableInvocation("orient", root, { task }),
@@ -411,7 +419,8 @@ test("unobserved declared-validation execution prevents aggregate Known", async 
     host_session: {
       host: "codex-cli",
       id: "declared-execution-session"
-    }
+    },
+    receipt_host_evidence: receiptHostEvidence("codex-cli")
   };
   const oriented = await invokeCodexSkill(
     stableInvocation("orient", root, { task }),
@@ -675,6 +684,19 @@ function gitSuccess(stdout) {
     stderr: "",
     timeout: false,
     overflow: false
+  };
+}
+
+/**
+ * @param {"codex-cli" | "claude-code"} host
+ * @returns {Record<string, string>}
+ */
+function receiptHostEvidence(host) {
+  return {
+    host,
+    session_id: "bounded-session",
+    compaction_id: "bounded-compaction",
+    lifecycle_id: "bounded-lifecycle"
   };
 }
 

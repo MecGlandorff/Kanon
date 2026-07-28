@@ -25,7 +25,9 @@ export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/bin/kanon.js", "runtime/bin/kanon-v1.js"],
   ["src/v1/cli.js", "runtime/cli.js"],
   ["src/v1/core/build-metadata.js", "runtime/core/build-metadata.js"],
+  ["src/v1/core/plugin-data.js", "runtime/core/plugin-data.js"],
   ["src/v1/core/receipt.js", "runtime/core/receipt.js"],
+  ["src/v1/core/receipt-store.js", "runtime/core/receipt-store.js"],
   ["src/v1/core/trust.js", "runtime/core/trust.js"],
   ["src/v1/repository/git.js", "runtime/repository/git.js"],
   ["src/v1/repository/inspect.js", "runtime/repository/inspect.js"],
@@ -162,6 +164,14 @@ export function embeddedBuildMetadata(sourcePackage) {
         delivery: "explicit-skill-and-status-output",
         future_requirement:
           "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
+      },
+      receipts: {
+        role: "advisory-continuity-evidence",
+        enforcement: false,
+        evaluation: "explicit-kanon-invocation-only",
+        persistence: "validated-plugin-data-when-available",
+        repository_fallback: false,
+        unavailable_host_evidence: "Unknown"
       }
     }
   };

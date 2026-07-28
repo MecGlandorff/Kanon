@@ -152,13 +152,30 @@ function inspectPackage(root, input) {
         .lifecycle_notice_hook === "Unavailable" &&
       metadataResult.value.public_capabilities.notice.automatic === false &&
       metadataResult.value.public_capabilities.notice.delivery ===
-        "explicit-skill-and-status-output",
-      "embedded capability metadata is valid, explicit-only, and non-enforcing"
+        "explicit-skill-and-status-output" &&
+      metadataResult.value.public_capabilities.receipts.enforcement ===
+        false &&
+      metadataResult.value.public_capabilities.receipts.evaluation ===
+        "explicit-kanon-invocation-only" &&
+      metadataResult.value.public_capabilities.receipts.persistence ===
+        "validated-plugin-data-when-available" &&
+      metadataResult.value.public_capabilities.receipts.repository_fallback ===
+        false,
+      "embedded capability metadata is valid, explicit-only, receipt-aware, and non-enforcing"
     ));
     checks.push(result(
       !Object.hasOwn(codexManifest, "hooks") &&
       !Object.hasOwn(claudeManifest, "hooks"),
       "host manifests declare no production lifecycle hook"
+    ));
+    checks.push(result(
+      fs.statSync(
+        path.join(root, "runtime", "core", "plugin-data.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "receipt-store.js")
+      ).isFile(),
+      "shared hardened plugin-data and receipt-store modules are shipped"
     ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))

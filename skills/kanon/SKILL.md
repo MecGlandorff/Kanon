@@ -45,8 +45,10 @@ working directory:
   `orient` or `verify`.
 
 The root plugin also exposes the stable `orient`, `resume`, `verify`, and
-`status` skills. Notice mode is advisory, enforcement is false, and the
-versioned context receipt is not persisted or enforced.
+`status` skills. Notice mode is advisory and enforcement is false. An explicit
+orient invocation may persist the versioned context receipt only in validated
+plugin data outside the repository; receipt evaluation occurs only during
+explicit Kanon invocations and is never enforcement or authorization.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove

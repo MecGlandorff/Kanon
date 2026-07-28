@@ -1,15 +1,19 @@
-import fs from "node:fs";
-import path from "node:path";
 import {
   checkExactVersionDeprecation
 } from "../registry/deprecation.js";
+import {
+  resolveExternalPluginDataRoot
+} from "../core/plugin-data.js";
 import {
   hasExactKeys,
   isBoundedString,
   isPlainRecord,
   sanitizeDisplayText
 } from "../core/trust.js";
-import { isReceiptHostSession } from "../core/receipt.js";
+import {
+  isReceiptHostEvidence,
+  isReceiptHostSession
+} from "../core/receipt.js";
 import {
   canonicalizeRepositoryRoot,
   isSafeRelativePath
@@ -36,6 +40,7 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *   host: InvocationHost,
  *   host_session?: unknown,
  *   plugin_data_root?: unknown,
+ *   receipt_host_evidence?: unknown,
  *   transport?: import("../registry/transport.js").RegistryTransport,
  *   now?: number,
  *   git_runner?: import("../repository/git.js").GitRunner
@@ -83,6 +88,11 @@ export async function executeStableInvocation(rawInput, context) {
     context.host_session.host === host
       ? context.host_session
       : undefined;
+  const receiptHostEvidence =
+    isReceiptHostEvidence(context.receipt_host_evidence) &&
+    context.receipt_host_evidence.host === host
+      ? context.receipt_host_evidence
+      : undefined;
   const pluginDataRoot = selectExternalPluginDataRoot(
     context.plugin_data_root,
     rawInput
@@ -121,7 +131,12 @@ export async function executeStableInvocation(rawInput, context) {
   const task = stableInput.task ||
     defaultTask(stableInput.skill, stableInput.target);
   const sharedContext = {
-    ...(hostSession === undefined ? {} : { host_session: hostSession }),
+    ...(pluginDataRoot === undefined
+      ? {}
+      : { plugin_data_root: pluginDataRoot }),
+    ...(receiptHostEvidence === undefined
+      ? {}
+      : { receipt_host_evidence: receiptHostEvidence }),
     ...(context.git_runner === undefined
       ? {}
       : { git_runner: context.git_runner }),
@@ -164,7 +179,11 @@ export async function executeStableInvocation(rawInput, context) {
         },
         {
           host,
-          deprecation_status: deprecation
+          deprecation_status: deprecation,
+          ...(pluginDataRoot === undefined
+            ? {}
+            : { plugin_data_root: pluginDataRoot }),
+          ...(validNow(context.now) ? { now: context.now } : {})
         }
       );
       break;
@@ -355,47 +374,16 @@ function validNow(value) {
  * @returns {string | undefined}
  */
 function selectExternalPluginDataRoot(pluginDataRoot, rawInput) {
-  if (
-    !isBoundedString(pluginDataRoot, 8_192) ||
-    !path.isAbsolute(pluginDataRoot) ||
-    !isPlainRecord(rawInput)
-  ) {
+  if (!isPlainRecord(rawInput)) {
     return undefined;
   }
   const repository = canonicalizeRepositoryRoot(rawInput.root);
   if (!repository.ok) {
     return undefined;
   }
-  try {
-    const selected = fs.lstatSync(pluginDataRoot);
-    if (!selected.isDirectory() || selected.isSymbolicLink()) {
-      return undefined;
-    }
-    const cacheRoot = fs.realpathSync(pluginDataRoot);
-    return (
-      containsPath(repository.root, cacheRoot) ||
-      containsPath(cacheRoot, repository.root)
-    )
-      ? undefined
-      : cacheRoot;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * @param {string} parent
- * @param {string} candidate
- * @returns {boolean}
- */
-function containsPath(parent, candidate) {
-  const relative = path.relative(parent, candidate);
-  return (
-    relative === "" ||
-    (
-      relative !== ".." &&
-      !relative.startsWith(`..${path.sep}`) &&
-      !path.isAbsolute(relative)
-    )
+  const selected = resolveExternalPluginDataRoot(
+    pluginDataRoot,
+    repository.root
   );
+  return selected.ok ? selected.root : undefined;
 }

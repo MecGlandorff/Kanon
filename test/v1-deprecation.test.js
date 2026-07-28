@@ -490,7 +490,8 @@ test("checker always requests only the embedded exact version at fixed bounds", 
     "src/v1/registry/cache.js",
     "src/v1/registry/deprecation.js",
     "src/v1/registry/sanitize.js",
-    "src/v1/registry/transport.js"
+    "src/v1/registry/transport.js",
+    "src/v1/core/plugin-data.js"
   ].map((relative) =>
     fs.readFileSync(path.join(repoRoot, relative), "utf8")
   ).join("\n");
@@ -501,8 +502,10 @@ test("checker always requests only the embedded exact version at fixed bounds", 
 });
 
 function makeChecker(responses) {
-  const pluginData = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-deprecation-")
+  const pluginData = fs.realpathSync(
+    fs.mkdtempSync(
+      path.join(os.tmpdir(), "kanon-deprecation-")
+    )
   );
   const calls = [];
   let index = 0;

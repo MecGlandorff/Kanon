@@ -5,7 +5,7 @@ classifications where applicable. Repository-derived strings are marked
 `trust: "repository-untrusted"` in structured evidence and rendered as inert
 data.
 
-## Stable slice 8 reports
+## Stable reports through slice 9
 
 - Orient: canonical repository, instruction-first bounded evidence, Git
   observation, limitations, and a minimal context receipt.
@@ -19,10 +19,13 @@ data.
 All four use `kanon-stable-skill-result-v1`, consult the shared exact-version
 deprecation checker, and preserve unavailable evidence as Unknown.
 
-The `kanon-context-receipt-v1` object contains only `schema`,
-`enforcement: false`, and SHA-256 root, task, evidence, and nullable
-host-session bindings. It is not persisted or enforced and has no invalidation,
-bypass, approval, or Guard lifecycle.
+The `kanon-context-receipt-v2` object contains only its schema,
+`enforcement: false`, fixed provenance, issuance time, and SHA-256 root, task,
+evidence, and nullable aggregate host-evidence bindings. It is advisory
+continuity evidence, never authorization. Explicit orient may replace it only
+in validated plugin data outside the repository. Status and verify may read it
+only during explicit invocations. There is no hook, bypass, approval, Guard,
+or repository-file fallback.
 
 ## Compatibility reports
 
@@ -35,6 +38,9 @@ bypass, approval, or Guard lifecycle.
 - Refresh: explicit continuity persistence.
 
 ## Persistent files
+
+The files below are the v0.4 repository continuity surface. The v1 receipt
+store is separate plugin data and is never placed under `.kanon/`.
 
 - `.kanon/KANON.md` — human continuity brief.
 - `.kanon/TODO.md` — human-owned follow-up, preserved by refresh.
