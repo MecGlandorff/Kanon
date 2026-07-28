@@ -50,7 +50,9 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *     name: InvocationHost,
  *     mode: "notice",
  *     enforcement: false,
- *     hook_status: "Unknown"
+ *     hook_status: "Unknown",
+ *     lifecycle_notice_hook: "Unavailable",
+ *     notice_delivery: "explicit-skill-and-status-output"
  *   },
  *   deprecation: Awaited<ReturnType<typeof checkExactVersionDeprecation>>,
  *   report: ReturnType<typeof runOrient> | ReturnType<typeof runResume> |
@@ -203,7 +205,9 @@ function envelope(skill, host, deprecation, report) {
       name: host,
       mode: "notice",
       enforcement: false,
-      hook_status: "Unknown"
+      hook_status: "Unknown",
+      lifecycle_notice_hook: "Unavailable",
+      notice_delivery: "explicit-skill-and-status-output"
     },
     deprecation,
     report,

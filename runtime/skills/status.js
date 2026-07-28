@@ -47,13 +47,29 @@ import { REPOSITORY_TRUST_BOUNDARY } from "./orient.js";
  *     "codex-cli": {
  *       mode: "notice",
  *       enforcement: false,
- *       hook_status: "Unknown"
+ *       hook_status: "Unknown",
+ *       lifecycle_notice_hook: "Unavailable",
+ *       notice_delivery: "explicit-skill-and-status-output"
  *     },
  *     "claude-code": {
  *       mode: "notice",
  *       enforcement: false,
- *       hook_status: "Unknown"
+ *       hook_status: "Unknown",
+ *       lifecycle_notice_hook: "Unavailable",
+ *       notice_delivery: "explicit-skill-and-status-output"
  *     }
+ *   } | null,
+ *   notice: {
+ *     advisory: true,
+ *     automatic: false,
+ *     blocks: false,
+ *     rewrites: false,
+ *     approves: false,
+ *     suppresses: false,
+ *     forces_reading: false,
+ *     claims_understanding: false,
+ *     delivery: "explicit-skill-and-status-output",
+ *     future_requirement: "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
  *   } | null,
  *   receipt: ReturnType<typeof inspectReceiptStatus>,
  *   diagnostics: string[]
@@ -97,6 +113,9 @@ export function runStatus(input, context) {
       "Active host introspection was unavailable; host state remains Unknown."
     );
   }
+  diagnostics.push(
+    "Automatic lifecycle notice is unavailable. Any future host-specific lifecycle notice requires a separately proven executable, argument-vector, and environment boundary."
+  );
   diagnostics.push(receipt.diagnostic);
   return {
     schema: "kanon-status-report-v1",
@@ -129,6 +148,9 @@ export function runStatus(input, context) {
     active_host: context.host,
     hosts: metadata.ok
       ? metadata.value.public_capabilities.hosts
+      : null,
+    notice: metadata.ok
+      ? metadata.value.public_capabilities.notice
       : null,
     receipt,
     diagnostics: diagnostics

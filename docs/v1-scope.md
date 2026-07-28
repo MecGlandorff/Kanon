@@ -1,12 +1,14 @@
 # Kanon v1 scope and compatibility freeze
 
-**Status:** Frozen scope plus additive Run B implementation status through
-product slice 8. This file is not a release claim and does not authorize
-slice 9, Guard, `steer`, or `aswitch`.
+**Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice
+amendment and additive Run B recovery status through product slice 8. This
+file is not a release claim and does not authorize slice 9, Guard, `steer`, or
+`aswitch`.
 
-**Authority:** [`V_1design.md`](../V_1design.md) is the frozen authoritative
-contract. This companion records its reduced scope without changing it. Where
-this file is less specific than the design, the design controls.
+**Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
+including its explicitly authorized 2026-07-28 amendment. This companion
+records the reduced scope. Where this file is less specific than the design,
+the design controls.
 
 ## Stable v1 contract
 
@@ -21,11 +23,12 @@ The following six skills are the entire stable v1 skill surface:
 | `$kanon:steer` | Keep a small evidence-backed work state for one verified slice at a time. |
 | `$kanon:aswitch` | Prepare a consented handoff with a manual fallback. |
 
-The stable promises are advisory context readiness and receipt-state notice,
-continuity without invented memory, epistemic honesty, and no hidden
-execution. Stable v1 classifies context and available receipt data as Current,
-Stale, or Unknown; it does not enforce mutation blocking on either supported
-host.
+The stable promises are advisory context readiness and receipt-state notice
+through explicit skill and status output, continuity without invented memory,
+epistemic honesty, and no hidden execution. Stable v1 classifies context and
+available receipt data as Current, Stale, or Unknown; it does not
+automatically intercept host operations or enforce mutation blocking on either
+supported host.
 The promises do not say that a model understood evidence, that a declared
 command is safe or succeeds, or that Kanon replaces host sandboxing, approvals,
 or human review.
@@ -70,6 +73,29 @@ this product decision does not rewrite their reports, promote non-observation
 to a negative capability conclusion, or turn either no-go into proof that
 enforcement is impossible.
 
+### Run B recovery lifecycle-notice amendment
+
+**Decision date:** 2026-07-28.
+
+The user authorized a narrow amendment after principal review reopened the
+slice-4 production-hook boundary. Lifecycle-hook declarations are now
+host-specific and optional. Stable v1 ships no automatic lifecycle notice for
+Codex CLI or Claude Code because no safe executable, argument-vector, and
+environment boundary is directly proven for every claimed platform.
+
+Stable notice is delivered only through explicit skill and status output.
+Both hosts remain in `notice` mode with `enforcement: false`. The shipped
+artifact contains no production `PreToolUse` hook, shared hook manifest,
+shell command, or PATH-dependent lifecycle launcher. The absence of Kanon's
+lifecycle notice is reported as unavailable; missing host hook introspection
+remains `Unknown`.
+
+This amendment does not reinterpret any historical Guard observation, relax
+the hostile-environment boundary, add a platform-specific hook, implement
+Guard or receipt persistence, or transfer evidence between hosts or
+platforms. Automatic lifecycle notice and hard Guard remain future,
+host-specific experimental work.
+
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
@@ -109,7 +135,8 @@ fail safely to the manual handoff.
 
 ### Known
 
-- `V_1design.md` is the frozen v1 contract on `release/v.1.0.0`.
+- `V_1design.md`, including the authorized 2026-07-28 amendment, is the
+  authoritative v1 contract on `release/v.1.0.0`.
 - The embedded development-artifact version remains `0.4.0-rc.1`; this branch
   is implementation evidence, not a v1 release.
 - The generated plugin exposes `kanon`, `orient`, `resume`, `status`, and
@@ -117,6 +144,9 @@ fail safely to the manual handoff.
 - The compatibility wrappers remain `ask`, `brief`, `refresh`, `resume`,
   `todo`, and `verify`; read aliases route to the stable slice 8 runtime,
   while `refresh` and `todo` retain their explicit bounded v0.4 writes.
+- The stable artifact has separate Codex and Claude manifests but no
+  production lifecycle-hook declaration. Advisory notice is present only in
+  explicit skill and status output.
 - The slice 8 receipt contains only a versioned schema, `enforcement: false`,
   and SHA-256 bindings for root, task, evidence, and an available host session.
   It has no persistence or lifecycle behavior.
@@ -129,7 +159,8 @@ fail safely to the manual handoff.
 
 ### Unknown
 
-- Unavailable host and hook introspection remains `Unknown`.
+- Unavailable host hook introspection remains `Unknown`; this is distinct from
+  the Known absence of a shipped Kanon lifecycle-notice hook.
 - Host session, compaction, and plugin-data behavior needed by any future
   experimental hard-Guard design remains unproven.
 - The release-governance participants, beta-adapter opt-in policy, first
@@ -140,9 +171,12 @@ fail safely to the manual handoff.
 
 - Slice 1 statements that the four read-skill directories did not yet exist
   are superseded by the additive slice 8 implementation record.
+- Pre-recovery Run B claims that the shared production hook had no open P1 are
+  superseded by the 2026-07-28 amendment and recovery certification.
 
 ### Suggested
 
-- Keep hard Guard and any broader receipt lifecycle outside public v1.
+- Keep automatic lifecycle notice, hard Guard, and any broader receipt
+  lifecycle outside public v1 until separately proven and authorized.
 - Before Run C, require a clean slice 8 commit and an explicit sequencing
   decision about skipping or reframing the now-out-of-scope product slice 9.

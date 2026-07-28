@@ -17,7 +17,9 @@ export const IMPLEMENTED_PUBLIC_SKILLS = Object.freeze([
  * @typedef {{
  *   mode: "notice",
  *   enforcement: false,
- *   hook_status: "Unknown"
+ *   hook_status: "Unknown",
+ *   lifecycle_notice_hook: "Unavailable",
+ *   notice_delivery: "explicit-skill-and-status-output"
  * }} HostCapability
  * @typedef {{
  *   schema: "kanon-build-metadata-v1",
@@ -36,12 +38,15 @@ export const IMPLEMENTED_PUBLIC_SKILLS = Object.freeze([
  *     },
  *     notice: {
  *       advisory: true,
+ *       automatic: false,
  *       blocks: false,
  *       rewrites: false,
  *       approves: false,
  *       suppresses: false,
  *       forces_reading: false,
- *       claims_understanding: false
+ *       claims_understanding: false,
+ *       delivery: "explicit-skill-and-status-output",
+ *       future_requirement: "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
  *     }
  *   }
  * }} BuildMetadata
@@ -152,17 +157,24 @@ function validCapabilities(value) {
     hasExactKeys(value.notice, [
       "advisory",
       "approves",
+      "automatic",
       "blocks",
       "claims_understanding",
+      "delivery",
       "forces_reading",
+      "future_requirement",
       "rewrites",
       "suppresses"
     ]) &&
     value.notice.advisory === true &&
     value.notice.approves === false &&
+    value.notice.automatic === false &&
     value.notice.blocks === false &&
     value.notice.claims_understanding === false &&
+    value.notice.delivery === "explicit-skill-and-status-output" &&
     value.notice.forces_reading === false &&
+    value.notice.future_requirement ===
+      "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary" &&
     value.notice.rewrites === false &&
     value.notice.suppresses === false
   );
@@ -175,10 +187,18 @@ function validCapabilities(value) {
 function validHost(value) {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ["enforcement", "hook_status", "mode"]) &&
+    hasExactKeys(value, [
+      "enforcement",
+      "hook_status",
+      "lifecycle_notice_hook",
+      "mode",
+      "notice_delivery"
+    ]) &&
     value.mode === "notice" &&
     value.enforcement === false &&
-    value.hook_status === "Unknown"
+    value.hook_status === "Unknown" &&
+    value.lifecycle_notice_hook === "Unavailable" &&
+    value.notice_delivery === "explicit-skill-and-status-output"
   );
 }
 

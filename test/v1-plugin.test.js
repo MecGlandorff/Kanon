@@ -5,8 +5,8 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { adaptClaudeNotice } from "../src/v1/adapters/claude.js";
-import { adaptCodexNotice } from "../src/v1/adapters/codex.js";
+import * as claudeAdapter from "../src/v1/adapters/claude.js";
+import * as codexAdapter from "../src/v1/adapters/codex.js";
 import {
   readEmbeddedBuildMetadata,
   validateEmbeddedBuildMetadata
@@ -20,7 +20,6 @@ const repoRoot = path.resolve(
 const packageManifest = readJson("package.json");
 const codexManifest = readJson(".codex-plugin/plugin.json");
 const claudeManifest = readJson(".claude-plugin/plugin.json");
-const hookManifest = readJson("hooks/hooks.json");
 const buildMetadata = readJson("runtime/build-metadata.json");
 
 test("dual-host manifests are separate and share skills plus one runtime root", () => {
@@ -61,12 +60,16 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
       "codex-cli": {
         mode: "notice",
         enforcement: false,
-        hook_status: "Unknown"
+        hook_status: "Unknown",
+        lifecycle_notice_hook: "Unavailable",
+        notice_delivery: "explicit-skill-and-status-output"
       },
       "claude-code": {
         mode: "notice",
         enforcement: false,
-        hook_status: "Unknown"
+        hook_status: "Unknown",
+        lifecycle_notice_hook: "Unavailable",
+        notice_delivery: "explicit-skill-and-status-output"
       }
     }
   );
@@ -74,12 +77,16 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
     buildMetadata.public_capabilities.notice,
     {
       advisory: true,
+      automatic: false,
       blocks: false,
       rewrites: false,
       approves: false,
       suppresses: false,
       forces_reading: false,
-      claims_understanding: false
+      claims_understanding: false,
+      delivery: "explicit-skill-and-status-output",
+      future_requirement:
+        "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
     }
   );
   const read = readEmbeddedBuildMetadata();
@@ -103,111 +110,94 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
   assert.doesNotMatch(JSON.stringify(buildMetadata), /steer|aswitch/);
 });
 
-test("host adapters validate and normalize without retaining host values", () => {
-  const hostile = {
-    hook_event_name: "PreToolUse",
-    tool_name: "Write",
-    tool_input: {
-      file_path: "/private/secret",
-      content: "<script>repository-controlled</script>"
-    },
-    session_id: "secret-session",
-    turn_id: "secret-turn",
-    cwd: "/secret/repository"
+test("host adapters expose only explicit stable-skill invocation", () => {
+  assert.deepEqual(Object.keys(codexAdapter), ["invokeCodexSkill"]);
+  assert.deepEqual(Object.keys(claudeAdapter), ["invokeClaudeSkill"]);
+  for (const relative of [
+    "src/v1/adapters/codex.js",
+    "src/v1/adapters/claude.js",
+    "src/v1/adapters/shared.js"
+  ]) {
+    const source = fs.readFileSync(path.join(repoRoot, relative), "utf8");
+    assert.doesNotMatch(
+      source,
+      /PreToolUse|hook_event_name|permissionDecision|updatedInput/
+    );
+  }
+});
+
+test("production plugin tree contains no lifecycle-hook declaration", () => {
+  assert.equal(fs.existsSync(path.join(repoRoot, "hooks", "hooks.json")), false);
+  assert.equal(
+    fs.existsSync(
+      path.join(repoRoot, "src", "v1", "adapters", "notice-hook.js")
+    ),
+    false
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(repoRoot, "runtime", "adapters", "notice-hook.js")
+    ),
+    false
+  );
+  assert.equal(
+    Object.hasOwn(codexManifest, "hooks") ||
+      Object.hasOwn(claudeManifest, "hooks"),
+    false
+  );
+  assert.doesNotMatch(
+    JSON.stringify([codexManifest, claudeManifest, buildMetadata]),
+    /PreToolUse|automatic["']?\s*:\s*true|enforcement["']?\s*:\s*true/
+  );
+});
+
+test("explicit status output carries advisory notice with no interception claim", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-notice-"));
+  fs.writeFileSync(path.join(root, "README.md"), "# Fixture\n");
+  const invocation = {
+    schema: "kanon-stable-invocation-v1",
+    skill: "status",
+    root
   };
-  const codex = adaptCodexNotice(hostile);
-  const claude = adaptClaudeNotice(hostile);
-  assert.equal(codex.ok, true);
-  assert.equal(claude.ok, true);
-  assert.deepEqual(codex.output, claude.output);
-  assert.equal(codex.event.host, "codex-cli");
-  assert.equal(claude.event.host, "claude-code");
-  for (const value of [
-    JSON.stringify(codex),
-    JSON.stringify(claude)
-  ]) {
-    assert.doesNotMatch(value, /secret|repository-controlled|script/);
-  }
-});
-
-test("host adapters fail to Unknown for malformed, unsupported, or oversized input", () => {
-  for (const input of [
-    null,
-    [],
-    {},
-    {
-      hook_event_name: "PostToolUse",
-      tool_name: "Write",
-      tool_input: {}
-    },
-    {
-      hook_event_name: "PreToolUse",
-      tool_name: "UnknownTool",
-      tool_input: {}
-    },
-    {
-      hook_event_name: "PreToolUse",
-      tool_name: "Write",
-      tool_input: {},
-      session_id: "x".repeat(257)
-    },
-    Object.assign(Object.create(null), {
-      hook_event_name: "PreToolUse",
-      tool_name: "Write",
-      tool_input: {}
+  const context = {
+    transport: async () => ({
+      ok: true,
+      status_code: 200,
+      content_type: "application/json",
+      body: JSON.stringify({
+        name: packageManifest.name,
+        version: packageManifest.version
+      })
     })
-  ]) {
-    assert.deepEqual(adaptCodexNotice(input), {
-      ok: false,
-      status: "Unknown",
-      diagnostic:
-        "Host hook input was unavailable or invalid; hook state remains Unknown."
-    });
-    assert.deepEqual(adaptClaudeNotice(input), {
-      ok: false,
-      status: "Unknown",
-      diagnostic:
-        "Host hook input was unavailable or invalid; hook state remains Unknown."
-    });
-  }
-});
+  };
+  const codex = await codexAdapter.invokeCodexSkill(invocation, context);
+  const claude = await claudeAdapter.invokeClaudeSkill(invocation, context);
 
-test("shared notice hook is observational and equivalent for both hosts", () => {
-  const event = JSON.stringify({
-    hook_event_name: "PreToolUse",
-    tool_name: "Write",
-    tool_input: { content: "hostile-data-must-not-return" },
-    session_id: "session"
-  });
-  const codex = runHook(event, { PLUGIN_ROOT: repoRoot });
-  const claude = runHook(event, { CLAUDE_PLUGIN_ROOT: repoRoot });
-  assert.equal(codex.status, 0);
-  assert.equal(claude.status, 0);
-  assert.equal(codex.stdout, claude.stdout);
-  assert.deepEqual(Object.keys(JSON.parse(codex.stdout)), ["systemMessage"]);
-  assert.doesNotMatch(codex.stdout, /hostile-data-must-not-return/);
-  assert.doesNotMatch(
-    codex.stdout,
-    /permissionDecision|updatedInput|continue|stopReason|suppressOutput/
-  );
-  assert.equal(hookManifest.hooks.PreToolUse[0].matcher, "Bash|Write|Edit|apply_patch");
-  assert.doesNotMatch(
-    JSON.stringify(hookManifest),
-    /permissionDecision|updatedInput|auto.?approve|suppressOutput/
-  );
-});
-
-test("shared notice hook fails open for malformed and oversized input", () => {
-  for (const input of [
-    "{not json",
-    "",
-    "x".repeat(64 * 1024 + 1)
-  ]) {
-    const result = runHook(input, { PLUGIN_ROOT: repoRoot });
-    assert.equal(result.status, 0);
-    assert.equal(result.stdout, "");
-    assert.match(result.stderr, /remains Unknown/);
+  for (const result of [codex, claude]) {
+    assert.equal(result.host.mode, "notice");
+    assert.equal(result.host.enforcement, false);
+    assert.equal(result.host.hook_status, "Unknown");
+    assert.equal(result.host.lifecycle_notice_hook, "Unavailable");
+    assert.equal(
+      result.host.notice_delivery,
+      "explicit-skill-and-status-output"
+    );
+    assert.equal(result.report.notice.advisory, true);
+    assert.equal(result.report.notice.automatic, false);
+    assert.equal(result.report.notice.blocks, false);
+    assert.equal(result.report.notice.rewrites, false);
+    assert.equal(result.report.notice.approves, false);
+    assert.equal(result.report.notice.suppresses, false);
+    assert.match(
+      result.report.notice.future_requirement,
+      /proven-executable-argument-vector-and-environment-boundary/
+    );
+    assert.match(
+      result.report.diagnostics.join(" "),
+      /Automatic lifecycle notice is unavailable/
+    );
   }
+  assert.deepEqual(codex.report.notice, claude.report.notice);
 });
 
 test("runtime remains ESM when copied below a CommonJS package boundary", () => {
@@ -267,7 +257,9 @@ test("package builder uses an exact production allowlist", () => {
   assert.deepEqual(actual, expected);
   assert.equal(actual.includes(".codex-plugin/plugin.json"), true);
   assert.equal(actual.includes(".claude-plugin/plugin.json"), true);
-  assert.equal(actual.includes("hooks/hooks.json"), true);
+  assert.equal(actual.some((file) => /(?:^|\/)hooks\//.test(file)), false);
+  assert.equal(actual.includes("runtime/adapters/notice-hook.js"), false);
+  assert.equal(actual.includes("runtime/core/notice.js"), false);
   assert.equal(actual.includes("runtime/package.json"), true);
   assert.equal(actual.includes("runtime/build-metadata.json"), true);
   assert.equal(
@@ -276,9 +268,28 @@ test("package builder uses an exact production allowlist", () => {
     ),
     false
   );
+  for (const disposableHook of [
+    "spikes/guard-feasibility/codex-cli/marketplace/plugins/kanon-guard-spike-codex/hooks/hooks.json",
+    "spikes/guard-feasibility/claude-code/plugin/hooks/hooks.json"
+  ]) {
+    assert.equal(fs.existsSync(path.join(repoRoot, disposableHook)), true);
+    assert.equal(actual.includes(disposableHook), false);
+  }
   assert.equal(
     actual.some((file) => file.startsWith("skills/kanon/runtime/")),
     false
+  );
+  const shippedText = actual
+    .filter((file) => /\.(?:js|json|md|ya?ml|ps1)$/.test(file))
+    .map((file) => fs.readFileSync(path.join(output, file), "utf8"))
+    .join("\n");
+  assert.doesNotMatch(
+    shippedText,
+    /PreToolUse|hook_event_name|notice-hook\.js/
+  );
+  assert.doesNotMatch(
+    shippedText,
+    /dangerously-bypass-hook-trust|dangerously-skip-permissions/
   );
 });
 
@@ -318,24 +329,6 @@ test("embedded metadata validator rejects extra, malformed, and hostile fields",
 
 function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, relative), "utf8"));
-}
-
-function runHook(input, hostEnvironment) {
-  return spawnSync(
-    process.execPath,
-    [path.join(repoRoot, "runtime", "adapters", "notice-hook.js")],
-    {
-      cwd: repoRoot,
-      input,
-      encoding: "utf8",
-      env: {
-        PATH: process.env.PATH,
-        ...hostEnvironment
-      },
-      timeout: 10_000,
-      maxBuffer: 256 * 1024
-    }
-  );
 }
 
 function listFiles(directory) {

@@ -66,12 +66,10 @@ test("every canonical v1 production module is in the strict project", () => {
     [
       "src/v1/adapters/claude.js",
       "src/v1/adapters/codex.js",
-      "src/v1/adapters/notice-hook.js",
       "src/v1/adapters/shared.js",
       "src/v1/bin/kanon.js",
       "src/v1/cli.js",
       "src/v1/core/build-metadata.js",
-      "src/v1/core/notice.js",
       "src/v1/core/receipt.js",
       "src/v1/core/trust.js",
       "src/v1/registry/cache.js",

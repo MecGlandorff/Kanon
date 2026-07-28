@@ -1,12 +1,39 @@
 # Kanon v1 Run B implementation record
 
-**Status:** development evidence for product slices 4 through 8. This file is
-not a release claim and does not authorize slice 9.
+**Status:** Run B recovery in progress for product slices 4 through 8. This
+file is not a release claim and does not authorize slice 9.
 
-The frozen authority remains [`V_1design.md`](../V_1design.md). The approved
-notice-only product decision is recorded in
+The authoritative contract is [`V_1design.md`](../V_1design.md), including its
+authorized 2026-07-28 lifecycle-notice amendment. The approved notice-only
+product decision is recorded in
 [`v1-scope.md`](v1-scope.md) and
 [`v1-guard-feasibility.md`](v1-guard-feasibility.md).
+
+## Recovery amendment frame
+
+**Decision date:** 2026-07-28.
+
+Principal review after commit `be0427e` reopened one slice-4 P1. The production
+shared hook invoked a bare `node` command and its tests exercised the adapter
+directly rather than the shipped manifest command. Under Codex CLI 0.145.0,
+the outer inherited shell and `-lc` startup processing occur before any inner
+launcher can establish a minimum environment. Claude Code can express a
+direct-exec form, but no portable trusted absolute Node.js executable is
+proven for every stable platform.
+
+The user authorized a narrow design amendment: lifecycle-hook declarations are
+optional and host-specific; stable v1 ships no automatic lifecycle notice for
+either host; and notice appears only through explicit skill and status output
+with `enforcement: false`. The hostile-environment boundary is unchanged.
+Automatic lifecycle notice and hard Guard remain future host-specific
+experimental work.
+
+All pre-recovery statements below saying “P0/P1 at completion: none,” that the
+shared hook passed principal review, or that Run B was complete are retained
+only as historical slice records. They are **Stale / suspicious** until this
+recovery removes the hook surface, preserves the existing correction set,
+reruns every stated validation after the fix, and commits a clean worktree.
+Historical Guard reports remain immutable.
 
 ## Slice 4 frame — dual-host plugin skeleton
 

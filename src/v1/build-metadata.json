@@ -19,22 +19,29 @@
       "codex-cli": {
         "mode": "notice",
         "enforcement": false,
-        "hook_status": "Unknown"
+        "hook_status": "Unknown",
+        "lifecycle_notice_hook": "Unavailable",
+        "notice_delivery": "explicit-skill-and-status-output"
       },
       "claude-code": {
         "mode": "notice",
         "enforcement": false,
-        "hook_status": "Unknown"
+        "hook_status": "Unknown",
+        "lifecycle_notice_hook": "Unavailable",
+        "notice_delivery": "explicit-skill-and-status-output"
       }
     },
     "notice": {
       "advisory": true,
+      "automatic": false,
       "blocks": false,
       "rewrites": false,
       "approves": false,
       "suppresses": false,
       "forces_reading": false,
-      "claims_understanding": false
+      "claims_understanding": false,
+      "delivery": "explicit-skill-and-status-output",
+      "future_requirement": "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
     }
   }
 }

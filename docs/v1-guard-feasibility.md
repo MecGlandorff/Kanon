@@ -642,3 +642,38 @@ The stable six-skill target and dual-host support remain unchanged. Runs A,
 A.1, and A.2 are not reinterpreted: missing evidence remains `Unknown`, the
 historical result files remain immutable, and a result from one host remains
 no evidence for the other.
+
+## Run B recovery lifecycle-notice amendment
+
+**Date:** 2026-07-28.
+
+**Status:** additive product-contract amendment. This section does not alter
+the Run A, A.1, or A.2 reports, hashes, observations, classifications,
+host-specific no-go decisions, or hard stops.
+
+Principal review of the production slice-4 hook found that a shared
+`hooks/hooks.json` command could not satisfy the hostile-environment boundary:
+Codex CLI 0.145.0 launches its command string through an inherited shell with
+`-lc`, while Claude Code's direct-exec form still requires a trusted absolute
+executable rather than a bare PATH-resolved name. No safe cross-platform
+executable, argument-vector, and environment boundary is directly proven for
+both stable host contracts.
+
+The user therefore authorizes this stable-v1 disposition:
+
+- lifecycle-hook declarations are optional and host-specific;
+- the production artifact ships no automatic lifecycle notice for Codex CLI
+  or Claude Code;
+- notice appears only in explicit skill and status output;
+- both hosts retain `mode: notice` and `enforcement: false`;
+- no production `PreToolUse` notice hook, launcher, Guard, denial, rewrite,
+  approval, suppression, forced reading, or persisted receipt lifecycle ships;
+- unavailable host hook introspection remains `Unknown`; and
+- automatic lifecycle notice and hard Guard remain future, separately proven,
+  host-and-platform-specific experimental work.
+
+The hostile-environment boundary is not relaxed. Claude's host-specific
+direct-exec capability is not evidence for Codex or for another platform, and
+the Codex command-string behavior is not promoted beyond its named version and
+surface. Explicit notice does not claim that repository evidence was read or
+understood.

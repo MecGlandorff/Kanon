@@ -21,12 +21,10 @@ export const STABLE_SLICE_8_SKILLS = Object.freeze(
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
   ["src/v1/adapters/codex.js", "runtime/adapters/codex.js"],
-  ["src/v1/adapters/notice-hook.js", "runtime/adapters/notice-hook.js"],
   ["src/v1/adapters/shared.js", "runtime/adapters/shared.js"],
   ["src/v1/bin/kanon.js", "runtime/bin/kanon-v1.js"],
   ["src/v1/cli.js", "runtime/cli.js"],
   ["src/v1/core/build-metadata.js", "runtime/core/build-metadata.js"],
-  ["src/v1/core/notice.js", "runtime/core/notice.js"],
   ["src/v1/core/receipt.js", "runtime/core/receipt.js"],
   ["src/v1/core/trust.js", "runtime/core/trust.js"],
   ["src/v1/repository/git.js", "runtime/repository/git.js"],
@@ -88,7 +86,6 @@ export function publicSkillFiles(repoRoot) {
   return [
     ".claude-plugin/plugin.json",
     ".codex-plugin/plugin.json",
-    "hooks/hooks.json",
     "runtime/package.json",
     "runtime/build-metadata.json",
     "runtime/bin/kanon.js",
@@ -141,22 +138,30 @@ export function embeddedBuildMetadata(sourcePackage) {
         "codex-cli": {
           mode: "notice",
           enforcement: false,
-          hook_status: "Unknown"
+          hook_status: "Unknown",
+          lifecycle_notice_hook: "Unavailable",
+          notice_delivery: "explicit-skill-and-status-output"
         },
         "claude-code": {
           mode: "notice",
           enforcement: false,
-          hook_status: "Unknown"
+          hook_status: "Unknown",
+          lifecycle_notice_hook: "Unavailable",
+          notice_delivery: "explicit-skill-and-status-output"
         }
       },
       notice: {
         advisory: true,
+        automatic: false,
         blocks: false,
         rewrites: false,
         approves: false,
         suppresses: false,
         forces_reading: false,
-        claims_understanding: false
+        claims_understanding: false,
+        delivery: "explicit-skill-and-status-output",
+        future_requirement:
+          "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
       }
     }
   };

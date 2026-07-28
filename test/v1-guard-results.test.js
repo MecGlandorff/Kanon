@@ -552,6 +552,31 @@ test("Run B additively selects advisory notice without rewriting host evidence",
   }
 });
 
+test("Run B recovery removes automatic lifecycle notice without rewriting evidence", () => {
+  assert.match(resultDocument, /Run B recovery lifecycle-notice amendment/);
+  assert.match(resultDocument, /\*\*Date:\*\* 2026-07-28/);
+  assert.match(
+    resultDocument,
+    /lifecycle-hook declarations are optional and host-specific/
+  );
+  assert.match(
+    resultDocument,
+    /production artifact ships no automatic lifecycle notice for Codex CLI\s+or Claude Code/
+  );
+  assert.match(
+    resultDocument,
+    /notice appears only in explicit skill and status output/
+  );
+  assert.match(
+    resultDocument,
+    /unavailable host hook introspection remains `Unknown`/
+  );
+  assert.match(
+    resultDocument,
+    /historical result files remain immutable|does not alter\s+the Run A, A\.1, or A\.2 reports/
+  );
+});
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

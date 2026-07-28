@@ -31,8 +31,9 @@ governance requirements below.
 
 The stable promises are:
 
-- **Context before covered mutation** — where Guard mode is proven, covered
-  mutation tools require a current context receipt.
+- **Advisory context readiness** — explicit Kanon skill and status output
+  surfaces context readiness and available receipt state without intercepting
+  or blocking host operations.
 - **Continuity without invented memory** — live repository evidence wins over
   stored state and conflicts remain visible.
 - **Epistemic honesty** — direct evidence, inference, non-observation,
@@ -43,6 +44,46 @@ The stable promises are:
 Kanon does not claim that a model understood evidence merely because the
 evidence entered its context. It does not prove a declared command is safe or
 successful. It does not replace the host sandbox, approvals, or human review.
+
+## Authorized lifecycle-notice amendment
+
+**Decision date:** 2026-07-28.
+
+This amendment changes only the automatic lifecycle-notice boundary. It
+supersedes the earlier mandatory shared-hook wording in **Plugin and host
+shape**, the lifecycle portion of **Stable host contract**, and any stable
+exit-criterion reading that assumes a production notice hook must ship.
+
+Lifecycle-hook declarations are host-specific and optional. Stable v1 ships
+no automatic lifecycle notice for Codex CLI or Claude Code because no safe
+cross-platform executable, argument-vector, and environment boundary has been
+directly proven for either stable host contract. Stable notice is delivered
+only through explicit skill and status output. It remains advisory, with
+`enforcement: false`; it never intercepts, denies, rewrites, approves,
+suppresses, or forces repository reading.
+
+The amendment preserves the hostile-environment boundary. Codex CLI 0.145.0
+accepts a command string and launches it through an inherited shell with
+`-lc`, so an inner launcher cannot neutralize shell selection or startup
+processing that occurs first. Claude Code's direct-exec form avoids a shell,
+but a bare executable still depends on inherited `PATH`, and no portable
+absolute Node.js executable or equivalent cross-platform boundary is proven.
+A host result never transfers to another host or platform.
+
+Affected production clauses now require:
+
+- no shared or host-specific production lifecycle-hook declaration in the
+  stable v1 artifact;
+- `notice` plus `enforcement: false` in both host capability records;
+- lifecycle-notice availability reported as unavailable, while unsupported
+  host hook introspection remains `Unknown`; and
+- any future automatic lifecycle notice or hard Guard to remain separately
+  proven, host-specific experimental work.
+
+Non-goals are a hostile-environment relaxation, a replacement shell or
+launcher, platform-specific stable hooks, Guard, receipt persistence,
+mutation interception, or any claim that explicit notice proves reading or
+understanding.
 
 ## Scope
 
@@ -93,7 +134,8 @@ supervision, crash recovery, or an agent-orchestration framework.
 
 Kanon v1 supports both Codex CLI and Claude Code as stable skill hosts. One
 released plugin root contains separate host manifests, shared concise skills,
-one runtime, and lifecycle hooks:
+and one runtime. Lifecycle-hook declarations are optional and host-specific;
+the stable v1 artifact contains none:
 
 ```text
 kanon/
@@ -108,8 +150,6 @@ kanon/
 │   ├── status/
 │   ├── steer/
 │   └── aswitch/
-├── hooks/
-│   └── hooks.json
 └── runtime/
     ├── core/
     ├── adapters/
@@ -124,10 +164,12 @@ manifest configures Claude Code only. Both hosts discover root-level
 `skills/`; host-specific event input and output are normalized by the
 corresponding runtime adapter.
 
-Use the default `hooks/hooks.json` location supported by both hosts. Keep its
-declaration minimal and dispatch behavior through the host adapters. Include a
-local runtime `package.json` declaring `"type": "module"` so a copied or
-installed artifact does not depend on an ancestor package boundary.
+Do not use a shared lifecycle-hook declaration. A future host-specific
+experimental declaration may exist only after its executable,
+argument-vector, environment, host version, operating system, and tool surface
+are independently proven. Include a local runtime `package.json` declaring
+`"type": "module"` so a copied or installed artifact does not depend on an
+ancestor package boundary.
 
 Keep every `SKILL.md` concise. Put deterministic behavior in runtime code and
 load detailed policy references only when needed.
@@ -139,11 +181,11 @@ or adapter is never treated as proof for the other host.
 
 ### Stable host contract
 
-| Host surface | Stable skills | Guard contract |
+| Host surface | Stable skills | Stable v1 runtime contract |
 | --- | --- | --- |
-| Codex CLI | All six v1 skills | `guard` only after the Codex spike passes; otherwise `notice` |
-| Claude Code CLI | All six v1 skills | `guard` only after the Claude spike passes; otherwise `notice` |
-| Other Codex or Claude surfaces | Only when installed-artifact tests cover them | `notice` until denial behavior is separately proven |
+| Codex CLI | All six v1 skills | Explicit skill/status `notice`; enforcement false; no lifecycle hook |
+| Claude Code CLI | All six v1 skills | Explicit skill/status `notice`; enforcement false; no lifecycle hook |
+| Other Codex or Claude surfaces | Only when installed-artifact tests cover them | No automatic notice or enforcement claim without separate host-and-platform proof |
 
 Host invocation syntax may differ, but skill behavior, schemas, trust labels,
 and failure semantics remain equivalent. Dual-host skill support is part of
@@ -326,7 +368,9 @@ evidence for the other.
 
 Desktop, IDE, web, and other surfaces receive a Guard claim only if the same
 installed-artifact integration tests prove their denial behavior. Otherwise
-they expose `notice` and are documented as unsupported for enforcement.
+they receive no automatic lifecycle or enforcement claim. Explicit skill and
+status output may expose advisory `notice` only where the installed artifact
+is covered.
 
 ### Decision
 
@@ -337,6 +381,10 @@ After the spike:
   further Guard work.
 
 Do not build production receipts against assumed hook semantics.
+
+The 2026-07-28 amendment records the completed stable-v1 branch of this
+decision: both initial hosts remain hard-Guard no-go, stable notice is explicit
+skill/status output only, and no production lifecycle hook ships.
 
 ### Receipt behavior
 
@@ -599,7 +647,8 @@ redesigned before evaluation.
 - [ ] Compatibility aliases behave as documented.
 - [ ] Guard denial is proven on every surface for which it is claimed.
 - [ ] A Guard result from one host is never promoted to another host.
-- [ ] Unsupported, disabled, untrusted, and bypassed hooks remain visible.
+- [ ] Unsupported or unavailable host hook introspection remains `Unknown`;
+      the absence of a shipped Kanon lifecycle-notice hook remains explicit.
 - [ ] Receipts are scoped, invalidated, bounded, and recoverable.
 - [ ] Read workflows do not mutate repository or Git metadata.
 - [ ] Live evidence overrides conflicting continuity state.
