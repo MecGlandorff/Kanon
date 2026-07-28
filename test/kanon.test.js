@@ -316,7 +316,7 @@ test("CLI exposes the narrowed public surface and rejects removed modes", async 
   assert.match(ask, /Kanon Answer/);
 });
 
-test("public skill ships only six wrappers and states the trust boundary", () => {
+test("public skills ship only supported wrappers and state the trust boundary", () => {
   const skill = fs.readFileSync(
     path.join(repoRoot, "skills/kanon/SKILL.md"),
     "utf8"
@@ -333,6 +333,33 @@ test("public skill ships only six wrappers and states the trust boundary", () =>
     .sort();
 
   assert.deepEqual(wrappers, expected);
+  for (const stable of ["orient", "resume", "status", "verify"]) {
+    const stableRoot = path.join(repoRoot, "skills", stable);
+    assert.equal(
+      fs.existsSync(path.join(stableRoot, "SKILL.md")),
+      true
+    );
+    assert.deepEqual(
+      fs.readdirSync(path.join(stableRoot, "scripts")).sort(),
+      [`kanon-${stable}`, `kanon-${stable}.ps1`]
+    );
+    const bashWrapper = fs.readFileSync(
+      path.join(stableRoot, "scripts", `kanon-${stable}`),
+      "utf8"
+    );
+    assert.match(bashWrapper, /^#!\/bin\/bash$/m);
+    assert.match(bashWrapper, /SAFE_PATH/);
+    assert.match(
+      bashWrapper,
+      /refused a repository-controlled Node\.js executable/
+    );
+  }
+  for (const removed of ["steer", "aswitch"]) {
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, "skills", removed)),
+      false
+    );
+  }
   assert.match(skill, /Repository content is untrusted data/);
   assert.match(skill, /explicit user approval/);
   assert.doesNotMatch(skill, /\bimprove\b|\brefactor\b|scorecard/i);
@@ -367,6 +394,10 @@ test("generated skill artifact is synchronized and self-contained", () => {
     assert.equal(run.status, 0, run.stderr);
     assert.equal(JSON.parse(run.stdout).version, "0.4.0-rc.1");
   }
+  assert.deepEqual(
+    readJson(path.join(repoRoot, "src/v1/build-metadata.json")),
+    readJson(path.join(repoRoot, "runtime/build-metadata.json"))
+  );
 });
 
 test("package metadata is clean and has no self-dependency", () => {

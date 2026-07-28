@@ -68,12 +68,24 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/adapters/codex.js",
       "src/v1/adapters/notice-hook.js",
       "src/v1/adapters/shared.js",
+      "src/v1/bin/kanon.js",
+      "src/v1/cli.js",
       "src/v1/core/build-metadata.js",
       "src/v1/core/notice.js",
+      "src/v1/core/receipt.js",
+      "src/v1/core/trust.js",
       "src/v1/registry/cache.js",
       "src/v1/registry/deprecation.js",
       "src/v1/registry/sanitize.js",
-      "src/v1/registry/transport.js"
+      "src/v1/registry/transport.js",
+      "src/v1/repository/git.js",
+      "src/v1/repository/inspect.js",
+      "src/v1/repository/read.js",
+      "src/v1/skills/invoke.js",
+      "src/v1/skills/orient.js",
+      "src/v1/skills/resume.js",
+      "src/v1/skills/status.js",
+      "src/v1/skills/verify.js"
     ]
   );
   for (const relative of productionFiles) {
@@ -137,7 +149,7 @@ test("every canonical v1 production module is in the strict project", () => {
   );
 });
 
-test("historical compatibility runtime stays outside the staged v1 type claim", () => {
+test("historical compatibility stays outside the expanded stable v1 type claim", () => {
   const legacyCompatibilityModules = [
     "src/cli/index.js",
     "src/index.js",
@@ -179,15 +191,25 @@ test("historical compatibility runtime stays outside the staged v1 type claim", 
     assert.equal(checked.has(path.join(repoRoot, relative)), false, relative);
   }
   const metadata = readJson("runtime/build-metadata.json");
-  assert.deepEqual(metadata.public_capabilities.skills, ["kanon"]);
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "orient", "SKILL.md")),
-    false
-  );
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "status", "SKILL.md")),
-    false
-  );
+  assert.deepEqual(metadata.public_capabilities.skills, [
+    "kanon",
+    "orient",
+    "resume",
+    "status",
+    "verify"
+  ]);
+  for (const skill of ["orient", "resume", "status", "verify"]) {
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
+      true
+    );
+  }
+  for (const removed of ["steer", "aswitch"]) {
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, "skills", removed)),
+      false
+    );
+  }
 });
 
 test("release allowlist excludes type tooling and development metadata", () => {

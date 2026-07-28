@@ -66,14 +66,27 @@ $kanon
 Brief this repo and tell me which evidence supports the first edit.
 ```
 
-The supported core workflows are:
+The current development artifact exposes four stable, read-only v1 skills:
+
+| Stable skill | Behavior |
+| --- | --- |
+| `orient` | Read instructions first, inspect bounded task-relevant evidence and Git, and return a minimal non-persisted receipt. |
+| `resume` | Compare authoritative live evidence with safe prior continuity claims through the shared engine. |
+| `verify` | Separate documentation and generated-artifact contradictions from non-observation; validation declarations are not execution success. |
+| `status` | Report embedded version, exact-version deprecation, notice mode, enforcement false, hook observability, and receipt availability. |
+
+Every stable invocation consults the same exact-installed-version deprecation
+checker. Network, host, hook, or session evidence that is unavailable remains
+Unknown and does not block the read workflow.
+
+The v0.4 compatibility workflows remain:
 
 | Intent | Workflow |
 | --- | --- |
-| Orient to a repository | `brief` |
-| Ask about purpose, run, test, Git, docs drift, or literal text | `ask` |
-| Check conventional README drift | `verify` |
-| Resume from persisted repo state | `resume` |
+| Orient to a repository | `brief` → stable `orient` |
+| Ask one narrow purpose, run, test, Git, docs-drift, or literal-search question | `ask` → stable `orient` or `verify` |
+| Check conventional README drift | `verify` → stable `verify` |
+| Resume from persisted repo state | `resume` → stable `resume` |
 | Refresh continuity state | `refresh` |
 | Track human follow-up | `todo` |
 
@@ -119,6 +132,10 @@ PowerShell wrappers call the shared root runtime from the repository being
 inspected; they are agent hooks, not a global terminal package. Codex CLI and
 Claude Code are both in advisory notice mode: enforcement is false, and the
 notice never claims that repository context was read or understood.
+
+The slice 8 context receipt is advisory data only. It is not stored, enforced,
+invalidated by hooks, or used to block mutation. Its freshness remains Unknown
+when current evidence or a host-session binding is unavailable.
 
 ## Development
 

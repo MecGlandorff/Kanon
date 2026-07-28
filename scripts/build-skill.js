@@ -7,6 +7,7 @@ import {
   collectRuntimeDependencies,
   embeddedBuildMetadata,
   PUBLIC_COMMANDS,
+  STABLE_SLICE_8_SKILLS,
   V1_RUNTIME_ARTIFACTS
 } from "./lib/artifact-files.js";
 
@@ -28,28 +29,50 @@ for (const sourceRelative of collectRuntimeDependencies(root)) {
 for (const [sourceRelative, targetRelative] of V1_RUNTIME_ARTIFACTS) {
   artifacts.push(copyArtifact(sourceRelative, targetRelative));
 }
-artifacts.push({
-  target: path.join(root, "runtime", "build-metadata.json"),
-  relative: "runtime/build-metadata.json",
-  contents: `${JSON.stringify(
-    embeddedBuildMetadata(readPackageJson()),
-    null,
-    2
-  )}\n`,
-  mode: 0o644
-});
+const generatedBuildMetadata = `${JSON.stringify(
+  embeddedBuildMetadata(readPackageJson()),
+  null,
+  2
+)}\n`;
+for (const relative of [
+  "src/v1/build-metadata.json",
+  "runtime/build-metadata.json"
+]) {
+  artifacts.push({
+    target: path.join(root, relative),
+    relative,
+    contents: generatedBuildMetadata,
+    mode: 0o644
+  });
+}
 
 for (const command of commands) {
+  const stableRead = ["ask", "brief", "resume", "verify"].includes(command);
   artifacts.push({
     target: path.join(skillRoot, "scripts", `kanon-${command}`),
     relative: `skills/kanon/scripts/kanon-${command}`,
-    contents: bashWrapper(command),
+    contents: bashWrapper(command, stableRead),
     mode: 0o755
   });
   artifacts.push({
     target: path.join(skillRoot, "scripts", `kanon-${command}.ps1`),
     relative: `skills/kanon/scripts/kanon-${command}.ps1`,
-    contents: powershellWrapper(command),
+    contents: powershellWrapper(command, stableRead),
+    mode: 0o644
+  });
+}
+for (const skill of STABLE_SLICE_8_SKILLS) {
+  const stableRoot = path.join(root, "skills", skill);
+  artifacts.push({
+    target: path.join(stableRoot, "scripts", `kanon-${skill}`),
+    relative: `skills/${skill}/scripts/kanon-${skill}`,
+    contents: bashWrapper(skill, true),
+    mode: 0o755
+  });
+  artifacts.push({
+    target: path.join(stableRoot, "scripts", `kanon-${skill}.ps1`),
+    relative: `skills/${skill}/scripts/kanon-${skill}.ps1`,
+    contents: powershellWrapper(skill, true),
     mode: 0o644
   });
 }
@@ -120,12 +143,17 @@ function listJavaScriptFiles(relativeDirectory) {
 }
 
 function listWrapperFiles() {
-  const directory = path.join(skillRoot, "scripts");
-  return fs.readdirSync(directory, { withFileTypes: true })
-    .filter((entry) =>
-      entry.isFile() && /^kanon-[^.]+(?:\.ps1)?$/.test(entry.name)
-    )
-    .map((entry) => `skills/kanon/scripts/${entry.name}`);
+  return ["kanon", ...STABLE_SLICE_8_SKILLS].flatMap((skill) => {
+    const directory = path.join(root, "skills", skill, "scripts");
+    if (!fs.existsSync(directory)) {
+      return [];
+    }
+    return fs.readdirSync(directory, { withFileTypes: true })
+      .filter((entry) =>
+        entry.isFile() && /^kanon-[^.]+(?:\.ps1)?$/.test(entry.name)
+      )
+      .map((entry) => `skills/${skill}/scripts/${entry.name}`);
+  });
 }
 
 function removeEmptyDirectories(directory) {
@@ -165,13 +193,15 @@ function readFile(filePath) {
   }
 }
 
-function bashWrapper(command) {
-  return `#!/usr/bin/env bash
+function bashWrapper(command, stable) {
+  return `#!/bin/bash
 set -euo pipefail
 
 COMMAND="${command}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../../../runtime/bin/kanon.js"
+LOCAL_KANON="$SCRIPT_DIR/../../../runtime/bin/${
+  stable ? "kanon-v1.js" : "kanon.js"
+}"
 
 if [[ ! -f "$LOCAL_KANON" ]]; then
   echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
@@ -179,26 +209,73 @@ if [[ ! -f "$LOCAL_KANON" ]]; then
   exit 127
 fi
 
-if ! command -v node >/dev/null 2>&1; then
+PATH_VALUE="\${PATH-}"
+if (( \${#PATH_VALUE} > 32768 )); then
+  echo "Kanon refused an oversized executable search path." >&2
+  exit 127
+fi
+
+REPOSITORY_ROOT="$(pwd -P)"
+SAFE_PATH=""
+IFS=':' read -r -a PATH_ENTRIES <<< "$PATH_VALUE"
+for PATH_ENTRY in "\${PATH_ENTRIES[@]}"; do
+  if [[ "$PATH_ENTRY" != /* ]]; then
+    continue
+  fi
+  PATH_DIRECTORY="$(CDPATH= cd -- "$PATH_ENTRY" 2>/dev/null && pwd -P)" || continue
+  if [[ "$PATH_DIRECTORY" == "$REPOSITORY_ROOT" || "$PATH_DIRECTORY" == "$REPOSITORY_ROOT/"* ]]; then
+    continue
+  fi
+  SAFE_PATH="\${SAFE_PATH:+$SAFE_PATH:}$PATH_DIRECTORY"
+done
+
+NODE_CANDIDATE="$(PATH="$SAFE_PATH" type -P node || true)"
+if [[ -z "$NODE_CANDIDATE" ]]; then
   echo "Kanon requires Node.js major 20, 22, 24, or 25." >&2
   exit 127
 fi
 
-NODE_MAJOR="$(node -p 'process.versions.node.split(\".\")[0]')"
-if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $(node --version)." >&2
+NODE_PATH=""
+for REALPATH_BINARY in /usr/bin/realpath /bin/realpath; do
+  if [[ -x "$REALPATH_BINARY" ]]; then
+    NODE_PATH="$("$REALPATH_BINARY" -- "$NODE_CANDIDATE" 2>/dev/null || true)"
+    break
+  fi
+done
+if [[ -z "$NODE_PATH" ]]; then
+  if [[ -L "$NODE_CANDIDATE" ]]; then
+    echo "Kanon could not safely resolve the Node.js executable." >&2
+    exit 127
+  fi
+  NODE_DIRECTORY="$(CDPATH= cd -- "$(dirname -- "$NODE_CANDIDATE")" && pwd -P)"
+  NODE_PATH="$NODE_DIRECTORY/$(basename -- "$NODE_CANDIDATE")"
+fi
+if [[ ! -f "$NODE_PATH" || ! -x "$NODE_PATH" || "$NODE_PATH" == *$'\\n'* ]]; then
+  echo "Kanon could not safely resolve the Node.js executable." >&2
+  exit 127
+fi
+if [[ "$NODE_PATH" == "$REPOSITORY_ROOT" || "$NODE_PATH" == "$REPOSITORY_ROOT/"* ]]; then
+  echo "Kanon refused a repository-controlled Node.js executable." >&2
   exit 127
 fi
 
-exec node "$LOCAL_KANON" "$COMMAND" "$@"
+NODE_MAJOR="$("$NODE_PATH" -p 'process.versions.node.split(\".\")[0]')"
+if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
+  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $("$NODE_PATH" --version)." >&2
+  exit 127
+fi
+
+exec "$NODE_PATH" "$LOCAL_KANON" "$COMMAND" "$@"
 `;
 }
 
-function powershellWrapper(command) {
+function powershellWrapper(command, stable) {
   return `$ErrorActionPreference = "Stop"
 
 $KanonCommand = "${command}"
-$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/kanon.js"
+$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/${
+  stable ? "kanon-v1.js" : "kanon.js"
+}"
 
 if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
   [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
@@ -206,20 +283,74 @@ if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
   exit 127
 }
 
-$Node = Get-Command node -ErrorAction SilentlyContinue
+$PathValue = [Environment]::GetEnvironmentVariable("PATH")
+if ($null -eq $PathValue -or $PathValue.Length -gt 32768) {
+  [Console]::Error.WriteLine("Kanon refused an unavailable or oversized executable search path.")
+  exit 127
+}
+
+$RepositoryRoot = [System.IO.Path]::GetFullPath((Get-Location).Path).TrimEnd(
+  [System.IO.Path]::DirectorySeparatorChar,
+  [System.IO.Path]::AltDirectorySeparatorChar
+)
+$RepositoryPrefix = $RepositoryRoot + [System.IO.Path]::DirectorySeparatorChar
+$SafePathEntries = @()
+foreach ($PathEntry in $PathValue.Split([System.IO.Path]::PathSeparator)) {
+  if ([string]::IsNullOrWhiteSpace($PathEntry) -or -not [System.IO.Path]::IsPathRooted($PathEntry)) {
+    continue
+  }
+  try {
+    $PathDirectory = (Resolve-Path -LiteralPath $PathEntry -ErrorAction Stop).Path
+  } catch {
+    continue
+  }
+  if (
+    $PathDirectory.Equals($RepositoryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $PathDirectory.StartsWith($RepositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  ) {
+    continue
+  }
+  $SafePathEntries += $PathDirectory
+}
+
+$OriginalPath = $env:PATH
+try {
+  $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
+  $Node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
+} finally {
+  $env:PATH = $OriginalPath
+}
 if (-not $Node) {
   [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
   exit 127
 }
 
-$NodeMajor = [int](& $Node.Source -p 'process.versions.node.split(".")[0]')
+$NodeItem = Get-Item -LiteralPath $Node.Source -ErrorAction Stop
+$NodePath = $NodeItem.FullName
+if ($NodeItem.LinkType) {
+  $ResolveLinkTarget = $NodeItem.PSObject.Methods["ResolveLinkTarget"]
+  if ($null -eq $ResolveLinkTarget) {
+    [Console]::Error.WriteLine("Kanon could not safely resolve the Node.js executable.")
+    exit 127
+  }
+  $NodePath = $NodeItem.ResolveLinkTarget($true).FullName
+}
+if (
+  $NodePath.Equals($RepositoryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+  $NodePath.StartsWith($RepositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+  [Console]::Error.WriteLine("Kanon refused a repository-controlled Node.js executable.")
+  exit 127
+}
+
+$NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
 if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
-  $NodeVersion = & $Node.Source --version
+  $NodeVersion = & $NodePath --version
   [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
   exit 127
 }
 
-& $Node.Source $LocalKanon $KanonCommand @args
+& $NodePath $LocalKanon $KanonCommand @args
 exit $LASTEXITCODE
 `;
 }

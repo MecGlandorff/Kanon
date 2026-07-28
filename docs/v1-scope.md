@@ -1,7 +1,8 @@
 # Kanon v1 scope and compatibility freeze
 
-**Status:** Slice 1 scope freeze. This file records the v1 boundary; it does
-not claim that a v1 runtime, plugin artifact, or Guard implementation exists.
+**Status:** Frozen scope plus additive Run B implementation status through
+product slice 8. This file is not a release claim and does not authorize
+slice 9, Guard, `steer`, or `aswitch`.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the frozen authoritative
 contract. This companion records its reduced scope without changing it. Where
@@ -16,31 +17,33 @@ The following six skills are the entire stable v1 skill surface:
 | `$kanon:orient` | Bounded task-relevant repository evidence and a context receipt. |
 | `$kanon:resume` | Compare prior continuity state with live repository evidence. |
 | `$kanon:verify` | Verify documentation, state, receipt, and validation claims. |
-| `$kanon:status` | Report version, deprecation, Guard, receipt, and diagnostic status. |
+| `$kanon:status` | Report version, deprecation, notice/enforcement, hook observability, receipt, and diagnostic status. |
 | `$kanon:steer` | Keep a small evidence-backed work state for one verified slice at a time. |
 | `$kanon:aswitch` | Prepare a consented handoff with a manual fallback. |
 
 The stable promises are advisory context readiness and receipt-state notice,
 continuity without invented memory, epistemic honesty, and no hidden
-execution. Stable v1 surfaces whether context and the available receipt data
-are current; it does not enforce mutation blocking on either supported host.
+execution. Stable v1 classifies context and available receipt data as Current,
+Stale, or Unknown; it does not enforce mutation blocking on either supported
+host.
 The promises do not say that a model understood evidence, that a declared
 command is safe or succeeds, or that Kanon replaces host sandboxing, approvals,
 or human review.
 
-Codex CLI and Claude Code CLI are the two stable skill-host candidates. The
-six-skill surface is a target contract for both hosts; it is not evidence of a
-released dual-host artifact yet. Other Codex and Claude surfaces need their
-own installed-artifact coverage before they receive a stable-surface claim.
+Codex CLI and Claude Code CLI have the two validated stable host adapters.
+Run B slice 8 implements the four read skills `orient`, `resume`, `verify`,
+and `status` equivalently for both adapters. The remaining frozen skills,
+`steer` and `aswitch`, are not exposed. Other Codex and Claude surfaces need
+their own installed-artifact coverage before they receive a stable-surface
+claim.
 
 ### Guard boundary
 
-This scope freeze deliberately selects no Guard mode for either host. A host
-may receive a `guard` claim only after its own feasibility spike directly
-proves denial for the covered calls. Until that proof and the user decision
-required by the design are present, this document makes neither a `guard` nor a
-`notice` runtime claim. A result from one host is never evidence for the
-other.
+The initial scope freeze deliberately selected no Guard mode for either host.
+The additive Run B decision below supersedes that open question with
+independent notice-only decisions. A future host may receive a `guard` claim
+only after a separate feasibility spike directly proves denial for its covered
+calls. A result from one host is never evidence for the other.
 
 ### Run B notice-mode decision
 
@@ -70,9 +73,8 @@ enforcement is impossible.
 ## Compatibility map
 
 The v0.4 workflows remain compatibility aliases or explicit continuity
-operations exactly as frozen by the v1 design. This table is a target mapping,
-not a claim that the aliases are already implemented in the current v0.4
-artifact.
+operations exactly as frozen by the v1 design. Run B slice 8 implements these
+routes without restoring removed public capabilities.
 
 | v0.4 workflow | v1 destination | Compatibility constraint |
 | --- | --- | --- |
@@ -83,9 +85,10 @@ artifact.
 | `todo` | Explicit continuity note | Remains a human-owned, bounded continuity operation. |
 | `verify` | `$kanon:verify` | Continue to distinguish contradiction from non-observation. |
 
-The `ask` routing discriminator is intentionally not invented here: the
-authoritative map permits `orient` or `verify`, while its exact v1 command
-grammar belongs to a later implementation slice.
+Narrow `ask` accepts exactly one purpose, run, test, Git-state,
+documentation-drift, or literal-search family. Documentation drift routes to
+`verify`; the other five route to `orient`. Mixed and unsupported questions
+are rejected as too broad.
 
 ## Experimental, beta, and excluded work
 
@@ -102,15 +105,21 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status at this freeze
+## Evidence status through Run B slice 8
 
 ### Known
 
 - `V_1design.md` is the frozen v1 contract on `release/v.1.0.0`.
-- The current package metadata and generated skill describe the existing
-  `0.4.0-rc.1` surface, not a v1 implementation.
-- The current public v0.4 wrappers are `ask`, `brief`, `refresh`, `resume`,
-  `todo`, and `verify`; the v1 names are not yet shipped.
+- The embedded development-artifact version remains `0.4.0-rc.1`; this branch
+  is implementation evidence, not a v1 release.
+- The generated plugin exposes `kanon`, `orient`, `resume`, `status`, and
+  `verify`. `steer` and `aswitch` are absent.
+- The compatibility wrappers remain `ask`, `brief`, `refresh`, `resume`,
+  `todo`, and `verify`; read aliases route to the stable slice 8 runtime,
+  while `refresh` and `todo` retain their explicit bounded v0.4 writes.
+- The slice 8 receipt contains only a versioned schema, `enforcement: false`,
+  and SHA-256 bindings for root, task, evidence, and an available host session.
+  It has no persistence or lifecycle behavior.
 
 ### Likely
 
@@ -120,26 +129,20 @@ fail safely to the manual handoff.
 
 ### Unknown
 
-- Whether Codex CLI can reliably deny covered shell and patch calls through a
-  trusted, enabled plugin hook.
-- Whether Claude Code can reliably deny covered shell and patch calls through
-  a trusted, enabled plugin hook.
-- The host-specific receipt, session, compaction, and plugin-data behavior
-  required for a production Guard design.
+- Unavailable host and hook introspection remains `Unknown`.
+- Host session, compaction, and plugin-data behavior needed by any future
+  experimental hard-Guard design remains unproven.
 - The release-governance participants, beta-adapter opt-in policy, first
   adapter directions, and full-history shipment decision listed in the v1
   design.
 
 ### Stale / suspicious
 
-- No direct contradiction was observed between this freeze and the reviewed
-  v0.4 release materials. Those materials are historical/current-v0.4
-  evidence, not proof of v1 behavior.
+- Slice 1 statements that the four read-skill directories did not yet exist
+  are superseded by the additive slice 8 implementation record.
 
 ### Suggested
 
-- Complete the isolated, host-specific Guard spikes before choosing a Guard
-  runtime mode or building receipts.
-- Do not begin the dual-manifest production plugin skeleton, type ratchet,
-  deprecation checker, continuity integration, or any later v1 slice while
-  this three-slice run is active.
+- Keep hard Guard and any broader receipt lifecycle outside public v1.
+- Before Run C, require a clean slice 8 commit and an explicit sequencing
+  decision about skipping or reframing the now-out-of-scope product slice 9.

@@ -246,3 +246,128 @@ deterministic type-scope test now fails if any of these compatibility files is
 silently pulled into the staged v1 claim. This is a scope record, not a waiver
 for slice 8's new stable modules: every new slice 8 v1 production module must
 enter the strict project immediately.
+
+## Slice 8 frame — four stable vertical read skills
+
+- **User outcome:** `orient`, `resume`, `verify`, and `status` work end to end
+  through equivalent Codex CLI and Claude Code adapters while preserving the
+  v0.4 compatibility routes.
+- **Changed invariant:** every stable read invocation consults the one
+  exact-version deprecation checker, exposes notice mode with
+  `enforcement: false`, surfaces the repository trust boundary, and returns a
+  bounded versioned report without executing repository-controlled code.
+- **Trust boundary:** repository roots, paths, instructions, file content,
+  Git output, ignore rules, package declarations, generated artifacts,
+  continuity state, receipts, registry results, host values, and environment
+  observations are hostile until runtime validation and sanitization.
+- **Non-goals:** persisted receipt state, invalidation or bypass lifecycle,
+  mutation hooks, Guard, denial, rewrite, forced reading, auto-approval,
+  suppression, `steer`, `aswitch`, terminal launch, full history, corpus or
+  holdout work, candidate freeze, release, publication, or an
+  incremental-value claim.
+- **Failure modes:** unsafe or unreadable paths; repository links and
+  replacement races; incomplete or oversized scans; hostile Git runners and
+  repository Git configuration; malformed continuity or receipt data;
+  unavailable host/session/hook state; registry failure; generated-artifact
+  comparison limits; stale generated copies; and compatibility-surface drift.
+- **Completion evidence:** dedicated unit and adversarial tests, host and
+  wrapper contracts, strict checked-JS, full validation, generator
+  synchronization, independent manifest validation, installed-artifact
+  conformance, package allowlisting, syntax checks, `git diff --check`, raw
+  diff review, historical Guard-report hash checks, a local commit, and a
+  clean worktree.
+
+### Slice 8 correction-loop result
+
+- **Dedicated unit, contract, host-equivalence, receipt, adversarial,
+  malformed-input, failure-path, compatibility, and real-Git checks:** 23
+  passed with no skip or failure.
+- **Focused stable-skill, plugin, compatibility, scope, package, and type
+  checks:** 56 passed with no skip or failure.
+- **Strict checked-JS:** all 22 canonical `src/v1` JavaScript modules are in
+  the strict project; 16 are new or touched by slice 8. The shared continuity
+  engine remains checked in the same project. There is no broad `any`,
+  `ts-ignore`, `nocheck`, unsafe-cast, or exclusion escape.
+- **Normal validation:** `npm run validate` passed with 172 tests passed, 1
+  Windows-only junction proof skipped, and no failures.
+- **Generated and package state:** the generator synchronizes 103 artifacts.
+  The deterministic package contains 121 npm entries, of which 120 are
+  hash-bound by `MANIFEST.sha256`; it contains 12 stable-skill files and 12
+  compatibility wrapper files, with no source, test, evaluation, development
+  dependency, or runtime dependency leakage.
+- **Installed-artifact behavior:** the exact staged package passes 26
+  conformance checks, including all six compatibility wrappers, all four
+  stable wrappers, manifest hashes, the shared continuity binding, zero
+  dependencies, non-execution of a declared destructive script or a
+  repository-controlled PATH executable, and the explicit refresh-write path.
+- **Manifest validation:** Claude Code 2.1.219
+  `plugin validate --strict` and the installed Codex plugin-creator validator
+  under Python 3.9/PyYAML 6.0.1 both passed. Codex CLI 0.145.0 still exposes
+  no native validate subcommand, so native Codex-side validation remains
+  **Unknown** rather than being inferred.
+- **Receipt boundary:** `kanon-context-receipt-v1` contains only
+  `schema`, `enforcement: false`, and SHA-256 bindings for canonical root,
+  task, task-relevant evidence, and an available host session. It is never
+  persisted or enforced. Root, task, evidence, or session contradiction is
+  Stale; unavailable session or incomplete current evidence remains Unknown.
+- **Git and scan behavior:** instruction files are read first after root
+  canonicalization. Directory allocation, file hashing, excerpts, output,
+  diagnostics, and Git subprocesses have explicit bounds. Git uses a resolved
+  executable outside the repository, disables hooks, fsmonitor, pagers,
+  optional locks, prompting, lazy fetch, and user/system configuration, and
+  rejects malformed structured output. A real repository test proves that a
+  configured fsmonitor is not executed and the index identity is unchanged.
+- **Verification behavior:** documentation and observed generated-artifact
+  mismatches are direct contradictions; missing support remains
+  non-observation. Incomplete evidence and generated-pair limits prevent
+  absence or synchronization conclusions. Declared validation is never
+  reported as executed.
+- **Compatibility and public surface:** `brief`, narrow `ask`, `resume`, and
+  `verify` route to the stable runtime; `refresh` and `todo` remain explicit
+  v0.4 bounded writes. The plugin exposes `kanon`, `orient`, `resume`,
+  `status`, and `verify`; it does not expose `steer` or `aswitch`.
+- **Principal challenge:** review corrected twenty-nine P1-class candidates
+  before close: development-source metadata availability, multi-family `ask`
+  routing, Git omission from receipt evidence, current-receipt claims over
+  incomplete evidence, permissive hostile Git parsing, unbounded directory
+  allocation, unsafe verify-target fallback, status loss on an invalid
+  repository root, silent generated-pair truncation, compatibility
+  normalization of repository identities, character-versus-byte output
+  limits, omission of declared-validation Unknown from aggregate status,
+  silent instruction-candidate truncation, and scan-to-evidence replacement
+  accounting, repository-controlled Node resolution in public wrappers, and
+  deprecation-cache overlap with the selected repository, plus unbounded or
+  repository-controlled Git search state and out-of-range host time values.
+  Locale-dependent evidence ordering was also replaced with deterministic
+  ordering, missing bidi-control classes were closed, truncated documentation
+  no longer produces a Known absence result, declared-validation truncation is
+  explicit, documentation-claim and generated-contradiction limits are
+  surfaced, the renamed stable CLI generated counterpart is mapped correctly,
+  filesystem-root inspection is rejected, plural credential and additional
+  private-key names remain excluded, validated identifier whitespace is
+  preserved, decoded byte expansion now surfaces truncation, and notice-hook
+  imports were decoupled from the stable read graph to reduce failure
+  coupling.
+- **Residual classification:** same-user filesystem replacement during an
+  already-open read and non-preemptible operating-system calls on pathological
+  filesystems remain lower-risk platform residuals. PowerShell execution and
+  native Codex manifest validation were unavailable on this macOS host.
+  Host/session/hook introspection remains **Unknown** where not directly
+  supplied. These residuals do not support enforcement or absence claims.
+- **Historical integrity:** `V_1design.md` and every historical Guard report
+  remain unchanged.
+- **P0/P1 at completion:** none.
+
+### Run C gate
+
+Run C requires the exact clean slice 8 commit on `release/v.1.0.0`, a fresh
+precondition check, and an explicit user sequencing decision. Product slice 9
+must not be inferred: production Guard and a broader receipt lifecycle remain
+outside public v1 after the accepted host no-go decisions. The user must
+explicitly choose whether Run C skips or reframes slice 9 before authorizing
+any later product slice.
+
+The user required this fresh slice 8 session because the prior TUI
+unexpectedly displayed a different low/fast model after slice 7. The fresh
+session header was independently confirmed as `gpt-5.6-sol` with `max`
+reasoning before slice 8.

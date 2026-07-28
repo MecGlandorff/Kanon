@@ -34,16 +34,19 @@ remains Unknown.
 Run wrappers from this skill directory while the selected repository is the
 working directory:
 
-- `scripts/kanon-brief` — evidence-bounded orientation.
-- `scripts/kanon-verify README.md` — direct README contradictions and Unknown
-  non-observations.
-- `scripts/kanon-resume` — compare safe persisted state with the live repo.
+- `scripts/kanon-brief` — compatibility route to stable `orient`.
+- `scripts/kanon-verify README.md` — compatibility route to stable `verify`.
+- `scripts/kanon-resume` — compatibility route to stable `resume`.
 - `scripts/kanon-refresh` — explicitly write bounded `.kanon/` continuity
   state.
 - `scripts/kanon-todo list|add|done` — manage human-owned follow-up.
-- `scripts/kanon-ask "question"` — only purpose, declared run candidate,
-  declared test candidate, Git state, documentation drift, or explicit literal
-  repository search.
+- `scripts/kanon-ask "question"` — route one narrow purpose, declared run/test,
+  Git-state, documentation-drift, or literal-search question to stable
+  `orient` or `verify`.
+
+The root plugin also exposes the stable `orient`, `resume`, `verify`, and
+`status` skills. Notice mode is advisory, enforcement is false, and the
+versioned context receipt is not persisted or enforced.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove

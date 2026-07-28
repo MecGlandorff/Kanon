@@ -23,7 +23,7 @@ const claudeManifest = readJson(".claude-plugin/plugin.json");
 const hookManifest = readJson("hooks/hooks.json");
 const buildMetadata = readJson("runtime/build-metadata.json");
 
-test("dual-host manifests are separate and share one skill and runtime root", () => {
+test("dual-host manifests are separate and share skills plus one runtime root", () => {
   assert.equal(codexManifest.name, "kanon");
   assert.equal(claudeManifest.name, "kanon");
   assert.equal(codexManifest.version, packageManifest.version);
@@ -35,14 +35,24 @@ test("dual-host manifests are separate and share one skill and runtime root", ()
     path.join(repoRoot, ".claude-plugin", "plugin.json")
   );
   assert.equal(readJson("runtime/package.json").type, "module");
+  assert.deepEqual(readJson("runtime/package.json").imports, {
+    "#kanon-continuity": "./src/continuity/engine.js"
+  });
   assert.equal(fs.existsSync(path.join(repoRoot, "skills", "kanon", "runtime")), false);
   assert.equal(fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon.js")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon-v1.js")), true);
 });
 
 test("embedded metadata exposes only accurate notice-mode capabilities", () => {
   const validated = validateEmbeddedBuildMetadata(buildMetadata);
   assert.equal(validated.ok, true);
-  assert.deepEqual(buildMetadata.public_capabilities.skills, ["kanon"]);
+  assert.deepEqual(buildMetadata.public_capabilities.skills, [
+    "kanon",
+    "orient",
+    "resume",
+    "status",
+    "verify"
+  ]);
   assert.equal(buildMetadata.package_name, packageManifest.name);
   assert.equal(buildMetadata.package_version, packageManifest.version);
   assert.deepEqual(
@@ -74,13 +84,21 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
   );
   const read = readEmbeddedBuildMetadata();
   assert.equal(read.ok, true);
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "kanon-orient")),
-    false
-  );
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "kanon-status")),
-    false
+  for (const skill of ["orient", "resume", "status", "verify"]) {
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
+      true
+    );
+  }
+  for (const removed of ["steer", "aswitch"]) {
+    assert.equal(
+      fs.existsSync(path.join(repoRoot, "skills", removed)),
+      false
+    );
+  }
+  assert.deepEqual(
+    readJson("src/v1/build-metadata.json"),
+    buildMetadata
   );
   assert.doesNotMatch(JSON.stringify(buildMetadata), /steer|aswitch/);
 });

@@ -1,11 +1,30 @@
 # Kanon Output Contract
 
-All human output separates Known, Likely, Unknown, Stale / suspicious, and
-Suggested claims. Repository-derived strings are marked
+Claims retain the Known, Likely, Unknown, Stale / suspicious, and Suggested
+classifications where applicable. Repository-derived strings are marked
 `trust: "repository-untrusted"` in structured evidence and rendered as inert
 data.
 
-## Supported reports
+## Stable slice 8 reports
+
+- Orient: canonical repository, instruction-first bounded evidence, Git
+  observation, limitations, and a minimal context receipt.
+- Resume: authoritative live continuity comparison without repository writes.
+- Verify: documentation, continuity, generated-artifact, declared-validation,
+  and available receipt claims.
+- Status: embedded version, exact-version deprecation, notice mode,
+  `enforcement: false`, hook observability, receipt availability, and bounded
+  diagnostics.
+
+All four use `kanon-stable-skill-result-v1`, consult the shared exact-version
+deprecation checker, and preserve unavailable evidence as Unknown.
+
+The `kanon-context-receipt-v1` object contains only `schema`,
+`enforcement: false`, and SHA-256 root, task, evidence, and nullable
+host-session bindings. It is not persisted or enforced and has no invalidation,
+bypass, approval, or Guard lifecycle.
+
+## Compatibility reports
 
 - Brief: purpose declaration, command declarations, important files, current
   state, limitations, and evidence.

@@ -49,11 +49,11 @@ test("v1 compatibility freeze preserves every v0.4 workflow mapping", () => {
 test("v1 scope preserves the historical gate and records the Run B decision", () => {
   assert.match(
     scope,
-    /deliberately selects no Guard mode for either host/
+    /initial scope freeze deliberately selected no Guard mode for either host/
   );
   assert.match(
     scope,
-    /neither a `guard` nor a\s+`notice` runtime claim/
+    /additive Run B decision below supersedes that open question with\s+independent notice-only decisions/
   );
   assert.match(
     scope,
@@ -64,7 +64,7 @@ test("v1 scope preserves the historical gate and records the Run B decision", ()
   assert.match(scope, /\| Claude Code CLI \| `notice` \| `false` \|/);
   assert.match(
     scope,
-    /surfaces whether context and the available receipt data\s+are current; it does not enforce mutation blocking/
+    /classifies context and available receipt data as Current,\s+Stale, or Unknown; it does not enforce mutation blocking/
   );
   assert.match(scope, /unobservable hook state remains `Unknown`/);
   assert.match(

@@ -4,6 +4,9 @@
   "private": true,
   "description": "Evidence-backed repo continuity skill runtime for Codex and Claude Code.",
   "type": "module",
+  "imports": {
+    "#kanon-continuity": "./src/continuity/engine.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MecGlandorff/Kanon.git"

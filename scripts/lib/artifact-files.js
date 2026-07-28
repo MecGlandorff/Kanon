@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { resolveContainedPath } from "../../src/path-security.js";
+import {
+  IMPLEMENTED_PUBLIC_SKILLS
+} from "../../src/v1/core/build-metadata.js";
 
 export const PUBLIC_COMMANDS = Object.freeze([
   "ask",
@@ -11,17 +14,33 @@ export const PUBLIC_COMMANDS = Object.freeze([
   "verify"
 ]);
 
+export const STABLE_SLICE_8_SKILLS = Object.freeze(
+  IMPLEMENTED_PUBLIC_SKILLS.filter((skill) => skill !== "kanon")
+);
+
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
   ["src/v1/adapters/codex.js", "runtime/adapters/codex.js"],
   ["src/v1/adapters/notice-hook.js", "runtime/adapters/notice-hook.js"],
   ["src/v1/adapters/shared.js", "runtime/adapters/shared.js"],
+  ["src/v1/bin/kanon.js", "runtime/bin/kanon-v1.js"],
+  ["src/v1/cli.js", "runtime/cli.js"],
   ["src/v1/core/build-metadata.js", "runtime/core/build-metadata.js"],
   ["src/v1/core/notice.js", "runtime/core/notice.js"],
+  ["src/v1/core/receipt.js", "runtime/core/receipt.js"],
+  ["src/v1/core/trust.js", "runtime/core/trust.js"],
+  ["src/v1/repository/git.js", "runtime/repository/git.js"],
+  ["src/v1/repository/inspect.js", "runtime/repository/inspect.js"],
+  ["src/v1/repository/read.js", "runtime/repository/read.js"],
   ["src/v1/registry/cache.js", "runtime/registry/cache.js"],
   ["src/v1/registry/deprecation.js", "runtime/registry/deprecation.js"],
   ["src/v1/registry/sanitize.js", "runtime/registry/sanitize.js"],
-  ["src/v1/registry/transport.js", "runtime/registry/transport.js"]
+  ["src/v1/registry/transport.js", "runtime/registry/transport.js"],
+  ["src/v1/skills/invoke.js", "runtime/skills/invoke.js"],
+  ["src/v1/skills/orient.js", "runtime/skills/orient.js"],
+  ["src/v1/skills/resume.js", "runtime/skills/resume.js"],
+  ["src/v1/skills/status.js", "runtime/skills/status.js"],
+  ["src/v1/skills/verify.js", "runtime/skills/verify.js"]
 ]);
 
 export function collectRuntimeDependencies(repoRoot, entry = "bin/kanon.js") {
@@ -84,6 +103,11 @@ export function publicSkillFiles(repoRoot) {
     ...PUBLIC_COMMANDS.flatMap((command) => [
       `skills/kanon/scripts/kanon-${command}`,
       `skills/kanon/scripts/kanon-${command}.ps1`
+    ]),
+    ...STABLE_SLICE_8_SKILLS.flatMap((skill) => [
+      `skills/${skill}/SKILL.md`,
+      `skills/${skill}/scripts/kanon-${skill}`,
+      `skills/${skill}/scripts/kanon-${skill}.ps1`
     ])
   ].sort();
 }
@@ -112,7 +136,7 @@ export function embeddedBuildMetadata(sourcePackage) {
       runtime_dependencies: 0
     },
     public_capabilities: {
-      skills: ["kanon"],
+      skills: [...IMPLEMENTED_PUBLIC_SKILLS],
       hosts: {
         "codex-cli": {
           mode: "notice",

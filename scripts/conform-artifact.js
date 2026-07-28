@@ -9,7 +9,10 @@ import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import { validateEmbeddedBuildMetadata } from "../src/v1/core/build-metadata.js";
-import { PUBLIC_COMMANDS } from "./lib/artifact-files.js";
+import {
+  PUBLIC_COMMANDS,
+  STABLE_SLICE_8_SKILLS
+} from "./lib/artifact-files.js";
 import { npmInvocation } from "./lib/npm-runner.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -122,13 +125,23 @@ function inspectPackage(root, input) {
     checks.push(result(
       runtimeManifest.private === true &&
       runtimeManifest.type === "module" &&
+      runtimeManifest.imports?.["#kanon-continuity"] ===
+        "./src/continuity/engine.js" &&
       !runtimeManifest.dependencies,
-      "shared runtime has an independent ESM boundary and no dependencies"
+      "shared runtime has an independent ESM boundary, continuity binding, and no dependencies"
     ));
     const metadataResult = validateEmbeddedBuildMetadata(buildMetadata);
     checks.push(result(
       metadataResult.ok &&
       metadataResult.value.package_version === input.candidateVersion &&
+      JSON.stringify(metadataResult.value.public_capabilities.skills) ===
+        JSON.stringify([
+          "kanon",
+          "orient",
+          "resume",
+          "status",
+          "verify"
+        ]) &&
       metadataResult.value.public_capabilities.hosts["codex-cli"]
         .enforcement === false &&
       metadataResult.value.public_capabilities.hosts["claude-code"]
@@ -146,8 +159,21 @@ function inspectPackage(root, input) {
       .sort();
     checks.push(result(
       JSON.stringify(shipped) === JSON.stringify(expected),
-      "only supported public wrappers are shipped"
+      "only supported compatibility wrappers are shipped"
     ));
+    for (const skill of STABLE_SLICE_8_SKILLS) {
+      const stableScripts = fs
+        .readdirSync(path.join(root, "skills", skill, "scripts"))
+        .sort();
+      checks.push(result(
+        fs.statSync(path.join(root, "skills", skill, "SKILL.md")).isFile() &&
+        JSON.stringify(stableScripts) === JSON.stringify([
+          `kanon-${skill}`,
+          `kanon-${skill}.ps1`
+        ]),
+        `stable ${skill} skill and wrappers are shipped`
+      ));
+    }
     const all = allFiles(root).map((file) =>
       path.relative(root, file).replaceAll("\\", "/")
     );
@@ -156,6 +182,10 @@ function inspectPackage(root, input) {
         /(?:^|\/)(?:improve|refactor)(?:\/|\.js$)/.test(file)
       ),
       "experimental improve/refactor modules are absent"
+    ));
+    checks.push(result(
+      !all.some((file) => /(?:^|\/)(?:steer|aswitch)(?:\/|[.-])/.test(file)),
+      "removed steer and aswitch capabilities are absent"
     ));
   } catch (error) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
@@ -203,6 +233,7 @@ function exerciseWrappers(packageRoot) {
   const checks = [];
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-conform-"));
   const marker = path.join(fixture, "repository-code-executed");
+  const hostileNodeMarker = path.join(fixture, "hostile-node-executed");
   fs.writeFileSync(path.join(fixture, "README.md"), "# Fixture\n\nRun `npm test`.\n");
   fs.writeFileSync(
     path.join(fixture, "package.json"),
@@ -214,37 +245,78 @@ function exerciseWrappers(packageRoot) {
       }
     })}\n`
   );
+  if (process.platform !== "win32") {
+    const hostileNode = path.join(fixture, "node");
+    fs.writeFileSync(
+      hostileNode,
+      "#!/bin/sh\n: > \"$PWD/hostile-node-executed\"\nexit 97\n"
+    );
+    fs.chmodSync(hostileNode, 0o755);
+  }
   const scripts = path.join(packageRoot, "skills", "kanon", "scripts");
   const family = process.platform === "win32" ? "powershell" : "bash";
   for (const command of PUBLIC_COMMANDS) {
-    const wrapper = path.join(
-      scripts,
-      `kanon-${command}${family === "powershell" ? ".ps1" : ""}`
+    checks.push(
+      exerciseWrapper(
+        path.join(scripts, wrapperName(command, family)),
+        command,
+        family,
+        fixture,
+        "compatibility"
+      )
     );
-    const args = wrapperArguments(command);
-    const execution = family === "powershell"
-      ? spawnPowerShell(wrapper, args, fixture)
-      : spawnSync(wrapper, args, runOptions(fixture));
-    checks.push({
-      name: `${family} wrapper ${command}`,
-      passed: execution.status === 0,
-      reason:
-        execution.status === 0
-          ? `${family} wrapper ${command} passed`
-          : `${family} wrapper ${command} failed: ${
-              execution.stderr?.trim() || execution.status
-            }`
-    });
+  }
+  for (const skill of STABLE_SLICE_8_SKILLS) {
+    checks.push(
+      exerciseWrapper(
+        path.join(
+          packageRoot,
+          "skills",
+          skill,
+          "scripts",
+          wrapperName(skill, family)
+        ),
+        skill,
+        family,
+        fixture,
+        "stable"
+      )
+    );
   }
   checks.push(result(
     !fs.existsSync(marker),
     "declared destructive package script was not executed"
   ));
   checks.push(result(
+    !fs.existsSync(hostileNodeMarker),
+    "repository-controlled PATH executable was not executed"
+  ));
+  checks.push(result(
     fs.existsSync(path.join(fixture, ".kanon", "STATE.json")),
     "refresh exercised bounded write workflow"
   ));
   return checks;
+}
+
+function exerciseWrapper(wrapper, command, family, fixture, surface) {
+  const args = wrapperArguments(command);
+  const execution = family === "powershell"
+    ? spawnPowerShell(wrapper, args, fixture)
+    : spawnSync(wrapper, args, runOptions(fixture, true));
+  return {
+    name: `${family} ${surface} wrapper ${command}`,
+    passed: execution.status === 0,
+    reason:
+      execution.status === 0
+        ? `${family} ${surface} wrapper ${command} passed`
+        : `${family} ${surface} wrapper ${command} failed: ${
+            execution.stderr?.trim() || execution.status
+          }`
+  };
+}
+
+function wrapperName(command, family) {
+  return `kanon-${command}${family === "powershell" ? ".ps1" : ""}`;
 }
 
 function wrapperArguments(command) {
@@ -256,6 +328,9 @@ function wrapperArguments(command) {
   }
   if (command === "todo") {
     return ["list"];
+  }
+  if (command === "orient") {
+    return ["artifact conformance"];
   }
   return command === "brief" ? ["--json"] : [];
 }
@@ -274,11 +349,19 @@ function spawnPowerShell(wrapper, args, cwd) {
   return { status: null, stderr: "PowerShell unavailable" };
 }
 
-function runOptions(cwd) {
+function runOptions(cwd, poisonPath = false) {
   return {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    env: {
+      ...process.env,
+      GIT_TERMINAL_PROMPT: "0",
+      ...(poisonPath && process.platform !== "win32"
+        ? {
+            PATH: `${cwd}${path.delimiter}${process.env.PATH || ""}`
+          }
+        : {})
+    },
     maxBuffer: 8 * 1024 * 1024,
     timeout: 30_000,
     windowsHide: true

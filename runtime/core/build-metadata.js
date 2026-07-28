@@ -5,6 +5,13 @@ import { isRecord } from "../adapters/shared.js";
 const MAX_BUILD_METADATA_BYTES = 32 * 1024;
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+export const IMPLEMENTED_PUBLIC_SKILLS = Object.freeze([
+  "kanon",
+  "orient",
+  "resume",
+  "status",
+  "verify"
+]);
 
 /**
  * @typedef {{
@@ -129,8 +136,10 @@ function validCapabilities(value) {
     !isRecord(value) ||
     !hasExactKeys(value, ["hosts", "notice", "skills"]) ||
     !Array.isArray(value.skills) ||
-    value.skills.length !== 1 ||
-    value.skills[0] !== "kanon" ||
+    value.skills.length !== IMPLEMENTED_PUBLIC_SKILLS.length ||
+    value.skills.some(
+      (skill, index) => skill !== IMPLEMENTED_PUBLIC_SKILLS[index]
+    ) ||
     !isRecord(value.hosts) ||
     !hasExactKeys(value.hosts, ["claude-code", "codex-cli"]) ||
     !validHost(value.hosts["codex-cli"]) ||
