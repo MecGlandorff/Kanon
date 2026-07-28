@@ -674,6 +674,28 @@ test("incomplete scans are reported but only block release evaluation", () => {
   );
 });
 
+test("raw case scores preserve bounded scan diagnostics", () => {
+  const result = scoreCase(
+    fixtureCase(),
+    fixtureAnalysis({
+      scan: {
+        complete: false,
+        symlinks_skipped: 2,
+        budgets_reached: ["max_file_bytes"],
+        path_failures: []
+      }
+    }),
+    policy
+  );
+
+  assert.equal(result.scan_complete, false);
+  assert.equal(result.scan_diagnostics.symlinks_skipped, 2);
+  assert.deepEqual(
+    result.scan_diagnostics.budgets_reached,
+    ["max_file_bytes"]
+  );
+});
+
 test("reports include abstentions, coverage, macros, and Wilson intervals", () => {
   const results = perfectResults();
   results[0].abstentions.run_command = true;
@@ -947,7 +969,7 @@ function fixtureAnalysis(options = {}) {
         run: options.run || [],
         test: options.test || []
       },
-      scan: { complete: true }
+      scan: options.scan || { complete: true }
     }
   };
 }

@@ -34,7 +34,7 @@ export function scoreCase(item, analysis, policy) {
   };
   return buildCaseResult(
     item,
-    analysis.state.scan.complete,
+    analysis.state.scan,
     {
       important_files: importantPredictions,
       run: runPredictions,
@@ -63,7 +63,7 @@ export function scoreErrorCase(item, error, policy) {
   };
   return buildCaseResult(
     item,
-    false,
+    { complete: false },
     { important_files: [], run: [], test: [] },
     dimensions,
     policy,
@@ -173,7 +173,7 @@ export function aggregateScores(results, policy, options = {}) {
 
 function buildCaseResult(
   item,
-  scanComplete,
+  scan,
   predictions,
   dimensions,
   policy,
@@ -183,7 +183,8 @@ function buildCaseResult(
     id: item.id,
     category: item.category,
     revision: item.revision,
-    scan_complete: scanComplete,
+    scan_complete: scan.complete === true,
+    scan_diagnostics: scan,
     analysis_error: analysisError,
     predictions,
     labels: item.labels,

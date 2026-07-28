@@ -1,4 +1,5 @@
 import { CODE_EXTENSIONS, GENERATED_FILE } from "./constants.js";
+import { selectRootReadme } from "../readme.js";
 import {
   extractFileReferences,
   extractImports,
@@ -67,6 +68,15 @@ export function inspectRepoCode(root, files, options = {}) {
     }
     for (const target of extractFileReferences(file.path, text, fileMap)) {
       addInbound(references, target, file.path);
+    }
+  }
+  const readme = selectRootReadme(files);
+  if (readme) {
+    const text = getText(root, readme.path, texts, 220_000);
+    for (const target of extractFileReferences(readme.path, text, fileMap)) {
+      if (CODE_EXTENSIONS.has(fileMap.get(target)?.extension || "")) {
+        addInbound(references, target, readme.path);
+      }
     }
   }
 

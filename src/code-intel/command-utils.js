@@ -83,12 +83,35 @@ export function selectCommand(candidates) {
     (candidate, index) =>
       index > 0 &&
       candidate.command !== best.command &&
-      candidate.score >= best.score - 5
+      candidate.score >= best.score - 5 &&
+      !sameInvocation(best, candidate)
   );
   if (best.confidence !== "known" && competing) {
     return [];
   }
   return [best];
+}
+
+/**
+ * Argument variants of the same declared invocation are not contradictory.
+ * Source and cwd must agree, and one complete token sequence must prefix the
+ * other.
+ *
+ * @param {CommandCandidate} left
+ * @param {CommandCandidate} right
+ * @returns {boolean}
+ */
+function sameInvocation(left, right) {
+  if (left.source !== right.source || left.cwd !== right.cwd) {
+    return false;
+  }
+  const leftTokens = left.command.split(/\s+/);
+  const rightTokens = right.command.split(/\s+/);
+  const shorter =
+    leftTokens.length <= rightTokens.length ? leftTokens : rightTokens;
+  const longer =
+    leftTokens.length <= rightTokens.length ? rightTokens : leftTokens;
+  return shorter.every((token, index) => token === longer[index]);
 }
 
 /**

@@ -98,21 +98,35 @@ export function resolveImport(importer, specifier, fileMap, goModule) {
 export function extractFileReferences(importer, text, fileMap) {
   /** @type {string[]} */
   const output = [];
-  for (const match of text.matchAll(
-    /["'`]([^"'`\n]{1,160}\.[A-Za-z0-9]{1,8})["'`]/g
-  )) {
-    const raw = match[1];
+  const importSpecifiers = new Set(extractImports(importer, text));
+  const candidates = [
+    ...Array.from(
+      text.matchAll(/["'`]([^"'`\n]{1,160}\.[A-Za-z0-9]{1,8})["'`]/g),
+      (match) => match[1]
+    ),
+    ...Array.from(
+      text.matchAll(/\[[^\]]*\]\(([^)\n]{1,200})\)/g),
+      (match) => match[1]?.split("#", 1)[0]
+    )
+  ];
+  for (const raw of candidates) {
     if (!raw) {
       continue;
     }
-    if (/^(?:https?:|data:|[A-Za-z]+:)/.test(raw) || /[{*]/.test(raw)) {
+    if (
+      importSpecifiers.has(raw) ||
+      /^(?:https?:|data:|[A-Za-z]+:|\/)/.test(raw) ||
+      /[{*]/.test(raw)
+    ) {
       continue;
     }
-    const candidates = [
+    const resolvedCandidates = [
       normalizeRelPath(raw.replace(/^\.\//, "")),
       normalizeRelPath(path.posix.join(path.posix.dirname(importer), raw))
     ];
-    const target = candidates.find((candidate) => fileMap.has(candidate));
+    const target = resolvedCandidates.find((candidate) =>
+      fileMap.has(candidate)
+    );
     if (target) {
       output.push(target);
     }

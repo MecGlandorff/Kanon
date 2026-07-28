@@ -7,7 +7,9 @@ import { readText } from "../scanner.js";
  *   reason: string,
  *   score: number,
  *   confidence?: "known" | "likely" | "unknown",
- *   source?: string
+ *   source?: string,
+ *   command_alias?: string,
+ *   declaration_path?: string
  * }} CodeSignal
  * @typedef {{
  *   path: string,

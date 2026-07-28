@@ -2,6 +2,7 @@ import {
   addBuildTargetCommands,
   addPackageCommands,
   addPoeCommands,
+  addWorkspaceBinaryAliases,
   detectPackageManager
 } from "./manifest-commands.js";
 import { addDocumentedCommands } from "./documented-commands.js";
@@ -52,6 +53,13 @@ export function detectRepoCommands(root, files, fileMap, texts, options) {
     packageManager,
     { primaryGoProject: fileMap.has("go.mod") }
   );
+  addWorkspaceBinaryAliases(
+    candidates,
+    fileMap,
+    options.signals,
+    options.packageJson,
+    packageManager
+  );
   addPoeCommands(root, fileMap, texts, candidates);
   addBuildTargetCommands(root, fileMap, texts, candidates);
   addDocumentedCommands(
@@ -60,14 +68,16 @@ export function detectRepoCommands(root, files, fileMap, texts, options) {
     fileMap,
     texts,
     candidates,
-    { primaryGoProject: fileMap.has("go.mod") }
+    {
+      primaryGoProject: fileMap.has("go.mod"),
+      signals: options.signals
+    }
   );
   addConventionalCommands(
     root,
     files,
     fileMap,
     texts,
-    options.signals,
     candidates
   );
   return {
