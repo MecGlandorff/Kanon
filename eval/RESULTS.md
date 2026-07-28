@@ -4,17 +4,17 @@
 
 This is an in-sample frozen compatibility sample, not a population-level capability estimate.
 
-Raw report: `eval/results/development-0.4.0-rc.1-d2a-74208b9a.json`
+Raw report: `eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`
 
-Raw report SHA-256: `747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3`
+Raw report SHA-256: `e1c69f8f443e8dcd8ebf75abf7ce15e01029ed979d409ec356070c05afa0fbde`
 
-Generated: `2026-07-28T22:07:52.691Z`
+Generated: `2026-07-28T23:00:12.860Z`
 
-Candidate: `74208b9a21652f2e99d41000881f66e73d7eceeb` at `0.4.0-rc.1` (worktree clean: `false`)
+Candidate: `7da293a544b94bcfad1eaaf05db5534d9ff4254c` at `0.4.0-rc.1` (worktree clean: `true`)
 
 Analyzer: `0.4.0-rc.1` (installed-artifact)
 
-Artifact SHA-256: `89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a` (conformance: `true`)
+Artifact SHA-256: `b26c67cb8a94a07f832fb3a3d527e8da7247a150a29d5af2a68543ff727592b1` (conformance: `true`)
 
 Corpus SHA-256: `4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92`
 
@@ -26,46 +26,48 @@ Cases: 30/30; analysis errors: 0; incomplete scans: 9.
 
 | Measure | Precision | Recall | 95% precision interval | 95% recall interval | TP | FP | FN |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Overall | 74.9% | 66.8% | 68.1%–80.6% | 60.1%–72.9% | 137 | 46 | 68 |
-| important_files | 69.2% | 67.3% | 61.3%–76.1% | 59.5%–74.3% | 101 | 45 | 49 |
-| run_command | 100.0% | 50.0% | 78.5%–100.0% | 32.6%–67.4% | 14 | 0 | 14 |
+| Overall | 71.5% | 60.0% | 64.4%–77.7% | 53.2%–66.5% | 123 | 49 | 82 |
+| important_files | 66.4% | 59.3% | 58.1%–73.9% | 51.3%–66.9% | 89 | 45 | 61 |
+| run_command | 80.0% | 42.9% | 54.8%–93.0% | 26.5%–60.9% | 12 | 3 | 16 |
 | test_command | 95.7% | 81.5% | 79.0%–99.2% | 63.3%–91.8% | 22 | 1 | 5 |
 
-Weighted error per case: 9.93.
+Weighted error per case: 10.90.
 
-Case-average precision/recall: 74.2% / 66.3%.
+Case-average precision/recall: 73.0% / 59.4%.
 
-Macro over categories: 74.3% / 66.6%.
+Macro over categories: 71.7% / 59.9%.
 
-Macro over dimensions: 88.3% / 66.3%.
+Macro over dimensions: 80.7% / 61.2%.
 
 ## Categories
 
 | Category | Cases | Precision | Recall | 95% precision interval | 95% recall interval |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| python-ml | 6 | 61.3% | 48.7% | 43.8%–76.3% | 33.9%–63.8% |
-| go-service | 6 | 70.3% | 61.9% | 54.2%–82.5% | 46.8%–75.0% |
-| monorepo | 6 | 66.7% | 63.4% | 51.0%–79.4% | 48.1%–76.4% |
-| rust-cli | 6 | 88.1% | 88.1% | 75.0%–94.8% | 75.0%–94.8% |
-| python-web | 6 | 85.3% | 70.7% | 69.9%–93.6% | 55.5%–82.4% |
+| python-ml | 6 | 69.2% | 46.2% | 50.0%–83.5% | 31.6%–61.4% |
+| go-service | 6 | 64.9% | 57.1% | 48.8%–78.2% | 42.2%–70.9% |
+| monorepo | 6 | 68.3% | 68.3% | 53.0%–80.4% | 53.0%–80.4% |
+| rust-cli | 6 | 75.0% | 64.3% | 58.9%–86.2% | 49.2%–77.0% |
+| python-web | 6 | 81.3% | 63.4% | 64.7%–91.1% | 48.1%–76.4% |
 
 ## Coverage
 
 | Dimension | Prediction coverage | Abstentions |
 | --- | ---: | ---: |
 | important_files | 100.0% | 0 |
-| run_command | 46.7% | 16 |
+| run_command | 50.0% | 15 |
 | test_command | 76.7% | 7 |
 
 ## Gate reasons
 
-- overall precision 74.9% is below 80.0%
-- weighted error/case 9.93 exceeds 4.00
-- important_files precision 69.2% is below 80.0%
-- run_command recall 50.0% is below 60.0%
-- category python-ml precision 61.3% is below 80.0%
-- category go-service precision 70.3% is below 80.0%
-- category monorepo precision 66.7% is below 80.0%
+- overall precision 71.5% is below 80.0%
+- weighted error/case 10.90 exceeds 4.00
+- important_files precision 66.4% is below 80.0%
+- important_files recall 59.3% is below 60.0%
+- run_command recall 42.9% is below 60.0%
+- category python-ml precision 69.2% is below 80.0%
+- category go-service precision 64.9% is below 80.0%
+- category monorepo precision 68.3% is below 80.0%
+- category rust-cli precision 75.0% is below 80.0%
 
 ## Stable-release status
 
