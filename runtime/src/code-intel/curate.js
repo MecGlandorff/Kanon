@@ -1,6 +1,8 @@
 import {
   add,
+  byPattern,
   byPath,
+  directDeclarations,
   finish,
   primaryEntrypoints,
   rootReadme
@@ -14,6 +16,8 @@ const ROOT_CONTRACTS = [
   ["package.json", "root-manifest", "root package manifest"],
   ["pyproject.toml", "root-manifest", "root Python manifest"],
   ["setup.py", "root-manifest", "root Python package manifest"],
+  ["setup.cfg", "root-manifest", "root Python package configuration"],
+  ["requirements.txt", "root-manifest", "root dependency manifest"],
   ["Cargo.toml", "root-manifest", "root Cargo manifest"],
   ["go.mod", "root-manifest", "root Go module manifest"],
   ["pnpm-workspace.yaml", "workspace-contract", "root workspace manifest"],
@@ -61,6 +65,17 @@ export function curateRankedFiles(ranked, context = {}) {
       !(
         contract === "setup.py" &&
         byPath(ranked, "pyproject.toml")
+      ) &&
+      !(
+        contract === "setup.cfg" &&
+        (
+          byPath(ranked, "pyproject.toml") ||
+          byPath(ranked, "setup.py")
+        )
+      ) &&
+      !(
+        contract === "requirements.txt" &&
+        byPath(ranked, "pyproject.toml")
       )
   );
   const manifestEntrypoints = primaryEntrypoints(ranked).filter(
@@ -69,18 +84,7 @@ export function curateRankedFiles(ranked, context = {}) {
         signal.reason.startsWith("declared ")
       )
   );
-  const frameworkDeclarations = ranked
-    .filter((item) =>
-      item.signals.some(
-        (signal) =>
-          signal.type === "declaration" &&
-          signal.source === "framework"
-      )
-    )
-    .sort((a, b) =>
-      b.score - a.score ||
-      a.path.localeCompare(b.path)
-    );
+  const declarations = directDeclarations(ranked);
   const hasGoRoot = Boolean(byPath(ranked, "go.mod"));
   const primaryGoSelection = hasGoRoot
     ? preferredGoEntrypoint(ranked, context.goModule)
@@ -109,22 +113,18 @@ export function curateRankedFiles(ranked, context = {}) {
   }
   if (!workspace) {
     for (const task of ROOT_TASKS) {
-      const candidate = byPath(ranked, task);
-      if (!candidate?.signals.some(
-        (signal) => signal.reason === "declared root task contract"
-      )) {
-        continue;
-      }
       addRegistered(
         selected,
-        candidate,
+        byPath(ranked, task),
         "root-task-contract",
         "root task/build contract"
       );
     }
   }
 
-  for (const declaration of frameworkDeclarations) {
+  for (const declaration of declarations.filter((item) =>
+    item.signals.some((signal) => signal.source === "framework")
+  )) {
     addRegistered(
       selected,
       declaration,
@@ -132,7 +132,10 @@ export function curateRankedFiles(ranked, context = {}) {
       "framework-declared repository file"
     );
   }
-  for (const entrypoint of manifestEntrypoints.slice(0, 1)) {
+  for (const entrypoint of manifestEntrypoints.slice(
+    0,
+    workspace ? 2 : 1
+  )) {
     addRegistered(
       selected,
       entrypoint,
@@ -153,6 +156,30 @@ export function curateRankedFiles(ranked, context = {}) {
     );
   }
 
+  const testAnchor = conventionalTestAnchor(ranked);
+  if (testAnchor) {
+    addRegistered(
+      selected,
+      testAnchor,
+      "ecosystem-test-anchor",
+      "ecosystem-conventional test entry"
+    );
+  }
+  for (const declaration of declarations.filter((item) =>
+    !item.signals.some((signal) => signal.source === "framework")
+  )) {
+    const framework = declaration.signals.some(
+      (signal) => signal.source === "framework"
+    );
+    addRegistered(
+      selected,
+      declaration,
+      framework ? "framework-declaration" : "manifest-entrypoint",
+      framework
+        ? "framework-declared repository file"
+        : "manifest-declared package target"
+    );
+  }
   if (workspace && byPath(ranked, "Cargo.toml")) {
     addWorkspaceTasks(selected, ranked);
   }
@@ -164,8 +191,27 @@ export function curateRankedFiles(ranked, context = {}) {
       "root usage contract"
     );
   }
+  const fanInCandidates = ranked
+    .filter((candidate) => candidate.fan_in > 0)
+    .filter(
+      (candidate) =>
+        !hasGoRoot || candidate.path.endsWith(".go")
+    );
   if (hasGoRoot) {
     registeredHeuristic("polyglot-root-precedence");
+  }
+  for (const item of fanInCandidates
+    .sort((a, b) =>
+      b.fan_in - a.fan_in ||
+      b.score - a.score ||
+      a.path.localeCompare(b.path)
+    )) {
+    addRegistered(
+      selected,
+      item,
+      "local-import-fan-in",
+      `imported by ${item.fan_in} local file(s)`
+    );
   }
   for (const item of ranked
     .filter((candidate) => candidate.referenced_by > 0)
@@ -181,15 +227,13 @@ export function curateRankedFiles(ranked, context = {}) {
       `referenced by ${item.referenced_by} local file(s)`
     );
   }
-  const syntaxExecutables = primaryEntrypoints(ranked).filter(
+  const executable = primaryEntrypoints(ranked).find(
     (item) =>
       item.path !== primaryGoEntrypoint?.path &&
       !item.signals.some((signal) =>
         signal.reason.startsWith("declared ")
       )
   );
-  const executable =
-    syntaxExecutables.length === 1 ? syntaxExecutables[0] : null;
   if (executable) {
     addRegistered(
       selected,
@@ -211,6 +255,30 @@ export function curateRankedFiles(ranked, context = {}) {
 function addRegistered(selected, item, heuristicId, reason) {
   registeredHeuristic(heuristicId);
   add(selected, item, reason, heuristicId);
+}
+
+/**
+ * @param {RankedFile[]} ranked
+ * @returns {RankedFile | null}
+ */
+function conventionalTestAnchor(ranked) {
+  if (byPath(ranked, "Cargo.toml")) {
+    return byPattern(
+      ranked,
+      /^tests\/(?:[^/]+\/)*(?:tests?|integration_tests|cli_tests)\.rs$/
+    ) || byPattern(ranked, /^tests\/[^/]+\.rs$/);
+  }
+  if (
+    byPath(ranked, "pyproject.toml") ||
+    byPath(ranked, "setup.py") ||
+    byPath(ranked, "requirements.txt")
+  ) {
+    return byPattern(
+      ranked,
+      /^(?:tests?|test)\/(?:[^/]+\/)*test[^/]*\.py$/
+    );
+  }
+  return null;
 }
 
 /**

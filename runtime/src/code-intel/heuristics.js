@@ -8,14 +8,14 @@ export const HEURISTIC_REGISTRY = Object.freeze([
   },
   {
     id: "root-manifest",
-    rationale: "Root package manifests declare package, module, or workspace boundaries.",
+    rationale: "Root manifests declare package, module, or workspace boundaries.",
     ecosystems: [
       "JavaScript/TypeScript",
       "Python",
       "Go",
       "Rust"
     ],
-    failure_modes: "A root package manifest may describe tooling rather than the primary product.",
+    failure_modes: "A root manifest may describe tooling rather than the primary product.",
     corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
@@ -27,22 +27,22 @@ export const HEURISTIC_REGISTRY = Object.freeze([
   },
   {
     id: "manifest-entrypoint",
-    rationale: "A manifest-declared binary is direct evidence, but an ambiguous workspace contributes at most one target.",
+    rationale: "A manifest-declared binary is a direct executable declaration.",
     ecosystems: ["JavaScript/TypeScript", "Rust"],
-    failure_modes: "The selected target may still be optional or secondary within its workspace.",
-    corpus_exposure: "constrained-during-visible-development-work"
+    failure_modes: "The declared target may be generated, optional, or currently broken.",
+    corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
     id: "executable-syntax",
-    rationale: "A unique language-level executable is direct structural evidence; competing executables require independent repository-level corroboration.",
+    rationale: "Language-level executable syntax is direct structural evidence.",
     ecosystems: [
       "JavaScript/TypeScript",
       "Python",
       "Go",
       "Rust"
     ],
-    failure_modes: "A unique auxiliary tool may still be mistaken for the primary executable.",
-    corpus_exposure: "command-use-constrained-during-visible-development-work"
+    failure_modes: "Examples and auxiliary tools may also contain executable syntax.",
+    corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
     id: "module-named-entrypoint",
@@ -53,22 +53,22 @@ export const HEURISTIC_REGISTRY = Object.freeze([
   },
   {
     id: "local-import-fan-in",
-    rationale: "Local import fan-in ranks independently eligible files but does not create eligibility by itself.",
+    rationale: "Many local importers indicate a shared implementation dependency.",
     ecosystems: [
       "JavaScript/TypeScript",
       "Python",
       "Go",
       "Rust"
     ],
-    failure_modes: "A central implementation file without a direct declaration may now be omitted.",
-    corpus_exposure: "eligibility-constrained-during-visible-development-work"
+    failure_modes: "Utility modules can have high fan-in without being good orientation entrypoints.",
+    corpus_exposure: "added-during-visible-development-work"
   },
   {
     id: "literal-local-reference",
-    rationale: "A literal contained path in repository content is direct reference evidence; import syntax is counted only as import evidence.",
+    rationale: "Repeated literal references show that repository files point to a target.",
     ecosystems: ["all"],
-    failure_modes: "Generated lists and stale documentation can still point to secondary files.",
-    corpus_exposure: "import-double-counting-removed-during-visible-development-work"
+    failure_modes: "Generated lists and documentation can inflate reference counts.",
+    corpus_exposure: "added-during-visible-development-work"
   },
   {
     id: "root-task-contract",
@@ -79,31 +79,38 @@ export const HEURISTIC_REGISTRY = Object.freeze([
   },
   {
     id: "framework-declaration",
-    rationale: "Framework bootstrap and settings files directly name configuration modules without replacing the direct target with an inherited alias.",
+    rationale: "Framework bootstrap and settings files directly name configuration modules.",
     ecosystems: ["Python/Django"],
     failure_modes: "Dynamic configuration can override or construct module names.",
-    corpus_exposure: "alias-chain-constrained-during-visible-development-work"
+    corpus_exposure: "added-during-visible-development-work"
+  },
+  {
+    id: "ecosystem-test-anchor",
+    rationale: "Cargo and Python document conventional top-level test-suite locations.",
+    ecosystems: ["Python", "Rust"],
+    failure_modes: "The conventional file may cover only part of the suite.",
+    corpus_exposure: "added-during-visible-development-work"
   },
   {
     id: "manifest-command",
-    rationale: "Root manifests and package scripts directly declare named tasks, including exact root-script/workspace-binary aliases.",
+    rationale: "Root manifests and package scripts directly declare named tasks.",
     ecosystems: ["JavaScript/TypeScript", "Python"],
     failure_modes: "A declared task may be destructive, broken, or environment-specific.",
-    corpus_exposure: "workspace-alias-support-added-during-visible-development-work"
+    corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
     id: "documented-command",
-    rationale: "Root or ordered root-linked documentation explicitly declares a contained command, cwd, phase, or executable component.",
+    rationale: "Root or root-linked contributor documentation explicitly declares a shell candidate.",
     ecosystems: ["all"],
-    failure_modes: "Documentation may be stale and equally supported commands still require abstention.",
-    corpus_exposure: "parser-strengthened-during-visible-development-work"
+    failure_modes: "Documentation may be stale and prose can resemble commands.",
+    corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
     id: "ecosystem-command-convention",
-    rationale: "Existing Cargo, Go, and Django test conventions remain available only for test discovery.",
+    rationale: "Cargo, Go, and Django publish stable project-level command conventions.",
     ecosystems: ["Python", "Go", "Rust"],
-    failure_modes: "Repository-specific test wrappers may be required instead.",
-    corpus_exposure: "run-synthesis-removed-during-visible-development-work"
+    failure_modes: "Repository-specific wrappers may be required instead.",
+    corpus_exposure: "predates-v0.4-development-corpus"
   },
   {
     id: "polyglot-root-precedence",

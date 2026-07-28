@@ -1,12 +1,6 @@
 import path from "node:path";
 import { types as nodeTypes } from "node:util";
-import {
-  addSignal,
-  getText,
-  normalizeRelPath,
-  parseBuildTargets,
-  parseCargoBinPaths
-} from "./shared.js";
+import { addSignal, getText, normalizeRelPath, parseCargoBinPaths } from "./shared.js";
 
 /**
  * @typedef {import("./shared.js").CodeSignal} CodeSignal
@@ -14,7 +8,7 @@ import {
  * @typedef {{path: string, basename: string}} CodeFile
  * @typedef {Map<string, CodeFile>} FileMap
  * @typedef {Map<string, CodeSignal[]>} SignalMap
- * @typedef {[string, "binary" | "export", string | null]} PackageTarget
+ * @typedef {[string, "binary" | "export"]} PackageTarget
  */
 
 /**
@@ -101,41 +95,7 @@ export function addManifestEntrypoints(
     packageJson
   );
   addCargoManifestTargets(root, fileMap, texts, signals);
-  addRootTaskDeclarations(root, fileMap, texts, signals);
   addDjangoDeclarations(root, fileMap, texts, signals);
-}
-
-/**
- * @param {string} root
- * @param {FileMap} fileMap
- * @param {TextCache} texts
- * @param {SignalMap} signals
- * @returns {void}
- */
-function addRootTaskDeclarations(root, fileMap, texts, signals) {
-  for (const filePath of [
-    "Makefile",
-    "makefile",
-    "GNUmakefile",
-    "Justfile",
-    "justfile"
-  ]) {
-    if (
-      !fileMap.has(filePath) ||
-      parseBuildTargets(
-        getText(root, filePath, texts, 180_000)
-      ).size === 0
-    ) {
-      continue;
-    }
-    addSignal(signals, filePath, {
-      type: "declaration",
-      source: "manifest",
-      confidence: "known",
-      score: 90,
-      reason: "declared root task contract"
-    });
-  }
 }
 
 /**
@@ -174,12 +134,11 @@ function addPackageManifestTargets(
         continue;
       }
     }
-    for (const [target, kind, commandAlias] of packageTargets(manifest)) {
+    for (const [target, kind] of packageTargets(manifest)) {
       const resolved = resolveManifestTarget(
         directory,
         target,
-        fileMap,
-        kind === "binary"
+        fileMap
       );
       if (!resolved) {
         continue;
@@ -192,9 +151,7 @@ function addPackageManifestTargets(
         reason:
           kind === "binary"
             ? "declared package binary"
-            : "declared package export",
-        ...(commandAlias ? { command_alias: commandAlias } : {}),
-        declaration_path: file.path
+            : "declared package export"
       });
     }
   }
@@ -323,7 +280,7 @@ function addDjangoDeclarations(root, fileMap, texts, signals) {
     const moduleName = text.match(
       /DJANGO_SETTINGS_MODULE["']?\s*,\s*["']([^"']+)["']/
     )?.[1];
-    const settings = resolvePythonModule(
+    let settings = resolvePythonModule(
       path.posix.dirname(file.path),
       moduleName,
       fileMap
@@ -342,6 +299,9 @@ function addDjangoDeclarations(root, fileMap, texts, signals) {
         : null,
       fileMap
     );
+    if (inheritedPath) {
+      settings = inheritedPath;
+    }
     addSignal(signals, settings, {
       type: "declaration",
       source: "framework",
@@ -349,28 +309,23 @@ function addDjangoDeclarations(root, fileMap, texts, signals) {
       score: 105,
       reason: "declared Django settings module"
     });
-    for (const candidate of [settings, inheritedPath]) {
-      if (!candidate) {
-        continue;
-      }
-      const effectiveText = getText(root, candidate, texts, 240_000);
-      for (const match of effectiveText.matchAll(
-        /^\s*(?:ROOT_URLCONF|ROOT_HOSTCONF)\s*=\s*["']([^"']+)["']/gm
-      )) {
-        const target = resolvePythonModule(
-          path.posix.dirname(file.path),
-          match[1],
-          fileMap
-        );
-        if (target) {
-          addSignal(signals, target, {
-            type: "declaration",
-            source: "framework",
-            confidence: "known",
-            score: 100,
-            reason: "declared Django root routing module"
-          });
-        }
+    const effectiveText = getText(root, settings, texts, 240_000);
+    for (const match of effectiveText.matchAll(
+      /^\s*(?:ROOT_URLCONF|ROOT_HOSTCONF)\s*=\s*["']([^"']+)["']/gm
+    )) {
+      const target = resolvePythonModule(
+        path.posix.dirname(file.path),
+        match[1],
+        fileMap
+      );
+      if (target) {
+        addSignal(signals, target, {
+          type: "declaration",
+          source: "framework",
+          confidence: "known",
+          score: 100,
+          reason: "declared Django root routing module"
+        });
       }
     }
   }
@@ -388,21 +343,17 @@ function packageTargets(manifest) {
   const output = [];
   const bin = manifest.bin;
   if (typeof bin === "string") {
-    const name =
-      typeof manifest.name === "string"
-        ? manifest.name.split("/").pop() || null
-        : null;
-    output.push([bin, "binary", name]);
+    output.push([bin, "binary"]);
   } else if (plainRecord(bin)) {
-    for (const [name, target] of Object.entries(bin)) {
+    for (const target of Object.values(bin)) {
       if (typeof target === "string") {
-        output.push([target, "binary", name]);
+        output.push([target, "binary"]);
       }
     }
   }
   for (const field of ["main", "module", "types"]) {
     if (typeof manifest[field] === "string") {
-      output.push([manifest[field], "export", null]);
+      output.push([manifest[field], "export"]);
     }
   }
   collectExportStrings(manifest.exports, output);
@@ -426,7 +377,7 @@ function collectExportStrings(
     return;
   }
   if (typeof value === "string") {
-    output.push([value, "export", null]);
+    output.push([value, "export"]);
     budget.entries += 1;
   } else if (plainRecord(value)) {
     for (const nested of Object.values(value)) {
@@ -439,15 +390,9 @@ function collectExportStrings(
  * @param {string} directory
  * @param {unknown} target
  * @param {FileMap} fileMap
- * @param {boolean} [binary]
  * @returns {string | null}
  */
-function resolveManifestTarget(
-  directory,
-  target,
-  fileMap,
-  binary = false
-) {
+function resolveManifestTarget(directory, target, fileMap) {
   if (typeof target !== "string" || target.includes("*")) {
     return null;
   }
@@ -465,10 +410,7 @@ function resolveManifestTarget(
   return candidates.find(
     (candidate) =>
       fileMap.has(candidate) &&
-      (
-        /\.(?:[cm]?[jt]sx?|d\.ts)$/.test(candidate) ||
-        (binary && candidate === base)
-      )
+      /\.(?:[cm]?[jt]sx?|d\.ts)$/.test(candidate)
   ) || null;
 }
 

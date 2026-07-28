@@ -1,11 +1,7 @@
 import { types as nodeTypes } from "node:util";
 import { findByPath } from "../scanner.js";
 import { addCommand, isPlaceholderScript, packageScriptCommand } from "./command-utils.js";
-import {
-  getText,
-  parseBuildTargets,
-  tomlSection
-} from "./shared.js";
+import { getText, parseBuildTargets, tomlSection } from "./shared.js";
 
 /**
  * @typedef {import("./command-utils.js").CommandCandidate} CommandCandidate
@@ -87,95 +83,6 @@ export function addPackageCommands(
       scripts.build
     );
   }
-}
-
-/**
- * Connect a root script to a workspace binary only when both manifests declare
- * the same exact command name.
- *
- * @param {CommandCandidates} candidates
- * @param {FileMap} fileMap
- * @param {Map<string, import("./shared.js").CodeSignal[]>} signals
- * @param {unknown} rootPackageJson
- * @param {PackageManager} packageManager
- * @returns {void}
- */
-export function addWorkspaceBinaryAliases(
-  candidates,
-  fileMap,
-  signals,
-  rootPackageJson,
-  packageManager
-) {
-  if (
-    ![
-      "pnpm-workspace.yaml",
-      "lerna.json",
-      "nx.json",
-      "turbo.json"
-    ].some((filePath) => fileMap.has(filePath)) ||
-    !plainRecord(rootPackageJson) ||
-    !plainRecord(rootPackageJson.scripts)
-  ) {
-    return;
-  }
-  const scriptNames = new Set(
-    Object.entries(rootPackageJson.scripts)
-      .filter(
-        ([name, value]) =>
-          typeof value === "string" &&
-          safePackageScriptName(name) &&
-          !["build", "dev", "start", "test", "watch"].includes(name)
-      )
-      .map(([name]) => name)
-  );
-  if (scriptNames.size === 0) {
-    return;
-  }
-  /** @type {Map<string, Set<string>>} */
-  const binaryDeclarations = new Map();
-  for (const [target, items] of signals) {
-    for (const signal of items) {
-      const name = signal.command_alias;
-      if (
-        signal.type !== "entrypoint" ||
-        signal.source !== "manifest" ||
-        signal.declaration_path === "package.json" ||
-        typeof name !== "string" ||
-        !safePackageScriptName(name)
-      ) {
-        continue;
-      }
-      const declarations = binaryDeclarations.get(name) || new Set();
-      declarations.add(`${signal.declaration_path}\u0000${target}`);
-      binaryDeclarations.set(name, declarations);
-    }
-  }
-  const aliases = Array.from(scriptNames)
-    .filter(
-      (name) => binaryDeclarations.get(name)?.size === 1
-    )
-    .sort();
-  if (aliases.length !== 1 || !aliases[0]) {
-    return;
-  }
-  const name = aliases[0];
-  addCommand(
-    candidates.run,
-    packageScriptCommand(packageManager, name),
-    "package.json",
-    220,
-    "known",
-    String(rootPackageJson.scripts[name])
-  );
-}
-
-/**
- * @param {string} name
- * @returns {boolean}
- */
-function safePackageScriptName(name) {
-  return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(name);
 }
 
 /**
