@@ -4,6 +4,7 @@ coverage/
 .nyc_output/
 npm-debug.log*
 improvements/
+ideas.md
 dist/
 *.tgz
 
