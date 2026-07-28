@@ -1,9 +1,12 @@
 import https from "node:https";
+import tls from "node:tls";
 
 export const REGISTRY_ORIGIN = "https://registry.npmjs.org";
 export const REGISTRY_TIMEOUT_MS = 2_500;
 export const MAX_REGISTRY_RESPONSE_BYTES = 64 * 1024;
 export const MAX_REGISTRY_REDIRECTS = 2;
+const BUNDLED_ROOT_CERTIFICATES = tls.rootCertificates.slice();
+Object.freeze(BUNDLED_ROOT_CERTIFICATES);
 
 /**
  * @typedef {{
@@ -56,6 +59,8 @@ export function fixedRegistryTransport(request) {
       {
         method: "GET",
         agent: false,
+        ca: BUNDLED_ROOT_CERTIFICATES,
+        rejectUnauthorized: true,
         headers: {
           Accept: "application/json",
           "User-Agent": "kanon-exact-version-check/1"

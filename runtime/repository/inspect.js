@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { TextDecoder } from "node:util";
 import {
   boundedDiagnostics,
   isBoundedString,
@@ -24,6 +25,8 @@ const MAX_HASH_BYTES = 32 * 1024 * 1024;
 const MAX_SCAN_MS = 5_000;
 const MAX_IGNORE_BYTES = 128 * 1024;
 const MAX_IGNORE_RULES = 256;
+const MAX_IGNORE_WILDCARDS = 64;
+const MAX_IGNORE_MATCH_WORK = 1_000_000;
 const MAX_EVIDENCE_ITEMS = 12;
 const MAX_INSTRUCTION_ITEMS = 8;
 const MAX_EVIDENCE_BYTES = 64 * 1024;
@@ -132,6 +135,7 @@ const BASELINE_PATHS = new Map([
  *     max_file_bytes: number,
  *     max_hash_bytes: number,
  *     max_scan_ms: number,
+ *     max_ignore_match_work: number,
  *     max_evidence_items: number,
  *     max_evidence_bytes: number
  *   }
@@ -176,6 +180,33 @@ const BASELINE_PATHS = new Map([
  *   },
  *   handoff_warning: string | null
  * }} PersistedContinuity
+ * @typedef {{
+ *   kind: "literal",
+ *   value: string
+ * } | {
+ *   kind: "single"
+ * } | {
+ *   kind: "star"
+ * } | {
+ *   kind: "globstar"
+ * }} IgnoreToken
+ * @typedef {{
+ *   tokens: IgnoreToken[],
+ *   directory_only: boolean,
+ *   anchored: boolean
+ * }} IgnoreRule
+ * @typedef {{
+ *   remaining: number,
+ *   deadline: number,
+ *   exhausted: boolean
+ * }} IgnoreMatchBudget
+ * @typedef {{
+ *   complete: true,
+ *   rules: IgnoreRule[]
+ * } | {
+ *   complete: false,
+ *   rules: []
+ * }} IgnoreLoadResult
  */
 
 /**
@@ -211,12 +242,20 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
 
   const coverage = createCoverage();
   const explicitPaths = extractTaskPaths(task);
+  const target =
+    options.target !== undefined && isSafeRelativePath(options.target)
+      ? options.target.replaceAll("\\", "/")
+      : undefined;
+  const instructionPaths =
+    target === undefined || explicitPaths.includes(target)
+      ? explicitPaths
+      : [...explicitPaths, target];
 
   // Applicable repository instructions are the first repository file content
   // read after canonicalization.
   const instructions = readApplicableInstructions(
     root.root,
-    explicitPaths,
+    instructionPaths,
     coverage
   );
   const scan = scanRepository(root.root, coverage);
@@ -225,10 +264,6 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
       ? {}
       : { runner: options.git_runner })
   });
-  const target =
-    options.target !== undefined && isSafeRelativePath(options.target)
-      ? options.target.replaceAll("\\", "/")
-      : undefined;
   const selected = selectEvidencePaths(
     scan.files,
     instructions.map((item) => item.path),
@@ -443,15 +478,20 @@ export function publicInspection(inspection) {
 function readApplicableInstructions(root, explicitPaths, coverage) {
   const candidates = new Set(INSTRUCTION_NAMES);
   for (const selectedPath of explicitPaths) {
+    /** @type {string[]} */
+    const directories = [];
     let directory = path.posix.dirname(selectedPath);
     while (directory !== "." && directory !== "/") {
-      candidates.add(`${directory}/AGENTS.md`);
-      candidates.add(`${directory}/CLAUDE.md`);
+      directories.unshift(directory);
       const parent = path.posix.dirname(directory);
       if (parent === directory) {
         break;
       }
       directory = parent;
+    }
+    for (const applicableDirectory of directories) {
+      candidates.add(`${applicableDirectory}/AGENTS.md`);
+      candidates.add(`${applicableDirectory}/CLAUDE.md`);
     }
   }
   if (candidates.size > 32) {
@@ -510,13 +550,23 @@ function readApplicableInstructions(root, explicitPaths, coverage) {
  * @returns {{files: InspectedFile[]}}
  */
 function scanRepository(root, coverage) {
-  const ignoreRules = loadIgnoreRules(root, coverage);
+  const started = Date.now();
+  const deadline = started + MAX_SCAN_MS;
+  const ignore = loadIgnoreRules(root, coverage);
+  if (!ignore.complete) {
+    return { files: [] };
+  }
+  const ignoreRules = ignore.rules;
+  /** @type {IgnoreMatchBudget} */
+  const ignoreMatchBudget = {
+    remaining: MAX_IGNORE_MATCH_WORK,
+    deadline,
+    exhausted: false
+  };
   /** @type {{absolute: string, relative: string}[]} */
   const pending = [{ absolute: root, relative: "" }];
   /** @type {InspectedFile[]} */
   const files = [];
-  const started = Date.now();
-  const deadline = started + MAX_SCAN_MS;
   let hashedBytes = 0;
   while (pending.length > 0 && !terminalBudgetReached(coverage)) {
     if (Date.now() > deadline) {
@@ -549,6 +599,10 @@ function scanRepository(root, coverage) {
     }
     entries.sort((left, right) => compareText(left.name, right.name));
     for (let index = entries.length - 1; index >= 0; index -= 1) {
+      if (Date.now() > deadline) {
+        noteBudget(coverage, "max_scan_ms");
+        break;
+      }
       const entry = entries[index];
       if (!entry) {
         continue;
@@ -576,7 +630,17 @@ function scanRepository(root, coverage) {
           coverage.fixed_directories_excluded += 1;
           continue;
         }
-        if (matchesIgnore(relative, true, ignoreRules)) {
+        const ignored = matchesIgnore(
+          relative,
+          true,
+          ignoreRules,
+          ignoreMatchBudget,
+          coverage
+        );
+        if (ignoreMatchBudget.exhausted) {
+          break;
+        }
+        if (ignored) {
           coverage.ignore_entries_excluded += 1;
           continue;
         }
@@ -593,7 +657,17 @@ function scanRepository(root, coverage) {
         samplePath(coverage.rejected_path_samples, relative);
         continue;
       }
-      if (matchesIgnore(relative, false, ignoreRules)) {
+      const ignored = matchesIgnore(
+        relative,
+        false,
+        ignoreRules,
+        ignoreMatchBudget,
+        coverage
+      );
+      if (ignoreMatchBudget.exhausted) {
+        break;
+      }
+      if (ignored) {
         coverage.ignore_entries_excluded += 1;
         continue;
       }
@@ -728,7 +802,7 @@ function readBoundedDirectory(directory, maximumEntries, deadline) {
 /**
  * @param {string} root
  * @param {InspectionCoverage} coverage
- * @returns {RegExp[]}
+ * @returns {IgnoreLoadResult}
  */
 function loadIgnoreRules(root, coverage) {
   const read = readBoundedRepositoryFile(
@@ -737,16 +811,29 @@ function loadIgnoreRules(root, coverage) {
     MAX_IGNORE_BYTES
   );
   if (!read.ok) {
-    if (read.status !== "missing") {
-      recordReadFailure(coverage, read);
-      coverage.diagnostics.push(
-        "The repository ignore file was unavailable; only fixed exclusions were used."
-      );
+    if (read.status === "missing") {
+      return { complete: true, rules: [] };
     }
-    return [];
+    recordReadFailure(coverage, read);
+    return incompleteIgnoreRules(
+      coverage,
+      "ignore_rules_unavailable",
+      "The repository ignore file was unavailable or unsafe; repository content scanning was stopped."
+    );
   }
-  const lines = read.bytes.toString("utf8").split(/\r?\n/);
-  /** @type {RegExp[]} */
+  /** @type {string} */
+  let decoded;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes);
+  } catch {
+    return incompleteIgnoreRules(
+      coverage,
+      "invalid_ignore_rules",
+      "The repository ignore file was invalid; repository content scanning was stopped."
+    );
+  }
+  const lines = decoded.split(/\r?\n/);
+  /** @type {IgnoreRule[]} */
   const rules = [];
   for (const line of lines) {
     const selected = line.trim();
@@ -758,47 +845,236 @@ function loadIgnoreRules(root, coverage) {
       selected.startsWith("!") ||
       selected.includes("..") ||
       path.isAbsolute(selected) ||
-      selected.length > 512
+      selected.length > 512 ||
+      /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(
+        selected
+      )
     ) {
-      coverage.diagnostics.push(
-        "One or more repository ignore rules were invalid or exceeded the rule budget."
+      return incompleteIgnoreRules(
+        coverage,
+        rules.length >= MAX_IGNORE_RULES
+          ? "max_ignore_rules"
+          : "invalid_ignore_rules",
+        "The repository ignore file contained an invalid, unsupported, or over-limit rule; repository content scanning was stopped."
       );
-      noteNonterminalBudget(coverage, "max_ignore_rules");
-      continue;
     }
-    rules.push(ignoreRule(selected));
+    const parsed = ignoreRule(selected);
+    if (parsed === null) {
+      return incompleteIgnoreRules(
+        coverage,
+        "max_ignore_rule_complexity",
+        "The repository ignore file exceeded the deterministic rule-complexity limit; repository content scanning was stopped."
+      );
+    }
+    rules.push(parsed);
   }
-  return rules;
+  return { complete: true, rules };
+}
+
+/**
+ * @param {InspectionCoverage} coverage
+ * @param {string} budget
+ * @param {string} diagnostic
+ * @returns {Extract<IgnoreLoadResult, {complete: false}>}
+ */
+function incompleteIgnoreRules(coverage, budget, diagnostic) {
+  noteNonterminalBudget(coverage, budget);
+  coverage.diagnostics.push(diagnostic);
+  return { complete: false, rules: [] };
 }
 
 /**
  * @param {string} rule
- * @returns {RegExp}
+ * @returns {IgnoreRule | null}
  */
 function ignoreRule(rule) {
   const normalized = rule.replaceAll("\\", "/").replace(/^\/+/, "");
-  const directory = normalized.endsWith("/");
-  const body = normalized
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "\u0000")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, "[^/]")
-    .replace(/\u0000/g, ".*");
-  const anchored = normalized.includes("/")
-    ? `^${body}`
-    : `(?:^|/)${body}`;
-  return new RegExp(`${anchored}${directory ? "(?:/|$)" : "$"}`);
+  const directoryOnly = normalized.endsWith("/");
+  const body = normalized.replace(/\/+$/, "");
+  const wildcardCount = Array.from(body).filter(
+    (character) => character === "*" || character === "?"
+  ).length;
+  if (
+    !body ||
+    wildcardCount > MAX_IGNORE_WILDCARDS
+  ) {
+    return null;
+  }
+  /** @type {IgnoreToken[]} */
+  const tokens = [];
+  for (let index = 0; index < body.length; index += 1) {
+    const character = body[index];
+    if (character === "*") {
+      if (body[index + 1] === "*") {
+        tokens.push({ kind: "globstar" });
+        index += 1;
+      } else {
+        tokens.push({ kind: "star" });
+      }
+    } else if (character === "?") {
+      tokens.push({ kind: "single" });
+    } else if (character !== undefined) {
+      tokens.push({ kind: "literal", value: character });
+    }
+  }
+  return {
+    tokens,
+    directory_only: directoryOnly,
+    anchored: body.includes("/")
+  };
 }
 
 /**
  * @param {string} relative
  * @param {boolean} directory
- * @param {RegExp[]} rules
+ * @param {IgnoreRule[]} rules
+ * @param {IgnoreMatchBudget} budget
+ * @param {InspectionCoverage} coverage
  * @returns {boolean}
  */
-function matchesIgnore(relative, directory, rules) {
-  const candidate = directory ? `${relative}/` : relative;
-  return rules.some((rule) => rule.test(candidate));
+function matchesIgnore(relative, directory, rules, budget, coverage) {
+  for (const rule of rules) {
+    if (rule.directory_only && !directory) {
+      continue;
+    }
+    const candidate = rule.anchored
+      ? relative
+      : relative.slice(relative.lastIndexOf("/") + 1);
+    const matched = matchIgnoreTokens(
+      rule.tokens,
+      candidate,
+      budget,
+      coverage
+    );
+    if (matched === null) {
+      return false;
+    }
+    if (matched) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Deterministic NFA-style glob matching. `star` never crosses a path
+ * separator, while `globstar` may. Work and wall-clock limits are shared by
+ * the complete repository scan.
+ *
+ * @param {IgnoreToken[]} tokens
+ * @param {string} candidate
+ * @param {IgnoreMatchBudget} budget
+ * @param {InspectionCoverage} coverage
+ * @returns {boolean | null}
+ */
+function matchIgnoreTokens(tokens, candidate, budget, coverage) {
+  let states = ignoreEpsilonClosure(
+    new Set([0]),
+    tokens,
+    budget,
+    coverage
+  );
+  if (states === null) {
+    return null;
+  }
+  for (const character of candidate) {
+    if (!consumeIgnoreMatchWork(budget, coverage)) {
+      return null;
+    }
+    /** @type {Set<number>} */
+    const next = new Set();
+    for (const state of states) {
+      if (!consumeIgnoreMatchWork(budget, coverage)) {
+        return null;
+      }
+      const token = tokens[state];
+      if (
+        token?.kind === "literal" &&
+        token.value === character
+      ) {
+        next.add(state + 1);
+      } else if (
+        token?.kind === "single" &&
+        character !== "/"
+      ) {
+        next.add(state + 1);
+      } else if (
+        token?.kind === "star" &&
+        character !== "/"
+      ) {
+        next.add(state);
+      } else if (token?.kind === "globstar") {
+        next.add(state);
+      }
+    }
+    states = ignoreEpsilonClosure(next, tokens, budget, coverage);
+    if (states === null) {
+      return null;
+    }
+    if (states.size === 0) {
+      return false;
+    }
+  }
+  return states.has(tokens.length);
+}
+
+/**
+ * @param {Set<number>} initial
+ * @param {IgnoreToken[]} tokens
+ * @param {IgnoreMatchBudget} budget
+ * @param {InspectionCoverage} coverage
+ * @returns {Set<number> | null}
+ */
+function ignoreEpsilonClosure(initial, tokens, budget, coverage) {
+  const states = new Set(initial);
+  const pending = Array.from(initial);
+  while (pending.length > 0) {
+    if (!consumeIgnoreMatchWork(budget, coverage)) {
+      return null;
+    }
+    const state = pending.pop();
+    if (state === undefined) {
+      continue;
+    }
+    const token = tokens[state];
+    if (
+      (token?.kind === "star" || token?.kind === "globstar") &&
+      !states.has(state + 1)
+    ) {
+      states.add(state + 1);
+      pending.push(state + 1);
+    }
+  }
+  return states;
+}
+
+/**
+ * @param {IgnoreMatchBudget} budget
+ * @param {InspectionCoverage} coverage
+ * @returns {boolean}
+ */
+function consumeIgnoreMatchWork(budget, coverage) {
+  if (budget.exhausted) {
+    return false;
+  }
+  if (Date.now() > budget.deadline) {
+    budget.exhausted = true;
+    noteBudget(coverage, "max_scan_ms");
+    coverage.diagnostics.push(
+      "Repository ignore matching exceeded the scan deadline."
+    );
+    return false;
+  }
+  if (budget.remaining < 1) {
+    budget.exhausted = true;
+    noteBudget(coverage, "max_ignore_match_work");
+    coverage.diagnostics.push(
+      "Repository ignore matching exceeded its deterministic work limit."
+    );
+    return false;
+  }
+  budget.remaining -= 1;
+  return true;
 }
 
 /**
@@ -896,19 +1172,26 @@ function readSelectedEvidence(
       break;
     }
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
+    const readMaximum =
+      file.sha256 === null ? maximum : MAX_FILE_BYTES;
     const read = readBoundedRepositoryFile(
       root,
       selectedPath,
-      maximum,
+      readMaximum,
       { truncate: true }
     );
     if (!read.ok) {
       recordReadFailure(coverage, read);
       continue;
     }
+    const currentDigest = sha256(read.bytes);
     if (
       read.size !== file.size ||
-      read.mtime_ms !== file.mtime_ms
+      read.mtime_ms !== file.mtime_ms ||
+      (
+        file.sha256 !== null &&
+        currentDigest !== file.sha256
+      )
     ) {
       coverage.unreadable_paths += 1;
       samplePath(coverage.unreadable_path_samples, selectedPath);
@@ -930,7 +1213,7 @@ function readSelectedEvidence(
       kind: evidenceKind(selectedPath),
       path: selectedPath,
       size: read.size,
-      sha256: file.sha256 || sha256(read.bytes),
+      sha256: file.sha256 || currentDigest,
       content,
       truncated: read.truncated || sanitizationTruncated,
       trust: "repository-untrusted"
@@ -1310,6 +1593,7 @@ function createCoverage() {
       max_file_bytes: MAX_FILE_BYTES,
       max_hash_bytes: MAX_HASH_BYTES,
       max_scan_ms: MAX_SCAN_MS,
+      max_ignore_match_work: MAX_IGNORE_MATCH_WORK,
       max_evidence_items: MAX_EVIDENCE_ITEMS,
       max_evidence_bytes: MAX_EVIDENCE_BYTES
     }
@@ -1372,7 +1656,8 @@ function terminalBudgetReached(coverage) {
   return coverage.budgets_reached.some((name) =>
     name === "max_entries" ||
     name === "max_files" ||
-    name === "max_scan_ms"
+    name === "max_scan_ms" ||
+    name === "max_ignore_match_work"
   );
 }
 

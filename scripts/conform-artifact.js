@@ -145,8 +145,20 @@ function inspectPackage(root, input) {
       metadataResult.value.public_capabilities.hosts["codex-cli"]
         .enforcement === false &&
       metadataResult.value.public_capabilities.hosts["claude-code"]
-        .enforcement === false,
-      "embedded capability metadata is valid and non-enforcing"
+        .enforcement === false &&
+      metadataResult.value.public_capabilities.hosts["codex-cli"]
+        .lifecycle_notice_hook === "Unavailable" &&
+      metadataResult.value.public_capabilities.hosts["claude-code"]
+        .lifecycle_notice_hook === "Unavailable" &&
+      metadataResult.value.public_capabilities.notice.automatic === false &&
+      metadataResult.value.public_capabilities.notice.delivery ===
+        "explicit-skill-and-status-output",
+      "embedded capability metadata is valid, explicit-only, and non-enforcing"
+    ));
+    checks.push(result(
+      !Object.hasOwn(codexManifest, "hooks") &&
+      !Object.hasOwn(claudeManifest, "hooks"),
+      "host manifests declare no production lifecycle hook"
     ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))
@@ -177,6 +189,20 @@ function inspectPackage(root, input) {
     const all = allFiles(root).map((file) =>
       path.relative(root, file).replaceAll("\\", "/")
     );
+    checks.push(result(
+      !all.some((file) =>
+        /(?:^|\/)hooks(?:\/|$)|notice-hook\.js$/.test(file)
+      ),
+      "installed artifact contains no lifecycle-hook declaration or runner"
+    ));
+    const lifecycleSurface = all
+      .filter((file) => /\.(?:js|json|ya?ml)$/.test(file))
+      .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+      .join("\n");
+    checks.push(result(
+      !/PreToolUse|hook_event_name|notice-hook\.js/.test(lifecycleSurface),
+      "installed executable and manifest content contains no lifecycle-hook surface"
+    ));
     checks.push(result(
       !all.some((file) =>
         /(?:^|\/)(?:improve|refactor)(?:\/|\.js$)/.test(file)
@@ -230,10 +256,49 @@ function verifyManifest(root) {
 }
 
 function exerciseWrappers(packageRoot) {
-  const checks = [];
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-conform-"));
+  try {
+    return exerciseWrappersInFixture(packageRoot, fixture);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+function exerciseWrappersInFixture(packageRoot, fixture) {
+  const checks = [];
   const marker = path.join(fixture, "repository-code-executed");
   const hostileNodeMarker = path.join(fixture, "hostile-node-executed");
+  const hostileDirnameMarker = path.join(
+    fixture,
+    "hostile-dirname-executed"
+  );
+  const bashEnvironmentMarker = path.join(
+    fixture,
+    "hostile-bash-environment-executed"
+  );
+  const nodeOptionsMarker = path.join(
+    fixture,
+    "hostile-node-options-executed"
+  );
+  const nodeRedirectWarnings = path.join(
+    fixture,
+    "hostile-node-redirect-warnings"
+  );
+  const nodeCoverage = path.join(fixture, "hostile-node-coverage");
+  const nodeCompileCache = path.join(
+    fixture,
+    "hostile-node-compile-cache"
+  );
+  fs.writeFileSync(
+    path.join(fixture, "hostile-bash-environment"),
+    `: > ${JSON.stringify(bashEnvironmentMarker)}\n`
+  );
+  fs.writeFileSync(
+    path.join(fixture, "hostile-node-options.cjs"),
+    `require("node:fs").writeFileSync(${JSON.stringify(
+      nodeOptionsMarker
+    )}, "executed");\n`
+  );
   fs.writeFileSync(path.join(fixture, "README.md"), "# Fixture\n\nRun `npm test`.\n");
   fs.writeFileSync(
     path.join(fixture, "package.json"),
@@ -245,13 +310,27 @@ function exerciseWrappers(packageRoot) {
       }
     })}\n`
   );
-  if (process.platform !== "win32") {
-    const hostileNode = path.join(fixture, "node");
+  if (process.platform === "win32") {
     fs.writeFileSync(
-      hostileNode,
-      "#!/bin/sh\n: > \"$PWD/hostile-node-executed\"\nexit 97\n"
+      path.join(fixture, "node.cmd"),
+      "@echo off\r\ntype nul > \"%CD%\\hostile-node-executed\"\r\nexit /b 97\r\n"
     );
-    fs.chmodSync(hostileNode, 0o755);
+    fs.writeFileSync(
+      path.join(fixture, "dirname.cmd"),
+      "@echo off\r\ntype nul > \"%CD%\\hostile-dirname-executed\"\r\nexit /b 97\r\n"
+    );
+  } else {
+    for (const [name, markerName] of [
+      ["node", "hostile-node-executed"],
+      ["dirname", "hostile-dirname-executed"]
+    ]) {
+      const hostile = path.join(fixture, name);
+      fs.writeFileSync(
+        hostile,
+        `#!/bin/sh\n: > "$PWD/${markerName}"\nexit 97\n`
+      );
+      fs.chmodSync(hostile, 0o755);
+    }
   }
   const scripts = path.join(packageRoot, "skills", "kanon", "scripts");
   const family = process.platform === "win32" ? "powershell" : "bash";
@@ -289,7 +368,25 @@ function exerciseWrappers(packageRoot) {
   ));
   checks.push(result(
     !fs.existsSync(hostileNodeMarker),
-    "repository-controlled PATH executable was not executed"
+    "repository-controlled PATH node executable was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(hostileDirnameMarker),
+    "repository-controlled PATH dirname executable was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(bashEnvironmentMarker),
+    "repository-controlled BASH_ENV startup file was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(nodeOptionsMarker),
+    "repository-controlled NODE_OPTIONS module was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(nodeRedirectWarnings) &&
+      !fs.existsSync(nodeCoverage) &&
+      !fs.existsSync(nodeCompileCache),
+    "repository-controlled Node write destinations were not used"
   ));
   checks.push(result(
     fs.existsSync(path.join(fixture, ".kanon", "STATE.json")),
@@ -301,7 +398,7 @@ function exerciseWrappers(packageRoot) {
 function exerciseWrapper(wrapper, command, family, fixture, surface) {
   const args = wrapperArguments(command);
   const execution = family === "powershell"
-    ? spawnPowerShell(wrapper, args, fixture)
+    ? spawnPowerShell(wrapper, args, fixture, true)
     : spawnSync(wrapper, args, runOptions(fixture, true));
   return {
     name: `${family} ${surface} wrapper ${command}`,
@@ -335,12 +432,12 @@ function wrapperArguments(command) {
   return command === "brief" ? ["--json"] : [];
 }
 
-function spawnPowerShell(wrapper, args, cwd) {
+function spawnPowerShell(wrapper, args, cwd, poisonPath = false) {
   for (const binary of ["pwsh", "powershell.exe"]) {
     const found = spawnSync(
       binary,
       ["-NoProfile", "-File", wrapper, ...args],
-      runOptions(cwd)
+      runOptions(cwd, poisonPath)
     );
     if (!found.error || found.error.code !== "ENOENT") {
       return found;
@@ -355,8 +452,21 @@ function runOptions(cwd, poisonPath = false) {
     encoding: "utf8",
     env: {
       ...process.env,
+      BASH_ENV: path.join(cwd, "hostile-bash-environment"),
       GIT_TERMINAL_PROMPT: "0",
-      ...(poisonPath && process.platform !== "win32"
+      NODE_COMPILE_CACHE: path.join(
+        cwd,
+        "hostile-node-compile-cache"
+      ),
+      NODE_OPTIONS:
+        `--require=${path.join(cwd, "hostile-node-options.cjs")}`,
+      NODE_PATH: cwd,
+      NODE_REDIRECT_WARNINGS: path.join(
+        cwd,
+        "hostile-node-redirect-warnings"
+      ),
+      NODE_V8_COVERAGE: path.join(cwd, "hostile-node-coverage"),
+      ...(poisonPath
         ? {
             PATH: `${cwd}${path.delimiter}${process.env.PATH || ""}`
           }

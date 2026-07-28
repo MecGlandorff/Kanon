@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import tls from "node:tls";
 import { fileURLToPath } from "node:url";
 import {
   DEPRECATION_CACHE_TTL_MS,
@@ -395,6 +398,67 @@ test("fixed production transport refuses non-registry origins without I/O", asyn
     ok: false,
     status: "Unknown",
     failure: "transport"
+  });
+});
+
+test("fixed production transport pins strict bundled TLS options and bounds", async () => {
+  const originalRequest = https.request;
+  /** @type {URL | undefined} */
+  let capturedUrl;
+  /** @type {Record<string, unknown> | undefined} */
+  let capturedOptions;
+  let capturedTimeout;
+  try {
+    https.request = (url, options, onResponse) => {
+      capturedUrl = url;
+      capturedOptions = options;
+      const request = new EventEmitter();
+      request.setTimeout = (timeout) => {
+        capturedTimeout = timeout;
+        return request;
+      };
+      request.destroy = () => request;
+      request.end = () => {
+        const response = new EventEmitter();
+        response.statusCode = 200;
+        response.headers = {
+          "content-type": "application/json"
+        };
+        response.destroy = () => response;
+        onResponse(response);
+        response.emit("data", Buffer.from("{}"));
+        response.emit("end");
+        return request;
+      };
+      return request;
+    };
+
+    const result = await fixedRegistryTransport({
+      url: `${REGISTRY_ORIGIN}/deterministic-no-network-fixture`,
+      timeout_ms: REGISTRY_TIMEOUT_MS,
+      max_response_bytes: MAX_REGISTRY_RESPONSE_BYTES
+    });
+    assert.deepEqual(result, {
+      ok: true,
+      status_code: 200,
+      content_type: "application/json",
+      location: "",
+      body: "{}"
+    });
+  } finally {
+    https.request = originalRequest;
+  }
+
+  assert.equal(capturedUrl?.origin, REGISTRY_ORIGIN);
+  assert.equal(capturedOptions?.method, "GET");
+  assert.equal(capturedOptions?.agent, false);
+  assert.equal(capturedOptions?.rejectUnauthorized, true);
+  assert.deepEqual(capturedOptions?.ca, tls.rootCertificates);
+  assert.equal(Object.isFrozen(capturedOptions?.ca), true);
+  assert.equal(capturedTimeout, REGISTRY_TIMEOUT_MS);
+  assert.deepEqual(capturedOptions?.headers, {
+    Accept: "application/json",
+    "User-Agent": "kanon-exact-version-check/1"
   });
 });
 

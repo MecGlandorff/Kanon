@@ -1,7 +1,7 @@
 # Kanon v1 Run B implementation record
 
-**Status:** Run B recovery in progress for product slices 4 through 8. This
-file is not a release claim and does not authorize slice 9.
+**Status:** Run B recovery accepted on 2026-07-28 for product slices 4
+through 8. This file is not a release claim and does not authorize slice 9.
 
 The authoritative contract is [`V_1design.md`](../V_1design.md), including its
 authorized 2026-07-28 lifecycle-notice amendment. The approved notice-only
@@ -29,11 +29,19 @@ Automatic lifecycle notice and hard Guard remain future host-specific
 experimental work.
 
 All pre-recovery statements below saying “P0/P1 at completion: none,” that the
-shared hook passed principal review, or that Run B was complete are retained
-only as historical slice records. They are **Stale / suspicious** until this
-recovery removes the hook surface, preserves the existing correction set,
-reruns every stated validation after the fix, and commits a clean worktree.
+shared hook passed principal review, or that Run B was complete became
+**Stale / suspicious** when the P1 reopened. They are retained only as
+historical slice records and are not current acceptance evidence. The
+post-fix recovery certification near the end of this document supersedes
+those claims and lists only validations rerun after the hook removal.
 Historical Guard reports remain immutable.
+
+## Historical pre-recovery slice records
+
+The slice records in this section preserve implementation chronology. Their
+old validation counts and hook assumptions do not certify the recovered
+tree. Current acceptance evidence begins at
+[Recovery certification](#recovery-certification--slices-4-through-8).
 
 ## Slice 4 frame — dual-host plugin skeleton
 
@@ -85,7 +93,8 @@ Historical Guard reports remain immutable.
 - **Residual classification:** the installed Codex CLI's lack of native
   manifest validation is **Unknown** host-side validation, not a negative
   capability conclusion. Hook observability also remains **Unknown**.
-- **P0/P1 at completion:** none.
+- **Historical P0/P1 claim at that slice boundary:** none. This claim was
+  superseded when the lifecycle-hook P1 reopened.
 
 ## Slice 5 frame — strict checked-JS ratchet
 
@@ -131,7 +140,8 @@ Historical Guard reports remain immutable.
   predicates. The first normal validation also caught a legacy test that
   prohibited all development dependencies; it now requires exactly the two
   design-approved pins while preserving the zero-runtime-dependency gate.
-- **P0/P1 at completion:** none.
+- **Historical P0/P1 claim at that slice boundary:** none. This claim was
+  superseded when the lifecycle-hook P1 reopened.
 
 ## Slice 6 frame — exact-version deprecation status
 
@@ -193,7 +203,8 @@ Historical Guard reports remain immutable.
   caching, and must be surfaced by slice 8. Same-user concurrent replacement
   between canonical validation and atomic rename remains a lower-risk
   platform residual shared with existing persistence.
-- **P0/P1 at completion:** none.
+- **Historical P0/P1 claim at that slice boundary:** none. This claim was
+  superseded when the lifecycle-hook P1 reopened.
 
 ## Slice 7 frame — shared continuity engine
 
@@ -252,7 +263,8 @@ Historical Guard reports remain immutable.
   read remains a documented lower-risk filesystem concurrency residual.
   Unsupported host introspection and any host session association remain
   **Unknown**; the engine imports neither.
-- **P0/P1 at completion:** none.
+- **Historical P0/P1 claim at that slice boundary:** none. This claim was
+  superseded when the lifecycle-hook P1 reopened.
 
 ### Slice 7 post-commit type-scope audit
 
@@ -381,18 +393,132 @@ enter the strict project immediately.
   native Codex manifest validation were unavailable on this macOS host.
   Host/session/hook introspection remains **Unknown** where not directly
   supplied. These residuals do not support enforcement or absence claims.
-- **Historical integrity:** `V_1design.md` and every historical Guard report
-  remain unchanged.
-- **P0/P1 at completion:** none.
+- **Historical integrity at that boundary:** `V_1design.md` and every
+  historical Guard report were unchanged. The design was subsequently
+  amended under the user's narrow authorization; Guard reports remain
+  unchanged.
+- **Historical P0/P1 claim at that slice boundary:** none. This claim was
+  superseded when the lifecycle-hook P1 reopened.
+
+## Recovery certification — slices 4 through 8
+
+This is the sole current Run B acceptance record. Every result below was
+rerun after removing the production lifecycle hook and preserving the
+33-file correction set. Historical per-slice counts above were not used to
+accept the recovered tree.
+
+### Amendment and correction disposition
+
+- The authorized amendment is commit `9ef1ec1`. It makes lifecycle-hook
+  declarations optional and host-specific, removes the shared production
+  hook, and limits stable notice to explicit skill and status output.
+- All 33 original dirty files were retained as measured corrections:
+  three canonical v1 boundary modules, their three generated runtime copies,
+  the wrapper generator, the installed-artifact conformance harness, twenty
+  generated Bash and PowerShell wrappers, and five associated test files.
+  No original correction was reset, restored, stashed, discarded, or
+  weakened.
+- The two host manifest descriptions and the plugin contract test were added
+  to make explicit-only notice visible at the public manifest boundary.
+- Generated copies were produced only through `scripts/build-skill.js`.
+  The generator synchronized 101 artifacts, and the subsequent
+  `npm run check:skill` comparison passed without drift.
+
+### Post-fix validation
+
+- **Focused recovery tests:** the plugin/no-hook, registry, continuity,
+  repository, wrapper, adversarial, skill, type-scope, scope, historical
+  evidence, package, and installed-artifact files ran together: 124 tests,
+  123 passed, 1 skipped because PowerShell was unavailable, and 0 failed.
+- **Strict checked JavaScript:** `npm run typecheck` passed with zero
+  diagnostics. All 20 canonical `src/v1` JavaScript modules plus the shared
+  continuity engine are in the promised strict project. No broad `any`,
+  `ts-ignore`, `nocheck`, unsafe cast, or decorative source exclusion was
+  introduced.
+- **Generated synchronization:** `npm run build:skill` reported 101
+  synchronized artifacts; `npm run check:skill` passed.
+- **Manifest validation:** Claude Code 2.1.219 native
+  `plugin validate --strict` passed. The bundled Codex plugin schema
+  validator passed under Python 3.9.18 and PyYAML 6.0.1. Codex CLI 0.145.0
+  exposes no native validation subcommand, so native Codex validation remains
+  **Unknown**.
+- **Exact installed artifact:** the deterministic staged package contained
+  118 files, 117 of them bound by `MANIFEST.sha256`, and passed 33 of 33
+  installed-artifact checks on macOS arm64 with Node.js 25.8.1. Checks include
+  separate manifests, the shared ESM runtime, zero runtime dependencies,
+  exact public wrappers, all manifest hashes, non-execution of declared
+  repository scripts, poisoned `PATH`, `BASH_ENV`, and Node environment
+  sentinels, explicit refresh behavior, and complete fixture cleanup.
+  The artifact contains no `hooks/` tree, lifecycle-hook runner, hook event
+  declaration, `steer`, or `aswitch`.
+- **Artifact setup diagnostics:** two preparatory commands failed closed
+  before conformance began: `/private/tmp` was not Node's canonical temporary
+  root, and the ambient npm cache was not writable in the sandbox. The
+  successful rerun used Node's canonical temporary root and a runner-owned
+  npm cache. Neither setup failure produced a conformance pass.
+- **Full validation:** `npm run validate` ran generated synchronization,
+  strict typechecking, and 184 tests: 182 passed, 2 platform proofs skipped
+  (PowerShell unavailable and Windows junctions), and 0 failed.
+- **Syntax and data checks:** `node --check` passed for all 15 changed
+  JavaScript files. Seven production and tooling JSON files parsed
+  successfully. `git diff --check` passed.
+- **Raw principal review:** no repository-controlled executable or startup
+  file can run through the stable read path tested on this host. Repository
+  content, filenames, Git output, ignore state, registry data, continuity
+  state, and host values are bounded and cannot create an absence or
+  enforcement claim when observation is incomplete. Public claims match the
+  installed allowlist, and generated files match their canonical sources.
+
+### Accepted slice status
+
+- **Slice 4 — accepted:** separate Codex and Claude manifests share one skill
+  root and ESM runtime, expose accurate explicit-only notice metadata, and
+  load no production lifecycle hook.
+- **Slice 5 — accepted:** the strict checked-JS ratchet passes for the promised
+  v1 and continuity scope with zero diagnostics.
+- **Slice 6 — accepted:** exact-version deprecation remains fixed-origin,
+  strict-TLS, bounded, runtime-validated, session-cached for at most one hour,
+  sticky only as specified, and fail-open to `Unknown`.
+- **Slice 7 — accepted:** continuity is shared, bounded, live-authoritative,
+  and read-only unless the user explicitly selects `refresh` or `todo`;
+  malformed or unavailable evidence remains `Unknown`.
+- **Slice 8 — accepted:** `orient`, `resume`, `verify`, and `status` execute
+  through equivalent Codex and Claude adapters; compatibility remains limited
+  to `brief`, narrow `ask`, `resume`, `refresh`, `todo`, and `verify`; receipts
+  remain minimal, in-memory, and non-enforcing.
+
+### Recovery residual classification
+
+- **Known:** both shipped manifests omit hooks; the exact installed artifact
+  has no production lifecycle hook; explicit notice remains available;
+  enforcement is false; runtime dependencies are zero; development
+  dependencies are exactly `typescript@7.0.2` and
+  `@types/node@20.19.43`.
+- **Likely, not release proof:** the common generator and static contracts
+  make Bash and PowerShell wrapper drift unlikely, but do not substitute for
+  runtime platform evidence.
+- **Unknown:** PowerShell behavior on this macOS host, Windows junction
+  behavior, native Codex manifest validation, unavailable host hook
+  introspection, and behavior on untested host/platform/version surfaces.
+- **Stale / suspicious:** every pre-recovery shared-hook claim, old package
+  count, old generated-artifact count, and old “P0/P1 none” completion claim
+  above.
+- **Suggested:** begin no later slice until a clean recovery commit is
+  precondition-checked and the user explicitly decides whether Run C defers
+  slice 9 entirely or authorizes a separately amended, receipt-only,
+  non-enforcing scope.
+- **Remaining P0/P1:** none after the post-fix correction loop. Platform
+  Unknowns remain release-gate evidence gaps, not promoted negative
+  conclusions.
 
 ### Run C gate
 
-Run C requires the exact clean slice 8 commit on `release/v.1.0.0`, a fresh
-precondition check, and an explicit user sequencing decision. Product slice 9
-must not be inferred: production Guard and a broader receipt lifecycle remain
-outside public v1 after the accepted host no-go decisions. The user must
-explicitly choose whether Run C skips or reframes slice 9 before authorizing
-any later product slice.
+Run C requires the exact clean recovery commit on `release/v.1.0.0`, a fresh
+branch/HEAD/worktree precondition check, and an explicit sequencing decision.
+Product slice 9 must not be inferred. Because production Guard remains outside
+public v1 after the accepted host no-go decisions, the user must choose either
+to defer slice 9 entirely or to authorize a narrow contract amendment for a
+receipt-only, non-enforcing lifecycle before any Run C implementation.
 
 The user required this fresh slice 8 session because the prior TUI
 unexpectedly displayed a different low/fast model after slice 7. The fresh

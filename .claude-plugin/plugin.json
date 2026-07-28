@@ -3,7 +3,7 @@
   "name": "kanon",
   "displayName": "Kanon",
   "version": "0.4.0-rc.1",
-  "description": "Evidence-backed repository orientation and continuity with advisory notice.",
+  "description": "Evidence-backed repository orientation and continuity with explicit advisory status.",
   "author": {
     "name": "mecglandorff",
     "url": "https://github.com/MecGlandorff"

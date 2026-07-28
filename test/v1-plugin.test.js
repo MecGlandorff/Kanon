@@ -29,6 +29,12 @@ test("dual-host manifests are separate and share skills plus one runtime root", 
   assert.equal(claudeManifest.version, packageManifest.version);
   assert.equal(codexManifest.skills, "./skills/");
   assert.equal(claudeManifest.skills, "./skills/");
+  assert.match(codexManifest.description, /explicit advisory status/);
+  assert.match(claudeManifest.description, /explicit advisory status/);
+  assert.match(
+    codexManifest.interface.longDescription,
+    /explicit output[\s\S]*no lifecycle hook/
+  );
   assert.notEqual(
     path.join(repoRoot, ".codex-plugin", "plugin.json"),
     path.join(repoRoot, ".claude-plugin", "plugin.json")

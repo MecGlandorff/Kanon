@@ -169,6 +169,7 @@ export function runVerify(input, context = {}) {
     documentation.status,
     generatedArtifacts.status,
     declaredValidation.status,
+    declaredValidation.execution_status,
     continuity.ok ? continuity.status : "Unknown",
     receipt.status
   ]);

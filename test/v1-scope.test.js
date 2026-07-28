@@ -138,4 +138,15 @@ test("authoritative design and Run B record visibly supersede the reopened P1", 
     runB,
     /pre-recovery statements below saying “P0\/P1 at completion: none,”[\s\S]*?\*\*Stale \/ suspicious\*\*/
   );
+  assert.match(runB, /Recovery certification — slices 4 through 8/);
+  assert.match(runB, /sole current Run B acceptance record/);
+  assert.match(runB, /124 tests,\s+123 passed,\s+1 skipped[\s\S]*?0 failed/);
+  assert.match(runB, /184 tests:\s+182 passed,\s+2 platform proofs skipped/);
+  assert.match(runB, /passed 33 of 33\s+installed-artifact checks/);
+  assert.match(runB, /artifact contains no `hooks\/` tree/);
+  assert.match(runB, /\*\*Remaining P0\/P1:\*\* none/);
+  assert.match(
+    runB,
+    /defer slice 9 entirely or to authorize a narrow contract amendment for a\s+receipt-only, non-enforcing lifecycle/
+  );
 });

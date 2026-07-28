@@ -584,6 +584,10 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
   const installParent = makeFixture({}, "kanon-install-parent-");
   const installRoot = path.join(installParent, "installed");
   const reportPath = path.join(packed, "conformance.json");
+  const conformanceTemp = makeFixture(
+    {},
+    "kanon-conformance-temp-root-"
+  );
   const build = spawnSync(
     process.execPath,
     ["scripts/build-package.js", "--output", stage],
@@ -630,6 +634,13 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
     .map((file) => path.join(repacked, file))[0];
   assert.equal(sha256File(secondTarball), sha256File(tarball));
 
+  const conformOptions = commandOptions(120_000);
+  conformOptions.env = {
+    ...conformOptions.env,
+    TEMP: conformanceTemp,
+    TMP: conformanceTemp,
+    TMPDIR: conformanceTemp
+  };
   const conform = spawnSync(
     process.execPath,
     [
@@ -645,7 +656,7 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
       "--candidate-version",
       "0.4.0-rc.1"
     ],
-    commandOptions(120_000)
+    conformOptions
   );
   assert.equal(conform.status, 0, conform.stderr || conform.stdout);
   const report = readJson(reportPath);
@@ -662,6 +673,52 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
     report.checks.some((check) =>
       /destructive package script was not executed/.test(check.name)
     )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /host manifests declare no production lifecycle hook/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /no lifecycle-hook declaration or runner/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /no lifecycle-hook surface/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /PATH node executable was not executed/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /PATH dirname executable was not executed/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /BASH_ENV startup file was not executed/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /NODE_OPTIONS module was not executed/.test(check.name)
+    )
+  );
+  assert.ok(
+    report.checks.some((check) =>
+      /Node write destinations were not used/.test(check.name)
+    )
+  );
+  assert.deepEqual(
+    fs.readdirSync(conformanceTemp).filter((entry) =>
+      entry.startsWith("kanon-conform-")
+    ),
+    []
   );
 });
 

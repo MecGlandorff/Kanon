@@ -388,6 +388,86 @@ test("declared-validation Unknown prevents an aggregate Known claim", async () =
   assert.equal(result.report.status, "Unknown");
 });
 
+test("unobserved declared-validation execution prevents aggregate Known", async () => {
+  const root = makeFixture({
+    "README.md": "# Fixture\n",
+    "package.json": JSON.stringify({
+      name: "fixture",
+      version: "1.2.3",
+      scripts: {
+        test: "node --test",
+        validate: "npm test"
+      }
+    }),
+    "runtime/build-metadata.json": JSON.stringify({
+      package_version: "1.2.3"
+    }),
+    "src/v1/example.js": "export const value = 1;\n",
+    "runtime/example.js": "export const value = 1;\n"
+  });
+  const task = "verify README.md";
+  const context = {
+    ...adapterContext([]),
+    host_session: {
+      host: "codex-cli",
+      id: "declared-execution-session"
+    }
+  };
+  const oriented = await invokeCodexSkill(
+    stableInvocation("orient", root, { task }),
+    context
+  );
+  const result = await invokeCodexSkill(
+    stableInvocation("verify", root, {
+      task,
+      target: "README.md",
+      receipt: oriented.report.receipt
+    }),
+    context
+  );
+
+  assert.equal(result.report.documentation.status, "Known");
+  assert.equal(result.report.generated_artifacts.status, "Known");
+  assert.equal(result.report.continuity.status, "Known");
+  assert.equal(result.report.receipt.status, "Known");
+  assert.equal(result.report.declared_validation.status, "Known");
+  assert.equal(
+    result.report.declared_validation.declarations.length,
+    2
+  );
+  assert.equal(
+    result.report.declared_validation.execution_status,
+    "Unknown"
+  );
+  assert.equal(result.report.status, "Unknown");
+});
+
+test("verify target establishes deterministic nested instruction scope", async () => {
+  const root = makeFixture({
+    "AGENTS.md": "root instruction\n",
+    "nested/AGENTS.md": "nested instruction\n",
+    "nested/README.md": "# Nested fixture\n"
+  });
+  const result = await invokeCodexSkill(
+    stableInvocation("verify", root, {
+      task: "custom verification request",
+      target: "nested/README.md"
+    }),
+    adapterContext([])
+  );
+
+  assert.deepEqual(
+    result.report.live.instructions.values.map(
+      (item) => item.path.value
+    ),
+    ["AGENTS.md", "nested/AGENTS.md"]
+  );
+  assert.equal(
+    result.report.live.instructions.values[1].excerpt.value,
+    "nested instruction"
+  );
+});
+
 test("generated-artifact comparison limits remain explicitly Unknown", async () => {
   /** @type {Record<string, string>} */
   const files = {

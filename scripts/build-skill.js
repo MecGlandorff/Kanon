@@ -194,12 +194,28 @@ function readFile(filePath) {
 }
 
 function bashWrapper(command, stable) {
-  return `#!/bin/bash
+  return `#!/bin/bash -p
 set -euo pipefail
 
+unset BASH_ENV ENV CDPATH GLOBIGNORE
+unset NODE_OPTIONS NODE_PATH NODE_REDIRECT_WARNINGS NODE_REPL_HISTORY
+unset NODE_V8_COVERAGE NODE_COMPILE_CACHE NODE_DEBUG NODE_DEBUG_NATIVE
+
 COMMAND="${command}"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../../../runtime/bin/${
+SCRIPT_SOURCE="\${BASH_SOURCE[0]}"
+case "$SCRIPT_SOURCE" in
+  */*) SCRIPT_PARENT="\${SCRIPT_SOURCE%/*}" ;;
+  *) SCRIPT_PARENT="." ;;
+esac
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_PARENT" 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed wrapper directory." >&2
+  exit 127
+}
+PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed plugin directory." >&2
+  exit 127
+}
+LOCAL_KANON="$PLUGIN_ROOT/runtime/bin/${
   stable ? "kanon-v1.js" : "kanon.js"
 }"
 
@@ -226,11 +242,14 @@ for PATH_ENTRY in "\${PATH_ENTRIES[@]}"; do
   if [[ "$PATH_DIRECTORY" == "$REPOSITORY_ROOT" || "$PATH_DIRECTORY" == "$REPOSITORY_ROOT/"* ]]; then
     continue
   fi
+  if [[ "$PATH_DIRECTORY" == "$PLUGIN_ROOT" || "$PATH_DIRECTORY" == "$PLUGIN_ROOT/"* ]]; then
+    continue
+  fi
   SAFE_PATH="\${SAFE_PATH:+$SAFE_PATH:}$PATH_DIRECTORY"
 done
 
 NODE_CANDIDATE="$(PATH="$SAFE_PATH" type -P node || true)"
-if [[ -z "$NODE_CANDIDATE" ]]; then
+if [[ -z "$NODE_CANDIDATE" || "$NODE_CANDIDATE" != /* || "$NODE_CANDIDATE" == *$'\\n'* ]]; then
   echo "Kanon requires Node.js major 20, 22, 24, or 25." >&2
   exit 127
 fi
@@ -247,8 +266,17 @@ if [[ -z "$NODE_PATH" ]]; then
     echo "Kanon could not safely resolve the Node.js executable." >&2
     exit 127
   fi
-  NODE_DIRECTORY="$(CDPATH= cd -- "$(dirname -- "$NODE_CANDIDATE")" && pwd -P)"
-  NODE_PATH="$NODE_DIRECTORY/$(basename -- "$NODE_CANDIDATE")"
+  NODE_PARENT="\${NODE_CANDIDATE%/*}"
+  NODE_NAME="\${NODE_CANDIDATE##*/}"
+  if [[ -z "$NODE_PARENT" || "$NODE_PARENT" == "$NODE_CANDIDATE" || -z "$NODE_NAME" ]]; then
+    echo "Kanon could not safely resolve the Node.js executable." >&2
+    exit 127
+  fi
+  NODE_DIRECTORY="$(CDPATH= cd -- "$NODE_PARENT" 2>/dev/null && pwd -P)" || {
+    echo "Kanon could not safely resolve the Node.js executable." >&2
+    exit 127
+  }
+  NODE_PATH="$NODE_DIRECTORY/$NODE_NAME"
 fi
 if [[ ! -f "$NODE_PATH" || ! -x "$NODE_PATH" || "$NODE_PATH" == *$'\\n'* ]]; then
   echo "Kanon could not safely resolve the Node.js executable." >&2
@@ -258,14 +286,18 @@ if [[ "$NODE_PATH" == "$REPOSITORY_ROOT" || "$NODE_PATH" == "$REPOSITORY_ROOT/"*
   echo "Kanon refused a repository-controlled Node.js executable." >&2
   exit 127
 fi
-
-NODE_MAJOR="$("$NODE_PATH" -p 'process.versions.node.split(\".\")[0]')"
-if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $("$NODE_PATH" --version)." >&2
+if [[ "$NODE_PATH" == "$PLUGIN_ROOT" || "$NODE_PATH" == "$PLUGIN_ROOT/"* ]]; then
+  echo "Kanon refused a plugin-controlled Node.js executable." >&2
   exit 127
 fi
 
-exec "$NODE_PATH" "$LOCAL_KANON" "$COMMAND" "$@"
+NODE_MAJOR="$(PATH="$SAFE_PATH" "$NODE_PATH" -p 'process.versions.node.split(\".\")[0]')"
+if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
+  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $(PATH="$SAFE_PATH" "$NODE_PATH" --version)." >&2
+  exit 127
+fi
+
+PATH="$SAFE_PATH" exec "$NODE_PATH" "$LOCAL_KANON" "$COMMAND" "$@"
 `;
 }
 
@@ -273,7 +305,12 @@ function powershellWrapper(command, stable) {
   return `$ErrorActionPreference = "Stop"
 
 $KanonCommand = "${command}"
-$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/${
+$PluginRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../../..") -ErrorAction Stop).Path.TrimEnd(
+  [System.IO.Path]::DirectorySeparatorChar,
+  [System.IO.Path]::AltDirectorySeparatorChar
+)
+$PluginPrefix = $PluginRoot + [System.IO.Path]::DirectorySeparatorChar
+$LocalKanon = Join-Path $PluginRoot "runtime/bin/${
   stable ? "kanon-v1.js" : "kanon.js"
 }"
 
@@ -289,7 +326,7 @@ if ($null -eq $PathValue -or $PathValue.Length -gt 32768) {
   exit 127
 }
 
-$RepositoryRoot = [System.IO.Path]::GetFullPath((Get-Location).Path).TrimEnd(
+$RepositoryRoot = (Resolve-Path -LiteralPath (Get-Location).Path -ErrorAction Stop).Path.TrimEnd(
   [System.IO.Path]::DirectorySeparatorChar,
   [System.IO.Path]::AltDirectorySeparatorChar
 )
@@ -310,22 +347,41 @@ foreach ($PathEntry in $PathValue.Split([System.IO.Path]::PathSeparator)) {
   ) {
     continue
   }
+  if (
+    $PathDirectory.Equals($PluginRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $PathDirectory.StartsWith($PluginPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  ) {
+    continue
+  }
   $SafePathEntries += $PathDirectory
 }
 
-$OriginalPath = $env:PATH
-try {
-  $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
-  $Node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
-} finally {
-  $env:PATH = $OriginalPath
+$NodeCandidate = $null
+$NodeNames = if (
+  [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+) {
+  @("node.exe")
+} else {
+  @("node")
 }
-if (-not $Node) {
+foreach ($PathDirectory in $SafePathEntries) {
+  foreach ($NodeName in $NodeNames) {
+    $Candidate = [System.IO.Path]::Combine($PathDirectory, $NodeName)
+    if ([System.IO.File]::Exists($Candidate)) {
+      $NodeCandidate = $Candidate
+      break
+    }
+  }
+  if ($null -ne $NodeCandidate) {
+    break
+  }
+}
+if ($null -eq $NodeCandidate) {
   [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
   exit 127
 }
 
-$NodeItem = Get-Item -LiteralPath $Node.Source -ErrorAction Stop
+$NodeItem = Get-Item -LiteralPath $NodeCandidate -ErrorAction Stop
 $NodePath = $NodeItem.FullName
 if ($NodeItem.LinkType) {
   $ResolveLinkTarget = $NodeItem.PSObject.Methods["ResolveLinkTarget"]
@@ -342,15 +398,60 @@ if (
   [Console]::Error.WriteLine("Kanon refused a repository-controlled Node.js executable.")
   exit 127
 }
-
-$NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
-if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
-  $NodeVersion = & $NodePath --version
-  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
+if (
+  $NodePath.Equals($PluginRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+  $NodePath.StartsWith($PluginPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+  [Console]::Error.WriteLine("Kanon refused a plugin-controlled Node.js executable.")
   exit 127
 }
 
-& $NodePath $LocalKanon $KanonCommand @args
-exit $LASTEXITCODE
+$OriginalPath = $env:PATH
+$NodeEnvironmentNames = @(
+  "NODE_OPTIONS",
+  "NODE_PATH",
+  "NODE_REDIRECT_WARNINGS",
+  "NODE_REPL_HISTORY",
+  "NODE_V8_COVERAGE",
+  "NODE_COMPILE_CACHE",
+  "NODE_DEBUG",
+  "NODE_DEBUG_NATIVE"
+)
+$OriginalNodeEnvironment = @{}
+foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
+  $OriginalNodeEnvironment[$NodeEnvironmentName] = [Environment]::GetEnvironmentVariable(
+    $NodeEnvironmentName,
+    [System.EnvironmentVariableTarget]::Process
+  )
+  [Environment]::SetEnvironmentVariable(
+    $NodeEnvironmentName,
+    $null,
+    [System.EnvironmentVariableTarget]::Process
+  )
+}
+$KanonExitCode = 127
+try {
+  $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
+  $NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
+  if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
+    $NodeVersion = & $NodePath --version
+    [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
+    exit 127
+  }
+
+  & $NodePath $LocalKanon $KanonCommand @args
+  $KanonExitCode = $LASTEXITCODE
+} finally {
+  $env:PATH = $OriginalPath
+  foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
+    [Environment]::SetEnvironmentVariable(
+      $NodeEnvironmentName,
+      $OriginalNodeEnvironment[$NodeEnvironmentName],
+      [System.EnvironmentVariableTarget]::Process
+    )
+  }
+}
+
+exit $KanonExitCode
 `;
 }

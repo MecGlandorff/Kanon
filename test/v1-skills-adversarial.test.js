@@ -180,6 +180,240 @@ test("instruction candidate limits remain explicit Unknown evidence", async () =
   );
 });
 
+test("same-size evidence replacement with restored mtime is omitted", async () => {
+  const originalContent = "# Alpha\n";
+  const replacementContent = "# Omega\n";
+  assert.equal(
+    Buffer.byteLength(originalContent),
+    Buffer.byteLength(replacementContent)
+  );
+  const root = makeFixture({ "README.md": originalContent });
+  const readme = path.join(root, "README.md");
+  const fixedTime = new Date("2026-07-28T07:00:00.000Z");
+  fs.utimesSync(readme, fixedTime, fixedTime);
+  const originalStat = fs.statSync(readme);
+  let replaced = false;
+  let restoredMtime = false;
+  const result = await invokeCodexSkill(
+    invocation("orient", root, { task: "inspect README.md" }),
+    {
+      ...stableContext(),
+      git_runner: (selectedRoot, args) => {
+        if (!replaced) {
+          fs.writeFileSync(readme, replacementContent);
+          fs.utimesSync(
+            readme,
+            originalStat.atime,
+            originalStat.mtime
+          );
+          restoredMtime =
+            Math.floor(fs.statSync(readme).mtimeMs) ===
+            Math.floor(originalStat.mtimeMs);
+          replaced = true;
+        }
+        return fixedGitRunner(selectedRoot, args);
+      }
+    }
+  );
+
+  assert.equal(replaced, true);
+  assert.equal(restoredMtime, true);
+  assert.equal(result.report.inspection.coverage.complete, false);
+  assert.equal(
+    result.report.inspection.evidence.some(
+      (item) => item.path.value === "README.md"
+    ),
+    false
+  );
+  assert.ok(
+    result.report.inspection.coverage.unreadable_path_samples.some(
+      (item) => item.value === "README.md"
+    )
+  );
+  assert.match(
+    result.report.inspection.coverage.diagnostics.join(" "),
+    /changed between the repository scan/
+  );
+});
+
+test("uncertain ignore parsing fails closed before ordinary evidence reads", async () => {
+  const complexityMarker = "COMPLEX_IGNORE_CONTENT_MUST_NOT_LEAK";
+  const complexRoot = makeFixture({
+    ".kanonignore": `${"*a".repeat(65)}\n`,
+    "README.md": `# Fixture\n\n${complexityMarker}\n`
+  });
+  const complex = await invokeCodexSkill(
+    invocation("orient", complexRoot, {
+      task: "inspect README.md"
+    }),
+    stableContext()
+  );
+  assert.equal(complex.report.inspection.coverage.complete, false);
+  assert.ok(
+    complex.report.inspection.coverage.budgets_reached.includes(
+      "max_ignore_rule_complexity"
+    )
+  );
+  assert.equal(complex.report.inspection.evidence.length, 0);
+  assert.doesNotMatch(JSON.stringify(complex), new RegExp(complexityMarker));
+  assert.equal(
+    complex.report.inspection.coverage.diagnostics.filter((diagnostic) =>
+      /ignore file/i.test(diagnostic)
+    ).length,
+    1
+  );
+
+  const oversizedMarker = "OVERSIZED_IGNORE_CONTENT_MUST_NOT_LEAK";
+  const oversizedRoot = makeFixture({
+    ".kanonignore": "x".repeat(128 * 1024 + 1),
+    "README.md": `# Fixture\n\n${oversizedMarker}\n`
+  });
+  const oversized = await invokeCodexSkill(
+    invocation("orient", oversizedRoot, {
+      task: "inspect README.md"
+    }),
+    stableContext()
+  );
+  assert.equal(oversized.report.inspection.coverage.complete, false);
+  assert.ok(
+    oversized.report.inspection.coverage.budgets_reached.includes(
+      "ignore_rules_unavailable"
+    )
+  );
+  assert.equal(oversized.report.inspection.evidence.length, 0);
+  assert.doesNotMatch(JSON.stringify(oversized), new RegExp(oversizedMarker));
+  assert.ok(oversized.report.inspection.coverage.diagnostics.length <= 2);
+});
+
+test("invalid, unsupported, and linked ignore state stops content scanning", async (t) => {
+  for (const [name, ignore] of [
+    ["invalid-utf8", Buffer.from([0xff, 0xfe, 0x0a])],
+    ["unsupported-negation", "!README.md\n"],
+    ["traversal", "../README.md\n"]
+  ]) {
+    const marker = `IGNORE_${name.toUpperCase().replaceAll("-", "_")}_MUST_NOT_LEAK`;
+    const root = makeFixture({
+      ".kanonignore": ignore,
+      "README.md": `# Fixture\n\n${marker}\n`
+    });
+    const result = await invokeCodexSkill(
+      invocation("orient", root, { task: "inspect README.md" }),
+      stableContext()
+    );
+    assert.equal(result.report.inspection.coverage.complete, false);
+    assert.equal(result.report.inspection.evidence.length, 0);
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(marker));
+    assert.match(
+      result.report.inspection.coverage.diagnostics.join(" "),
+      /ignore file/
+    );
+  }
+
+  const outside = makeFixture({
+    "ignore": "*.txt\n"
+  });
+  const linkedMarker = "LINKED_IGNORE_CONTENT_MUST_NOT_LEAK";
+  const linkedRoot = makeFixture({
+    "README.md": `# Fixture\n\n${linkedMarker}\n`
+  });
+  try {
+    fs.symlinkSync(
+      path.join(outside, "ignore"),
+      path.join(linkedRoot, ".kanonignore")
+    );
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error.code === "EPERM" || error.code === "EACCES")
+    ) {
+      t.skip("Symbolic links are unavailable on this platform.");
+      return;
+    }
+    throw error;
+  }
+  const linked = await invokeCodexSkill(
+    invocation("orient", linkedRoot, { task: "inspect README.md" }),
+    stableContext()
+  );
+  assert.equal(linked.report.inspection.coverage.complete, false);
+  assert.equal(linked.report.inspection.evidence.length, 0);
+  assert.doesNotMatch(JSON.stringify(linked), new RegExp(linkedMarker));
+  assert.ok(
+    linked.report.inspection.coverage.budgets_reached.includes(
+      "ignore_rules_unavailable"
+    )
+  );
+});
+
+test("valid simple ignore rules preserve exclusions and bounded matching", async () => {
+  const ignoredMarker = "VALID_IGNORE_SECRET_MUST_NOT_LEAK";
+  const visibleMarker = "VALID_IGNORE_VISIBLE_EVIDENCE";
+  const simpleRoot = makeFixture({
+    ".kanonignore": "ignored-*.txt\n",
+    "README.md": `# Fixture\n\n${visibleMarker}\n`,
+    "ignored-secret.txt": `${ignoredMarker}\n`
+  });
+  const simple = await invokeCodexSkill(
+    invocation("orient", simpleRoot, {
+      task: "inspect README.md and ignored-secret.txt"
+    }),
+    stableContext()
+  );
+  assert.equal(
+    simple.report.inspection.coverage.ignore_entries_excluded,
+    1
+  );
+  assert.ok(
+    simple.report.inspection.evidence.some(
+      (item) => item.path.value === "README.md"
+    )
+  );
+  assert.equal(
+    simple.report.inspection.evidence.some(
+      (item) => item.path.value === "ignored-secret.txt"
+    ),
+    false
+  );
+  assert.match(JSON.stringify(simple), new RegExp(visibleMarker));
+  assert.doesNotMatch(JSON.stringify(simple), new RegExp(ignoredMarker));
+
+  const supportedPattern = `${"**a".repeat(32)}z`;
+  /** @type {Record<string, string>} */
+  const files = {
+    ".kanonignore": `${Array.from(
+      { length: 64 },
+      () => supportedPattern
+    ).join("\n")}\n`,
+    "README.md": "# Fixture\n"
+  };
+  for (let index = 0; index < 12; index += 1) {
+    files[
+      `${"a".repeat(120)}-${String(index).padStart(2, "0")}.txt`
+    ] = "bounded\n";
+  }
+  const workRoot = makeFixture(files);
+  const bounded = await invokeCodexSkill(
+    invocation("orient", workRoot, {
+      task: "inspect README.md"
+    }),
+    stableContext()
+  );
+
+  assert.equal(bounded.report.inspection.coverage.complete, false);
+  assert.ok(
+    bounded.report.inspection.coverage.budgets_reached.includes(
+      "max_ignore_match_work"
+    )
+  );
+  assert.match(
+    bounded.report.inspection.coverage.diagnostics.join(" "),
+    /deterministic work limit/
+  );
+  assert.equal(bounded.report.inspection.evidence.length, 0);
+});
+
 test("linked instructions and continuity files cannot escape the repository", async (t) => {
   const outside = makeFixture({
     "secret.txt": "OUTSIDE_SECRET_MUST_NOT_LEAK"
@@ -425,6 +659,36 @@ test("oversized host executable search state fails Git closed", () => {
     assert.equal(git.found, false);
     assert.equal(git.observation_complete, false);
     assert.match(git.diagnostics.join(" "), /trusted Git executable/);
+    assert.equal(fs.existsSync(marker), false);
+  } finally {
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+  }
+});
+
+test("Git executable resolution ignores a repository-local poisoned PATH entry", (t) => {
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  const initialized = initializeGit(root);
+  if (initialized.status !== 0) {
+    t.skip("Git is unavailable for the poisoned-PATH resolver check.");
+    return;
+  }
+  const marker = path.join(root, "repository-git-executed");
+  executableScript(root, "git", {
+    unix:
+      "#!/bin/sh\n: > \"$PWD/repository-git-executed\"\nexit 97\n",
+    windows:
+      "@echo off\r\ntype nul > \"%CD%\\repository-git-executed\"\r\nexit /b 97\r\n"
+  });
+  const originalPath = process.env.PATH;
+  try {
+    process.env.PATH = `${root}${path.delimiter}${originalPath || ""}`;
+    const git = observeRepositoryGit(fs.realpathSync(root));
+    assert.equal(git.found, true, git.diagnostics.join("\n"));
+    assert.equal(git.observation_complete, true, git.diagnostics.join("\n"));
     assert.equal(fs.existsSync(marker), false);
   } finally {
     if (originalPath === undefined) {

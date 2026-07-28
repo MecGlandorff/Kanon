@@ -1,7 +1,12 @@
 $ErrorActionPreference = "Stop"
 
 $KanonCommand = "ask"
-$LocalKanon = Join-Path $PSScriptRoot "../../../runtime/bin/kanon-v1.js"
+$PluginRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../../..") -ErrorAction Stop).Path.TrimEnd(
+  [System.IO.Path]::DirectorySeparatorChar,
+  [System.IO.Path]::AltDirectorySeparatorChar
+)
+$PluginPrefix = $PluginRoot + [System.IO.Path]::DirectorySeparatorChar
+$LocalKanon = Join-Path $PluginRoot "runtime/bin/kanon-v1.js"
 
 if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
   [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
@@ -15,7 +20,7 @@ if ($null -eq $PathValue -or $PathValue.Length -gt 32768) {
   exit 127
 }
 
-$RepositoryRoot = [System.IO.Path]::GetFullPath((Get-Location).Path).TrimEnd(
+$RepositoryRoot = (Resolve-Path -LiteralPath (Get-Location).Path -ErrorAction Stop).Path.TrimEnd(
   [System.IO.Path]::DirectorySeparatorChar,
   [System.IO.Path]::AltDirectorySeparatorChar
 )
@@ -36,22 +41,41 @@ foreach ($PathEntry in $PathValue.Split([System.IO.Path]::PathSeparator)) {
   ) {
     continue
   }
+  if (
+    $PathDirectory.Equals($PluginRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+    $PathDirectory.StartsWith($PluginPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  ) {
+    continue
+  }
   $SafePathEntries += $PathDirectory
 }
 
-$OriginalPath = $env:PATH
-try {
-  $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
-  $Node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
-} finally {
-  $env:PATH = $OriginalPath
+$NodeCandidate = $null
+$NodeNames = if (
+  [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+) {
+  @("node.exe")
+} else {
+  @("node")
 }
-if (-not $Node) {
+foreach ($PathDirectory in $SafePathEntries) {
+  foreach ($NodeName in $NodeNames) {
+    $Candidate = [System.IO.Path]::Combine($PathDirectory, $NodeName)
+    if ([System.IO.File]::Exists($Candidate)) {
+      $NodeCandidate = $Candidate
+      break
+    }
+  }
+  if ($null -ne $NodeCandidate) {
+    break
+  }
+}
+if ($null -eq $NodeCandidate) {
   [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
   exit 127
 }
 
-$NodeItem = Get-Item -LiteralPath $Node.Source -ErrorAction Stop
+$NodeItem = Get-Item -LiteralPath $NodeCandidate -ErrorAction Stop
 $NodePath = $NodeItem.FullName
 if ($NodeItem.LinkType) {
   $ResolveLinkTarget = $NodeItem.PSObject.Methods["ResolveLinkTarget"]
@@ -68,13 +92,58 @@ if (
   [Console]::Error.WriteLine("Kanon refused a repository-controlled Node.js executable.")
   exit 127
 }
-
-$NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
-if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
-  $NodeVersion = & $NodePath --version
-  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
+if (
+  $NodePath.Equals($PluginRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+  $NodePath.StartsWith($PluginPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+) {
+  [Console]::Error.WriteLine("Kanon refused a plugin-controlled Node.js executable.")
   exit 127
 }
 
-& $NodePath $LocalKanon $KanonCommand @args
-exit $LASTEXITCODE
+$OriginalPath = $env:PATH
+$NodeEnvironmentNames = @(
+  "NODE_OPTIONS",
+  "NODE_PATH",
+  "NODE_REDIRECT_WARNINGS",
+  "NODE_REPL_HISTORY",
+  "NODE_V8_COVERAGE",
+  "NODE_COMPILE_CACHE",
+  "NODE_DEBUG",
+  "NODE_DEBUG_NATIVE"
+)
+$OriginalNodeEnvironment = @{}
+foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
+  $OriginalNodeEnvironment[$NodeEnvironmentName] = [Environment]::GetEnvironmentVariable(
+    $NodeEnvironmentName,
+    [System.EnvironmentVariableTarget]::Process
+  )
+  [Environment]::SetEnvironmentVariable(
+    $NodeEnvironmentName,
+    $null,
+    [System.EnvironmentVariableTarget]::Process
+  )
+}
+$KanonExitCode = 127
+try {
+  $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
+  $NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
+  if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
+    $NodeVersion = & $NodePath --version
+    [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
+    exit 127
+  }
+
+  & $NodePath $LocalKanon $KanonCommand @args
+  $KanonExitCode = $LASTEXITCODE
+} finally {
+  $env:PATH = $OriginalPath
+  foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
+    [Environment]::SetEnvironmentVariable(
+      $NodeEnvironmentName,
+      $OriginalNodeEnvironment[$NodeEnvironmentName],
+      [System.EnvironmentVariableTarget]::Process
+    )
+  }
+}
+
+exit $KanonExitCode

@@ -1,7 +1,7 @@
 {
   "name": "kanon",
   "version": "0.4.0-rc.1",
-  "description": "Evidence-backed repository orientation and continuity with advisory notice.",
+  "description": "Evidence-backed repository orientation and continuity with explicit advisory status.",
   "author": {
     "name": "mecglandorff",
     "url": "https://github.com/MecGlandorff"
@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "Kanon",
     "shortDescription": "Evidence-backed repository continuity.",
-    "longDescription": "Inspect bounded repository evidence without executing repository-controlled code. Notice mode is advisory and non-enforcing.",
+    "longDescription": "Inspect bounded repository evidence without executing repository-controlled code. Notice appears only in explicit output, is advisory and non-enforcing, and has no lifecycle hook.",
     "developerName": "mecglandorff",
     "category": "Productivity",
     "capabilities": [],

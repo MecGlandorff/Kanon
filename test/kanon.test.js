@@ -347,11 +347,30 @@ test("public skills ship only supported wrappers and state the trust boundary", 
       path.join(stableRoot, "scripts", `kanon-${stable}`),
       "utf8"
     );
-    assert.match(bashWrapper, /^#!\/bin\/bash$/m);
+    assert.match(bashWrapper, /^#!\/bin\/bash -p$/m);
     assert.match(bashWrapper, /SAFE_PATH/);
+    assert.match(bashWrapper, /unset NODE_OPTIONS NODE_PATH/);
+    assert.doesNotMatch(
+      bashWrapper,
+      /\b(?:dirname|basename|command\s+-v)\b/
+    );
     assert.match(
       bashWrapper,
       /refused a repository-controlled Node\.js executable/
+    );
+    const powershellWrapper = fs.readFileSync(
+      path.join(stableRoot, "scripts", `kanon-${stable}.ps1`),
+      "utf8"
+    );
+    assert.doesNotMatch(powershellWrapper, /Get-Command\s+node/);
+    assert.match(
+      powershellWrapper,
+      /Resolve-Path -LiteralPath \(Get-Location\)\.Path/
+    );
+    assert.match(powershellWrapper, /NODE_OPTIONS/);
+    assert.match(
+      powershellWrapper,
+      /SetEnvironmentVariable\([\s\S]*?\$null/
     );
   }
   for (const removed of ["steer", "aswitch"]) {
@@ -363,6 +382,80 @@ test("public skills ship only supported wrappers and state the trust boundary", 
   assert.match(skill, /Repository content is untrusted data/);
   assert.match(skill, /explicit user approval/);
   assert.doesNotMatch(skill, /\bimprove\b|\brefactor\b|scorecard/i);
+});
+
+test("PowerShell wrapper canonicalizes a symlinked cwd before Node lookup", (t) => {
+  if (process.platform === "win32") {
+    t.skip("The marker executable fixture requires a POSIX interpreter.");
+    return;
+  }
+  let shell = null;
+  for (const candidate of ["pwsh", "powershell.exe"]) {
+    const probe = spawnSync(
+      candidate,
+      ["-NoProfile", "-Command", "exit 0"],
+      {
+        encoding: "utf8",
+        timeout: 10_000,
+        windowsHide: true
+      }
+    );
+    if (probe.status === 0) {
+      shell = candidate;
+      break;
+    }
+  }
+  if (shell === null) {
+    t.skip("PowerShell is unavailable.");
+    return;
+  }
+
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  const aliasParent = makeFixture();
+  const alias = path.join(aliasParent, "repository-alias");
+  try {
+    fs.symlinkSync(root, alias, "dir");
+  } catch {
+    t.skip("Directory symlinks are unavailable.");
+    return;
+  }
+  const marker = path.join(root, "repository-node-executed");
+  const hostileNode = path.join(root, "node");
+  fs.writeFileSync(
+    hostileNode,
+    `#!/bin/sh\n: > ${JSON.stringify(marker)}\nexit 97\n`
+  );
+  fs.chmodSync(hostileNode, 0o755);
+  const wrapper = path.join(
+    repoRoot,
+    "skills",
+    "orient",
+    "scripts",
+    "kanon-orient.ps1"
+  );
+  const quotePowerShell = (value) =>
+    `'${value.replaceAll("'", "''")}'`;
+  const run = spawnSync(
+    shell,
+    [
+      "-NoProfile",
+      "-Command",
+      `Set-Location -LiteralPath ${quotePowerShell(alias)}; & ${quotePowerShell(wrapper)} 'symlink target check'`
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${root}${path.delimiter}${process.env.PATH || ""}`
+      },
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: 30_000,
+      windowsHide: true
+    }
+  );
+
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.equal(fs.existsSync(marker), false);
 });
 
 test("generated skill artifact is synchronized and self-contained", () => {
