@@ -4,8 +4,57 @@ import {
 } from "./commands.js";
 import { observeFeatureClaims } from "./claims.js";
 
+/**
+ * @typedef {{
+ *   type: string,
+ *   severity: string,
+ *   conclusion: "contradiction" | "unknown",
+ *   claim: string,
+ *   observation: string,
+ *   evidence: string[],
+ *   suggestion?: string
+ * }} VerificationObservation
+ * @typedef {{
+ *   readmeTarget: string | null,
+ *   readmeFile: import("../scanner/read.js").ScannedFile | null,
+ *   readmeText: string,
+ *   skillInfo: unknown,
+ *   scan: {complete: boolean},
+ *   files: import("../scanner/read.js").ScannedFile[],
+ *   evidence: import("../evidence.js").EvidenceBook,
+ *   packageInfo: {
+ *     scripts: Record<string, unknown>,
+ *     json: unknown,
+ *     evidence: string
+ *   } | null,
+ *   deploy: {files: {path: string}[]},
+ *   ci: {found: boolean},
+ *   release: {found: boolean},
+ *   findTerm: (
+ *     term: unknown,
+ *     options?: {exclude?: unknown[]}
+ *   ) => string[]
+ * }} VerificationContext
+ * @typedef {{
+ *   target: string,
+ *   checked: boolean,
+ *   applicable: boolean,
+ *   scan_complete: boolean,
+ *   note?: string,
+ *   commands_checked?: number,
+ *   issues: VerificationObservation[],
+ *   unknowns: VerificationObservation[]
+ * }} VerificationResult
+ */
+
+/**
+ * @param {VerificationContext} context
+ * @returns {VerificationResult}
+ */
 export function verifyReadme(context) {
+  /** @type {VerificationObservation[]} */
   const issues = [];
+  /** @type {VerificationObservation[]} */
   const unknowns = [];
   const target = context.readmeTarget ||
     context.readmeFile?.path ||
@@ -42,9 +91,13 @@ export function verifyReadme(context) {
     };
   }
 
+  const checkedContext = {
+    ...context,
+    readmeFile: context.readmeFile
+  };
   const commands = extractCommandsFromMarkdown(context.readmeText);
   for (const command of commands) {
-    const issue = verifyCommand(command, context);
+    const issue = verifyCommand(command, checkedContext);
     if (issue) {
       if (issue.conclusion === "contradiction") {
         issues.push(issue);
@@ -54,7 +107,7 @@ export function verifyReadme(context) {
     }
   }
 
-  unknowns.push(...observeFeatureClaims(context));
+  unknowns.push(...observeFeatureClaims(checkedContext));
 
   return {
     target,

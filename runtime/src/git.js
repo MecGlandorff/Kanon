@@ -4,6 +4,66 @@ import { safeTerminalText } from "./trust.js";
 
 const RETAINED_CHANGE_LIMIT = 100;
 
+/**
+ * @typedef {{
+ *   path: string,
+ *   index: string,
+ *   worktree: string,
+ *   trust: "repository-untrusted"
+ * }} GitChange
+ * @typedef {{
+ *   hash: string,
+ *   date: string,
+ *   subject: string,
+ *   trust: "repository-untrusted"
+ * }} GitCommit
+ * @typedef {{
+ *   operation: string,
+ *   kind: string,
+ *   message: string,
+ *   status?: number | null,
+ *   signal?: NodeJS.Signals | null,
+ *   timeout?: boolean,
+ *   overflow?: boolean,
+ *   stderr?: string
+ * }} GitDiagnostic
+ * @typedef {{
+ *   found: boolean,
+ *   branch: string | null,
+ *   head: string | null,
+ *   dirty: boolean | null,
+ *   change_count: number | null,
+ *   change_count_exact: boolean,
+ *   changes: GitChange[],
+ *   changes_truncated: boolean,
+ *   sensitive_changes_skipped: number,
+ *   recent_commits: GitCommit[],
+ *   observation_complete: boolean,
+ *   diagnostics: GitDiagnostic[],
+ *   trust: "repository-untrusted" | "kanon-generated",
+ *   evidence: string[]
+ * }} GitInspection
+ * @typedef {{
+ *   enabled?: boolean,
+ *   timeoutMs?: number,
+ *   maxOutputBytes?: number,
+ *   gitBinary?: string,
+ *   runner?: typeof runGit
+ * }} GitInspectionOptions
+ * @typedef {{
+ *   total: number,
+ *   changes: GitChange[],
+ *   sensitiveSkipped: number,
+ *   changesTruncated: boolean
+ * }} ParsedStatus
+ */
+
+/**
+ * @param {string} root
+ * @param {import("./evidence.js").EvidenceBook} evidence
+ * @param {GitInspectionOptions} [options]
+ * @returns {GitInspection}
+ */
 export function inspectGit(root, evidence, options = {}) {
   if (options.enabled === false) {
     return unavailableGit(
@@ -12,13 +72,24 @@ export function inspectGit(root, evidence, options = {}) {
     );
   }
 
+  /** @type {{name: string, result: ReturnType<typeof runGit>}[]} */
   const observations = [];
   const runner = options.runner || runGit;
+  /**
+   * @param {string} name
+   * @param {string[]} args
+   */
   const observe = (name, args) => {
     const result = runner(root, args, {
-      timeoutMs: options.timeoutMs,
-      maxOutputBytes: options.maxOutputBytes,
-      gitBinary: options.gitBinary
+      ...(options.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: options.timeoutMs }),
+      ...(options.maxOutputBytes === undefined
+        ? {}
+        : { maxOutputBytes: options.maxOutputBytes }),
+      ...(options.gitBinary === undefined
+        ? {}
+        : { gitBinary: options.gitBinary })
     });
     observations.push({ name, result });
     return result;
@@ -90,7 +161,7 @@ export function inspectGit(root, evidence, options = {}) {
     found: true,
     branch,
     head,
-    dirty: statusResult.ok ? changeCount > 0 : null,
+    dirty: parsed ? parsed.total > 0 : null,
     change_count: changeCount,
     change_count_exact: statusResult.ok,
     changes: parsed?.changes || [],
@@ -106,6 +177,12 @@ export function inspectGit(root, evidence, options = {}) {
 
 export { runGit } from "./git-runner.js";
 
+/**
+ * @param {string} reason
+ * @param {string} kind
+ * @param {GitDiagnostic | null} [diagnostic]
+ * @returns {GitInspection}
+ */
 function unavailableGit(reason, kind, diagnostic = null) {
   return {
     found: false,
@@ -131,8 +208,14 @@ function unavailableGit(reason, kind, diagnostic = null) {
   };
 }
 
+/**
+ * @param {string} output
+ * @param {string} [prefix]
+ * @returns {ParsedStatus}
+ */
 function parseStatus(output, prefix = "") {
   const entries = output.split("\0");
+  /** @type {GitChange[]} */
   const changes = [];
   let total = 0;
   let sensitiveSkipped = 0;
@@ -173,6 +256,11 @@ function parseStatus(output, prefix = "") {
   };
 }
 
+/**
+ * @param {string} relPath
+ * @param {string} prefix
+ * @returns {string | null}
+ */
 function stripRepoPrefix(relPath, prefix) {
   if (!prefix) {
     return relPath;
@@ -182,8 +270,13 @@ function stripRepoPrefix(relPath, prefix) {
     : null;
 }
 
+/**
+ * @param {string} output
+ * @returns {GitCommit[]}
+ */
 function parseLog(output) {
   const fields = output.split("\0");
+  /** @type {GitCommit[]} */
   const commits = [];
   for (let index = 0; index + 2 < fields.length; index += 3) {
     const hash = fields[index]?.trim();
@@ -202,6 +295,11 @@ function parseLog(output) {
   return commits;
 }
 
+/**
+ * @param {string} operation
+ * @param {ReturnType<typeof runGit>} result
+ * @returns {GitDiagnostic}
+ */
 function diagnosticRecord(operation, result) {
   return {
     operation,
@@ -215,6 +313,10 @@ function diagnosticRecord(operation, result) {
   };
 }
 
+/**
+ * @param {ReturnType<typeof runGit>} result
+ * @returns {string}
+ */
 function failureKind(result) {
   if (result.timeout) {
     return "timeout";

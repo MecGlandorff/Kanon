@@ -6,11 +6,86 @@ import {
   resolveContainedPath
 } from "./shared.js";
 
+/**
+ * @typedef {{
+ *   maxBytes: number,
+ *   bytesRead: number
+ * }} ReadBudget
+ * @typedef {{
+ *   path: string | null,
+ *   status: string,
+ *   code: string,
+ *   reason: string
+ * }} ReadPathFailure
+ * @typedef {{
+ *   complete: boolean,
+ *   truncated?: boolean,
+ *   budgets_reached?: string[],
+ *   path_failures?: ReadPathFailure[],
+ *   path_failures_truncated?: boolean,
+ *   rejected_paths?: number,
+ *   outside_root_paths?: number,
+ *   unreadable_entries?: number
+ * }} ReadDiagnostics
+ * @typedef {{
+ *   limit?: number,
+ *   optional?: boolean,
+ *   budgetName?: string,
+ *   diagnostics?: ReadDiagnostics,
+ *   recordTruncation?: boolean,
+ *   budget?: ReadBudget
+ * }} ReadOptions
+ * @typedef {{
+ *   ok: true,
+ *   status: "ok",
+ *   relativePath: string,
+ *   text: string,
+ *   bytes: number,
+ *   truncated: boolean,
+ *   size: number
+ * }} ReadSuccess
+ * @typedef {{
+ *   ok: false,
+ *   status: string,
+ *   relativePath: string | null,
+ *   reason: string,
+ *   code: string
+ * }} ReadFailure
+ * @typedef {ReadSuccess | ReadFailure} ReadResult
+ * @typedef {{
+ *   path: string,
+ *   basename: string,
+ *   extension: string,
+ *   size: number,
+ *   mtime_ms: number | null,
+ *   text: boolean,
+ *   sha256: string | null
+ * }} ScannedFile
+ * @typedef {{
+ *   path: string,
+ *   line: number,
+ *   matched_term: string,
+ *   excerpt: string
+ * }} TextHit
+ */
+
+/**
+ * @param {string} root
+ * @param {unknown} relPath
+ * @param {ReadOptions} [options]
+ * @returns {string}
+ */
 export function readText(root, relPath, options = {}) {
   const result = readTextResult(root, relPath, options);
   return result.ok ? result.text : "";
 }
 
+/**
+ * @param {string} root
+ * @param {unknown} relPath
+ * @param {ReadOptions} [options]
+ * @returns {ReadResult}
+ */
 export function readTextResult(root, relPath, options = {}) {
   const limit = boundedReadLimit(options.limit);
   if (isSensitivePath(relPath)) {
@@ -70,6 +145,7 @@ export function readTextResult(root, relPath, options = {}) {
     if (budget) {
       budget.bytesRead += bytes;
     }
+    /** @type {ReadSuccess} */
     const output = {
       ok: true,
       status: "ok",
@@ -95,10 +171,10 @@ export function readTextResult(root, relPath, options = {}) {
   } catch (error) {
     return recordFailure(options.diagnostics, {
       ok: false,
-      status: error?.code === "ENOENT" ? "missing" : "unreadable",
+      status: errorCode(error) === "ENOENT" ? "missing" : "unreadable",
       relativePath: resolved.relativePath,
       reason: "The contained file could not be opened safely.",
-      code: error?.code || "SAFE_OPEN_FAILED"
+      code: errorCode(error) || "SAFE_OPEN_FAILED"
     });
   } finally {
     if (fd !== undefined) {
@@ -107,6 +183,13 @@ export function readTextResult(root, relPath, options = {}) {
   }
 }
 
+/**
+ * @param {ReadDiagnostics} diagnostics
+ * @param {string} relativePath
+ * @param {number} limit
+ * @param {string} budgetName
+ * @returns {void}
+ */
 function markReadLimit(diagnostics, relativePath, limit, budgetName) {
   diagnostics.complete = false;
   diagnostics.truncated = true;
@@ -127,24 +210,63 @@ function markReadLimit(diagnostics, relativePath, limit, budgetName) {
   }
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {unknown} relPath
+ * @returns {boolean}
+ */
 export function fileExists(files, relPath) {
   return files.some((file) => file.path === normalizeRelPath(relPath));
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {string[]} names
+ * @returns {ScannedFile | undefined}
+ */
 export function findFirst(files, names) {
   const wanted = new Set(names.map((name) => name.toLowerCase()));
   return files.find((file) => wanted.has(file.basename.toLowerCase()));
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {unknown} relPath
+ * @returns {ScannedFile | undefined}
+ */
 export function findByPath(files, relPath) {
   const normalized = normalizeRelPath(relPath);
   return files.find((file) => file.path === normalized);
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {unknown} term
+ * @param {FindTextOptions} [options]
+ * @returns {string[]}
+ */
 export function findTextReferences(root, files, term, options = {}) {
   return findTextHits(root, files, [term], options).map((hit) => hit.path);
 }
 
+/**
+ * @typedef {{
+ *   exclude?: unknown[],
+ *   readLimit?: number,
+ *   budget?: ReadBudget,
+ *   diagnostics?: ReadDiagnostics,
+ *   limit?: number
+ * }} FindTextOptions
+ */
+
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {unknown[]} terms
+ * @param {FindTextOptions} [options]
+ * @returns {TextHit[]}
+ */
 export function findTextHits(root, files, terms, options = {}) {
   const exclude = new Set((options.exclude || []).map(normalizeRelPath));
   const normalizedTerms = Array.from(
@@ -154,6 +276,7 @@ export function findTextHits(root, files, terms, options = {}) {
         .filter(Boolean)
     )
   );
+  /** @type {TextHit[]} */
   const matches = [];
   if (!normalizedTerms.length) {
     return matches;
@@ -166,12 +289,20 @@ export function findTextHits(root, files, terms, options = {}) {
 
     const text = readText(root, file.path, {
       limit: options.readLimit ?? 120_000,
-      budget: options.budget,
-      diagnostics: options.diagnostics
+      ...(options.budget === undefined
+        ? {}
+        : { budget: options.budget }),
+      ...(options.diagnostics === undefined
+        ? {}
+        : { diagnostics: options.diagnostics })
     });
     const lines = text.split(/\r?\n/);
     for (let index = 0; index < lines.length; index += 1) {
-      const lower = lines[index].toLowerCase();
+      const line = lines[index];
+      if (line === undefined) {
+        continue;
+      }
+      const lower = line.toLowerCase();
       const matchedTerm = normalizedTerms.find((term) => lower.includes(term));
       if (!matchedTerm) {
         continue;
@@ -180,7 +311,7 @@ export function findTextHits(root, files, terms, options = {}) {
         path: file.path,
         line: index + 1,
         matched_term: matchedTerm,
-        excerpt: normalizeExcerpt(lines[index])
+        excerpt: normalizeExcerpt(line)
       });
       break;
     }
@@ -193,25 +324,45 @@ export function findTextHits(root, files, terms, options = {}) {
   return matches;
 }
 
+/**
+ * @param {unknown} maxBytes
+ * @returns {ReadBudget}
+ */
 export function createReadBudget(maxBytes) {
   return {
-    maxBytes: Number.isInteger(maxBytes) && maxBytes >= 0
+    maxBytes:
+      typeof maxBytes === "number" &&
+      Number.isInteger(maxBytes) &&
+      maxBytes >= 0
       ? maxBytes
       : 8 * 1024 * 1024,
     bytesRead: 0
   };
 }
 
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
 function boundedReadLimit(value) {
   if (value === undefined) {
     return 300_000;
   }
-  if (!Number.isInteger(value) || value < 0) {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 0
+  ) {
     return 0;
   }
   return Math.min(value, 64 * 1024 * 1024);
 }
 
+/**
+ * @param {fs.Stats} before
+ * @param {fs.Stats} after
+ * @returns {boolean}
+ */
 function fileIdentityChanged(before, after) {
   return (
     before.dev !== undefined &&
@@ -225,6 +376,12 @@ function fileIdentityChanged(before, after) {
   );
 }
 
+/**
+ * @template {ReadFailure} T
+ * @param {ReadDiagnostics | undefined} diagnostics
+ * @param {T} result
+ * @returns {T}
+ */
 function recordFailure(diagnostics, result) {
   if (!diagnostics) {
     return result;
@@ -258,4 +415,19 @@ function recordFailure(diagnostics, result) {
     diagnostics.complete = false;
   }
   return result;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorCode(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    ? error.code
+    : "";
 }

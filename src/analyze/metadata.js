@@ -1,19 +1,70 @@
 import { findByPath, readText } from "../scanner.js";
 import { firstHeadingOrLine } from "./utils.js";
 
+/**
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {NonNullable<Parameters<typeof readText>[2]>} ReadOptions
+ * @typedef {{
+ *   path: string,
+ *   json: Record<string, unknown> | null,
+ *   name: string | null,
+ *   description: string | null,
+ *   scripts: Record<string, unknown>,
+ *   evidence: string
+ * }} PackageInfo
+ * @typedef {{
+ *   path: string,
+ *   name: string | null,
+ *   description: string | null,
+ *   scripts: Record<string, string>,
+ *   hasPytest: boolean,
+ *   evidence: string
+ * }} PyprojectInfo
+ * @typedef {{
+ *   path: string,
+ *   evidence: string
+ * }} EvidencePath
+ * @typedef {{
+ *   requirements: EvidencePath | null,
+ *   pytestConfig: EvidencePath | null,
+ *   mentionsPytest: boolean
+ * }} PythonHints
+ * @typedef {{
+ *   path: string,
+ *   description: string | null,
+ *   evidence: string
+ * }} SkillInfo
+ * @typedef {{
+ *   claim: string,
+ *   confidence: "known" | "likely" | "unknown",
+ *   evidence: string[],
+ *   trust: "repository-untrusted" | "kanon-generated"
+ * }} Purpose
+ */
+
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {ReadOptions} [readOptions]
+ * @returns {PackageInfo | null}
+ */
 export function readPackageJson(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "package.json");
   if (!file) {
     return null;
   }
   const text = readText(root, file.path, readOptions);
-  let json;
+  /** @type {unknown} */
+  let parsed;
   try {
-    json = JSON.parse(text);
+    parsed = JSON.parse(text);
   } catch {
     return {
       path: file.path,
       json: null,
+      name: null,
+      description: null,
       scripts: {},
       evidence: evidence.add(
         "config",
@@ -22,21 +73,34 @@ export function readPackageJson(root, files, evidence, readOptions = {}) {
       )
     };
   }
-  const scripts =
-    json.scripts && typeof json.scripts === "object" ? json.scripts : {};
+  const json = plainRecord(parsed) ? parsed : null;
+  const scripts = json && plainRecord(json.scripts) ? json.scripts : {};
+  const name = json && typeof json.name === "string" ? json.name : null;
+  const description = json && typeof json.description === "string"
+    ? json.description
+    : null;
   return {
     path: file.path,
     json,
+    name,
+    description,
     scripts,
     evidence: evidence.add(
       "config",
       file.path,
-      `package.json declares package ${json.name || "(unnamed)"} with ${Object.keys(scripts).length} script(s).`,
-      JSON.stringify({ name: json.name, scripts })
+      `package.json declares package ${name || "(unnamed)"} with ${Object.keys(scripts).length} script(s).`,
+      JSON.stringify({ name, scripts }) ?? ""
     )
   };
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {ReadOptions} [readOptions]
+ * @returns {PyprojectInfo | null}
+ */
 export function readPyproject(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "pyproject.toml");
   if (!file) {
@@ -59,7 +123,15 @@ export function readPyproject(root, files, evidence, readOptions = {}) {
   };
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {ReadOptions} [readOptions]
+ * @returns {PythonHints}
+ */
 export function readPythonHints(root, files, evidence, readOptions = {}) {
+  /** @type {PythonHints} */
   const hints = {
     requirements: null,
     pytestConfig: null,
@@ -96,6 +168,13 @@ export function readPythonHints(root, files, evidence, readOptions = {}) {
   return hints;
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {ReadOptions} [readOptions]
+ * @returns {SkillInfo | null}
+ */
 export function readSkillInfo(root, files, evidence, readOptions = {}) {
   const file = findByPath(files, "SKILL.md");
   if (!file) {
@@ -119,6 +198,18 @@ export function readSkillInfo(root, files, evidence, readOptions = {}) {
   };
 }
 
+/**
+ * @param {{
+ *   readmeFile: ScannedFile | null,
+ *   readmeText: string,
+ *   readmeEvidence: string | null,
+ *   packageInfo: PackageInfo | null,
+ *   pyprojectInfo: PyprojectInfo | null,
+ *   skillInfo: SkillInfo | null
+ * }} input
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @returns {Purpose}
+ */
 export function detectPurpose(input, evidence) {
   const {
     readmeFile,
@@ -128,9 +219,9 @@ export function detectPurpose(input, evidence) {
     pyprojectInfo,
     skillInfo
   } = input;
-  if (packageInfo?.json?.description) {
+  if (packageInfo?.description) {
     return {
-      claim: packageInfo.json.description,
+      claim: packageInfo.description,
       confidence: "likely",
       evidence: [packageInfo.evidence],
       trust: "repository-untrusted"
@@ -177,8 +268,14 @@ export function detectPurpose(input, evidence) {
   };
 }
 
+/**
+ * @param {string} text
+ * @param {string} section
+ * @returns {Record<string, string>}
+ */
 function parseTomlSection(text, section) {
   const header = `[${section}]`;
+  /** @type {Record<string, string>} */
   const entries = {};
   let active = false;
   for (const line of text.split(/\r?\n/)) {
@@ -193,16 +290,37 @@ function parseTomlSection(text, section) {
     const item = line.match(
       /^\s*([A-Za-z0-9_.-]+)\s*=\s*["']([^"']+)["']/
     );
-    if (item) {
+    if (item?.[1] && item[2]) {
       entries[item[1]] = item[2];
     }
   }
   return entries;
 }
 
+/**
+ * @param {string} text
+ * @param {string} key
+ * @returns {string | null}
+ */
 function findTomlString(text, key) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return text.match(
     new RegExp(`^\\s*${escaped}\\s*=\\s*["']([^"']+)["']`, "m")
   )?.[1] || null;
+}
+
+/**
+ * JSON.parse produces data properties, but callers still receive a validated
+ * record rather than an unchecked array or primitive root.
+ *
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function plainRecord(value) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
 }

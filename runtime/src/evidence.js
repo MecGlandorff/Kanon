@@ -6,6 +6,21 @@ import {
 
 let runSequence = 0;
 
+/**
+ * @typedef {{
+ *   id: string,
+ *   kind: string,
+ *   path: string,
+ *   claim: string,
+ *   trust: string,
+ *   excerpt?: string
+ * }} EvidenceRecord
+ */
+
+/**
+ * @param {{date?: Date, unique?: boolean}} [options]
+ * @returns {string}
+ */
 export function createRunId(options = {}) {
   const date = options.date || new Date();
   const timestamp = date.toISOString().replace(/[-:TZ.]/g, "").slice(0, 17);
@@ -17,16 +32,29 @@ export function createRunId(options = {}) {
 }
 
 export class EvidenceBook {
+  /**
+   * @param {string} [runId]
+   */
   constructor(runId = createRunId()) {
     this.runId = runId;
     this.next = 1;
+    /** @type {EvidenceRecord[]} */
     this.records = [];
   }
 
+  /**
+   * @param {unknown} kind
+   * @param {unknown} path
+   * @param {unknown} claim
+   * @param {unknown} [excerpt]
+   * @param {{trust?: string}} [options]
+   * @returns {string}
+   */
   add(kind, path, claim, excerpt = "", options = {}) {
     const id = `e_${this.runId}_${String(this.next).padStart(3, "0")}`;
     this.next += 1;
 
+    /** @type {EvidenceRecord} */
     const record = {
       id,
       kind: safeTerminalText(kind),

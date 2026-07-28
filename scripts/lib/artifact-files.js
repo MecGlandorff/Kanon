@@ -88,16 +88,42 @@ export function collectRuntimeDependencies(repoRoot, entry = "bin/kanon.js") {
   return Array.from(sources).sort();
 }
 
+/**
+ * Return the exact checked-source to installed-runtime mapping for every
+ * executable JavaScript module in the stable artifact.
+ *
+ * @param {string} repoRoot
+ * @returns {[string, string][]}
+ */
+export function stableRuntimeArtifacts(repoRoot) {
+  const compatibility = [
+    ["bin/kanon.js", "runtime/bin/kanon.js"],
+    ...collectRuntimeDependencies(repoRoot).map(
+      (source) => [source, `runtime/${source}`]
+    )
+  ];
+  return [...compatibility, ...V1_RUNTIME_ARTIFACTS]
+    .map(([source, target]) => [source, target])
+    .sort((left, right) => left[1].localeCompare(right[1]));
+}
+
+/**
+ * @param {string} repoRoot
+ * @returns {string[]}
+ */
+export function stableRuntimeCanonicalSources(repoRoot) {
+  return Array.from(
+    new Set(stableRuntimeArtifacts(repoRoot).map(([source]) => source))
+  ).sort();
+}
+
 export function publicSkillFiles(repoRoot) {
-  const runtimeSources = collectRuntimeDependencies(repoRoot);
   return [
     ".claude-plugin/plugin.json",
     ".codex-plugin/plugin.json",
     "runtime/package.json",
     "runtime/build-metadata.json",
-    "runtime/bin/kanon.js",
-    ...runtimeSources.map((source) => `runtime/${source}`),
-    ...V1_RUNTIME_ARTIFACTS.map(([, target]) => target),
+    ...stableRuntimeArtifacts(repoRoot).map(([, target]) => target),
     "skills/kanon/SKILL.md",
     "skills/kanon/LICENSE",
     "skills/kanon/agents/openai.yaml",

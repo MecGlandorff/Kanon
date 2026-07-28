@@ -1,15 +1,39 @@
+import { types as nodeTypes } from "node:util";
 import { findByPath } from "../scanner.js";
 import { addCommand, isPlaceholderScript, packageScriptCommand } from "./command-utils.js";
 import { getText, parseBuildTargets, tomlSection } from "./shared.js";
 
+/**
+ * @typedef {import("./command-utils.js").CommandCandidate} CommandCandidate
+ * @typedef {import("./shared.js").TextCache} TextCache
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {Map<string, ScannedFile>} FileMap
+ * @typedef {"npm" | "pnpm" | "yarn" | "bun"} PackageManager
+ * @typedef {{
+ *   run: CommandCandidate[],
+ *   test: CommandCandidate[],
+ *   build: CommandCandidate[],
+ *   dev: CommandCandidate[]
+ * }} CommandCandidates
+ */
+
+/**
+ * @param {CommandCandidates} candidates
+ * @param {unknown} packageJson
+ * @param {PackageManager} packageManager
+ * @param {{primaryGoProject?: boolean}} [options]
+ * @returns {void}
+ */
 export function addPackageCommands(
   candidates,
   packageJson,
   packageManager,
   options = {}
 ) {
-  const scripts = packageJson?.scripts;
-  if (!scripts || typeof scripts !== "object") {
+  const scripts = plainRecord(packageJson) && plainRecord(packageJson.scripts)
+    ? packageJson.scripts
+    : null;
+  if (!scripts) {
     return;
   }
   const source = "package.json";
@@ -17,17 +41,15 @@ export function addPackageCommands(
     if (options.primaryGoProject) {
       break;
     }
-    if (
-      typeof scripts[name] === "string" &&
-      !isPlaceholderScript(scripts[name])
-    ) {
+    const script = scripts[name];
+    if (typeof script === "string" && !isPlaceholderScript(script)) {
       addCommand(
         candidates.test,
         packageScriptCommand(packageManager, name),
         source,
         name === "test" ? 205 : 198,
         "known",
-        scripts[name]
+        script
       );
       break;
     }
@@ -36,7 +58,8 @@ export function addPackageCommands(
     if (options.primaryGoProject) {
       break;
     }
-    if (typeof scripts[name] !== "string") {
+    const script = scripts[name];
+    if (typeof script !== "string") {
       continue;
     }
     const command = packageScriptCommand(packageManager, name);
@@ -45,9 +68,9 @@ export function addPackageCommands(
       name === "dev" ? 202 :
       name === "serve" ? 198 :
       194;
-    addCommand(candidates.run, command, source, score, "known", scripts[name]);
+    addCommand(candidates.run, command, source, score, "known", script);
     if (name === "dev" || name === "watch") {
-      addCommand(candidates.dev, command, source, score, "known", scripts[name]);
+      addCommand(candidates.dev, command, source, score, "known", script);
     }
   }
   if (typeof scripts.build === "string") {
@@ -62,6 +85,13 @@ export function addPackageCommands(
   }
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {CommandCandidates} candidates
+ * @returns {void}
+ */
 export function addPoeCommands(root, fileMap, texts, candidates) {
   const file = fileMap.get("pyproject.toml");
   if (!file) {
@@ -72,12 +102,14 @@ export function addPoeCommands(root, fileMap, texts, candidates) {
   if (!section) {
     return;
   }
-  const tasks = new Set(
-    Array.from(
-      section.matchAll(/^([A-Za-z0-9_.-]+)\s*=/gm),
-      (match) => match[1].split(".")[0]
-    )
-  );
+  /** @type {Set<string>} */
+  const tasks = new Set();
+  for (const match of section.matchAll(/^([A-Za-z0-9_.-]+)\s*=/gm)) {
+    const task = match[1]?.split(".")[0];
+    if (task) {
+      tasks.add(task);
+    }
+  }
   const prefix = fileMap.has("uv.lock") ? "uv run " : "";
   if (tasks.has("start")) {
     addCommand(candidates.run, `${prefix}poe start`, file.path, 220, "known");
@@ -87,6 +119,13 @@ export function addPoeCommands(root, fileMap, texts, candidates) {
   }
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {CommandCandidates} candidates
+ * @returns {void}
+ */
 export function addBuildTargetCommands(root, fileMap, texts, candidates) {
   for (const buildFile of ["Makefile", "makefile", "GNUmakefile"]) {
     const file = fileMap.get(buildFile);
@@ -109,9 +148,24 @@ export function addBuildTargetCommands(root, fileMap, texts, candidates) {
   addJustCommands(root, fileMap, texts, candidates);
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {unknown} packageJson
+ * @returns {PackageManager}
+ */
 export function detectPackageManager(files, packageJson) {
-  const declared = String(packageJson?.packageManager || "").split("@")[0];
-  if (["pnpm", "yarn", "npm", "bun"].includes(declared)) {
+  const declaredValue = plainRecord(packageJson)
+    ? packageJson.packageManager
+    : "";
+  const declared = typeof declaredValue === "string"
+    ? declaredValue.split("@")[0]
+    : "";
+  if (
+    declared === "pnpm" ||
+    declared === "yarn" ||
+    declared === "npm" ||
+    declared === "bun"
+  ) {
     return declared;
   }
   if (findByPath(files, "pnpm-lock.yaml")) {
@@ -126,6 +180,13 @@ export function detectPackageManager(files, packageJson) {
   return "npm";
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {CommandCandidates} candidates
+ * @returns {void}
+ */
 function addJustCommands(root, fileMap, texts, candidates) {
   for (const buildFile of ["justfile", "Justfile"]) {
     const file = fileMap.get(buildFile);
@@ -143,4 +204,23 @@ function addJustCommands(root, fileMap, texts, candidates) {
       addCommand(candidates.build, "just build", file.path, 195, "known");
     }
   }
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function plainRecord(value) {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    return false;
+  }
+  return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+    (descriptor) => !descriptor.get && !descriptor.set
+  );
 }

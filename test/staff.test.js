@@ -11,6 +11,7 @@ import {
   renderBrief,
   renderTodoList,
   resolveContainedPath,
+  validatePersistedState,
   writeKanonOutputs
 } from "../src/index.js";
 import { EvidenceBook } from "../src/evidence.js";
@@ -537,6 +538,54 @@ test("huge config, state, and TODO inputs are bounded with diagnostics", () => {
   assert.match(state.warning, /budget-exceeded/);
   assert.equal(todos.valid, false);
   assert.match(todos.warning, /budget-exceeded/);
+});
+
+test("compatibility state and option validators reject accessors and proxies", () => {
+  const root = makeFixture({ "README.md": "# Demo\n" });
+  let getterCalls = 0;
+  const getterBearing = {};
+  Object.defineProperty(getterBearing, "schema_version", {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error("getter must not run");
+    }
+  });
+  let proxyTrapCalls = 0;
+  const proxy = new Proxy({}, {
+    getPrototypeOf() {
+      proxyTrapCalls += 1;
+      throw new Error("proxy trap must not run");
+    }
+  });
+
+  assert.equal(validatePersistedState(getterBearing).valid, false);
+  assert.equal(validatePersistedState(proxy).valid, false);
+  assert.equal(inspectPreviousState(root, getterBearing).valid, false);
+  assert.equal(inspectPreviousState(root, proxy).valid, false);
+  assert.equal(inspectKanonTodos(root, getterBearing).valid, false);
+  assert.equal(inspectKanonTodos(root, proxy).valid, false);
+  assert.equal(getterCalls, 0);
+  assert.equal(proxyTrapCalls, 0);
+});
+
+test("deep package export metadata remains bounded during analysis", () => {
+  let exportsValue = "./src/index.js";
+  for (let index = 0; index < 256; index += 1) {
+    exportsValue = { nested: exportsValue };
+  }
+  const root = makeFixture({
+    "README.md": "# Deep manifest\n",
+    "package.json": JSON.stringify({
+      name: "deep-manifest",
+      exports: exportsValue
+    }),
+    "src/index.js": "export const value = 1;\n"
+  });
+
+  const analysis = analyzeRepo(root, { inspectGit: false });
+  assert.equal(validatePersistedState(analysis.state).valid, true);
+  assert.ok(analysis.state.repo.files_scanned >= 3);
 });
 
 function runProgramAsGit(source, options) {

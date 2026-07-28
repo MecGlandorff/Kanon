@@ -6,11 +6,16 @@ const C0_C1_CONTROL =
 export const REPOSITORY_UNTRUSTED = "repository-untrusted";
 export const KANON_GENERATED = "kanon-generated";
 
+/**
+ * @param {unknown} value
+ * @param {{multiline?: boolean}} [options]
+ * @returns {string}
+ */
 export function safeTerminalText(value, options = {}) {
   let text = String(value ?? "");
   text = stripAnsiAndOsc(text)
     .replace(BIDI_CONTROL, (character) =>
-      `[U+${character.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}]`
+      `[U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}]`
     )
     .replace(C0_C1_CONTROL, "")
     .replace(/[\u2028\u2029]/g, options.multiline ? "\n" : " ");
@@ -24,6 +29,10 @@ export function safeTerminalText(value, options = {}) {
   return text;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
 export function sanitizeRepositoryData(value) {
   if (typeof value === "string") {
     return safeTerminalText(value, { multiline: true });
@@ -42,12 +51,20 @@ export function sanitizeRepositoryData(value) {
   return value;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 export function escapeMarkdownText(value) {
   return safeTerminalText(value)
     .replace(/\\/g, "\\\\")
     .replace(/([`*_[\]<>|])/g, "\\$1");
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 export function codeSpan(value) {
   const text = safeTerminalText(value);
   const matches = text.match(/`+/g) || [];
@@ -65,6 +82,11 @@ export function codeSpan(value) {
   return `${fence}${padded}${fence}`;
 }
 
+/**
+ * @param {unknown} value
+ * @param {string | number} [indent]
+ * @returns {string[]}
+ */
 export function repositoryDataBlock(value, indent = "") {
   const prefix = typeof indent === "number" ? " ".repeat(indent) : indent;
   const text = safeTerminalText(value, { multiline: true });
@@ -81,6 +103,11 @@ export function repositoryDataBlock(value, indent = "") {
   ];
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [space]
+ * @returns {string}
+ */
 export function safeJsonStringify(value, space = 2) {
   return JSON.stringify(
     value,
@@ -90,9 +117,13 @@ export function safeJsonStringify(value, space = 2) {
         : item
     ),
     space
-  );
+  ) ?? "";
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 export function safeEvidenceId(value) {
   const text = String(value || "");
   return /^e_[A-Za-z0-9-]{8,64}_[0-9]{3,8}$/.test(text)
@@ -100,6 +131,10 @@ export function safeEvidenceId(value) {
     : "invalid-evidence-id";
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function stripAnsiAndOsc(value) {
   return value
     .replace(
@@ -117,6 +152,10 @@ function stripAnsiAndOsc(value) {
     .replace(/\u001b[@-_]/g, "");
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
 function isPlainObject(value) {
   return Boolean(
     value &&

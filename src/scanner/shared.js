@@ -7,6 +7,29 @@ export {
   sanitizeFilenameComponent
 } from "../path-security.js";
 
+/**
+ * @typedef {{
+ *   maxBytes: number,
+ *   bytesHashed: number
+ * }} HashBudget
+ * @typedef {{
+ *   ok: false,
+ *   status: string,
+ *   relativePath: string | null,
+ *   reason: string,
+ *   code: string
+ * }} HashFailure
+ * @typedef {{
+ *   maxFileBytes?: number,
+ *   hashBudget?: HashBudget,
+ *   onFailure?: (failure: HashFailure) => void
+ * }} HashOptions
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 export function normalizeRelPath(value) {
   return String(value || "")
     .replaceAll("\\", "/")
@@ -14,13 +37,25 @@ export function normalizeRelPath(value) {
     .replace(/^\/+/, "");
 }
 
+/**
+ * @param {unknown} root
+ * @param {unknown} relPath
+ * @param {number} size
+ * @param {HashOptions} [options]
+ * @returns {string | null}
+ */
 export function hashFile(root, relPath, size, options = {}) {
   const maxFileBytes = options.maxFileBytes ?? 750_000;
+  const hashBudget = options.hashBudget;
   try {
     if (
+      !Number.isSafeInteger(size) ||
+      size < 0 ||
       size > maxFileBytes ||
-      options.hashBudget?.bytesHashed + size >
-        options.hashBudget?.maxBytes
+      (
+        hashBudget !== undefined &&
+        hashBudget.bytesHashed + size > hashBudget.maxBytes
+      )
     ) {
       return null;
     }
@@ -75,8 +110,8 @@ export function hashFile(root, relPath, size, options = {}) {
       if (offset !== size) {
         return null;
       }
-      if (options.hashBudget) {
-        options.hashBudget.bytesHashed += offset;
+      if (hashBudget) {
+        hashBudget.bytesHashed += offset;
       }
       return crypto
         .createHash("sha256")
@@ -88,18 +123,38 @@ export function hashFile(root, relPath, size, options = {}) {
   } catch (error) {
     options.onFailure?.({
       ok: false,
-      status: error?.code === "ENOENT" ? "missing" : "unreadable",
+      status: errorCode(error) === "ENOENT" ? "missing" : "unreadable",
       relativePath: normalizeRelPath(relPath),
       reason: "The contained file could not be hashed safely.",
-      code: error?.code || "SAFE_HASH_FAILED"
+      code: errorCode(error) || "SAFE_HASH_FAILED"
     });
     return null;
   }
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} [limit]
+ * @returns {string}
+ */
 export function normalizeExcerpt(value, limit = 240) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, limit);
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorCode(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    ? error.code
+    : "";
 }

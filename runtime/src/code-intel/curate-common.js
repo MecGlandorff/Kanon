@@ -1,6 +1,15 @@
 import { selectRootReadme } from "../readme.js";
 import { depth } from "./shared.js";
 
+/** @typedef {import("./shared.js").RankedFile} RankedFile */
+
+/**
+ * @param {RankedFile[]} selected
+ * @param {RankedFile | null | undefined} item
+ * @param {string} reason
+ * @param {string | null} [heuristic]
+ * @returns {void}
+ */
 export function add(selected, item, reason, heuristic = null) {
   if (!item || selected.some((candidate) => candidate.path === item.path)) {
     return;
@@ -13,10 +22,24 @@ export function add(selected, item, reason, heuristic = null) {
   });
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {string} relPath
+ * @returns {RankedFile | null}
+ */
 export function byPath(ranked, relPath) {
   return ranked.find((item) => item.path === relPath) || null;
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {RegExp} pattern
+ * @param {{
+ *   exclude?: RegExp,
+ *   compare?: (left: RankedFile, right: RankedFile) => number
+ * }} [options]
+ * @returns {RankedFile | null}
+ */
 export function byPattern(ranked, pattern, options = {}) {
   return ranked
     .filter((item) => pattern.test(item.path))
@@ -24,6 +47,15 @@ export function byPattern(ranked, pattern, options = {}) {
     .sort(options.compare || compareScore)[0] || null;
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {RegExp} pattern
+ * @param {{
+ *   exclude?: RegExp,
+ *   compare?: (left: RankedFile, right: RankedFile) => number
+ * }} [options]
+ * @returns {RankedFile[]}
+ */
 export function allByPattern(ranked, pattern, options = {}) {
   return ranked
     .filter((item) => pattern.test(item.path))
@@ -31,14 +63,28 @@ export function allByPattern(ranked, pattern, options = {}) {
     .sort(options.compare || compareScore);
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @returns {RankedFile | null}
+ */
 export function rootReadme(ranked) {
   return selectRootReadme(ranked);
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {string} relPath
+ * @returns {boolean}
+ */
 export function hasPath(ranked, relPath) {
   return ranked.some((item) => item.path === relPath);
 }
 
+/**
+ * @param {RankedFile} a
+ * @param {RankedFile} b
+ * @returns {number}
+ */
 export function shortestPath(a, b) {
   return (
     depth(a.path) - depth(b.path) ||
@@ -47,6 +93,11 @@ export function shortestPath(a, b) {
   );
 }
 
+/**
+ * @param {RankedFile} a
+ * @param {RankedFile} b
+ * @returns {number}
+ */
 export function compareScore(a, b) {
   return (
     b.score - a.score ||
@@ -55,6 +106,12 @@ export function compareScore(a, b) {
   );
 }
 
+/**
+ * @param {RankedFile[]} selected
+ * @param {RankedFile[]} ranked
+ * @param {number} [limit]
+ * @returns {RankedFile[]}
+ */
 export function finish(selected, ranked, limit = 5) {
   const recommended = selected.slice(0, limit);
   const chosen = new Set(recommended.map((item) => item.path));
@@ -66,6 +123,10 @@ export function finish(selected, ranked, limit = 5) {
   ];
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @returns {RankedFile[]}
+ */
 export function primaryEntrypoints(ranked) {
   return ranked
     .filter((item) =>
@@ -97,6 +158,10 @@ export function primaryEntrypoints(ranked) {
     });
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @returns {RankedFile[]}
+ */
 export function directDeclarations(ranked) {
   return ranked
     .filter((item) =>

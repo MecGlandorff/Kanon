@@ -11,6 +11,37 @@ import {
   unique
 } from "./shared.js";
 
+/**
+ * @typedef {import("./command-utils.js").CommandCandidate} CommandCandidate
+ * @typedef {import("./shared.js").TextCache} TextCache
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {Map<string, ScannedFile>} FileMap
+ * @typedef {{
+ *   run: CommandCandidate[],
+ *   test: CommandCandidate[],
+ *   build: CommandCandidate[],
+ *   dev: CommandCandidate[]
+ * }} CommandCandidates
+ * @typedef {{
+ *   command: string,
+ *   cwd: string,
+ *   context: string
+ * }} ExtractedCommand
+ * @typedef {{
+ *   group: "run" | "test" | "build" | "dev",
+ *   score: number
+ * }} CommandClassification
+ */
+
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {CommandCandidates} candidates
+ * @param {{primaryGoProject?: boolean}} [options]
+ * @returns {void}
+ */
 export function addDocumentedCommands(
   root,
   files,
@@ -65,8 +96,15 @@ export function addDocumentedCommands(
   }
 }
 
+/**
+ * @param {string} text
+ * @param {string} sourcePath
+ * @param {string} root
+ * @returns {ExtractedCommand[]}
+ */
 function extractShellCommands(text, sourcePath, root) {
   const lines = text.split(/\r?\n/);
+  /** @type {ExtractedCommand[]} */
   const output = [];
   const documentDirectory = normalizeCwd(path.posix.dirname(sourcePath));
   const baseCwd = /^(?:docs?|documentation)(?:\/|$)/i.test(documentDirectory)
@@ -79,7 +117,7 @@ function extractShellCommands(text, sourcePath, root) {
   let cloneDirectory = null;
 
   for (let index = 0; index < lines.length; index += 1) {
-    const trimmed = lines[index].trim();
+    const trimmed = (lines[index] ?? "").trim();
     const prompted = /^\$\s+/.test(trimmed);
     if (/^#{1,6}\s+/.test(trimmed)) {
       heading = trimmed.replace(/^#{1,6}\s+/, "");
@@ -134,6 +172,11 @@ function extractShellCommands(text, sourcePath, root) {
   return output;
 }
 
+/**
+ * @param {string} command
+ * @param {string} context
+ * @returns {CommandClassification | null}
+ */
 function classifyCommand(command, context) {
   const lower = command.toLowerCase();
   const contextLower = context.toLowerCase();
@@ -178,12 +221,20 @@ function classifyCommand(command, context) {
   return null;
 }
 
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
 function looksLikeShellCommand(line) {
   return /^(?:\.\/[\w./-]+|python3?\b|py\.test\b|pytest\b|go\b|cargo\b|make\b|just\b|pnpm\b|npm\b|yarn\b|bun\b|uv\b|docker\b|bash\b|sh\b|torchrun\b|git clone\b|cd\b)/.test(
     line
   );
 }
 
+/**
+ * @param {string} line
+ * @returns {boolean}
+ */
 function looksLikeStandaloneCommand(line) {
   if (!looksLikeShellCommand(line) || /[.!?]$/.test(line)) {
     return false;
@@ -193,12 +244,22 @@ function looksLikeStandaloneCommand(line) {
   );
 }
 
+/**
+ * @param {string} readmeText
+ * @param {FileMap} fileMap
+ * @returns {string[]}
+ */
 function extractLinkedDocs(readmeText, fileMap) {
+  /** @type {string[]} */
   const output = [];
   for (const match of readmeText.matchAll(
     /\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)/g
   )) {
-    const target = normalizeRelPath(match[1].replace(/\/$/, "/README.md"));
+    const linked = match[1];
+    if (!linked) {
+      continue;
+    }
+    const target = normalizeRelPath(linked.replace(/\/$/, "/README.md"));
     const candidates = [
       target,
       `${target}.md`,
@@ -214,6 +275,13 @@ function extractLinkedDocs(readmeText, fileMap) {
   return unique(output);
 }
 
+/**
+ * @param {string} current
+ * @param {string} requested
+ * @param {string} root
+ * @param {string | null} cloneDirectory
+ * @returns {string}
+ */
 function resolveDocumentCwd(current, requested, root, cloneDirectory) {
   const cleaned = requested.replace(/^["']|["']$/g, "").replace(/\/$/, "");
   if (!cleaned || cleaned === ".") {
@@ -238,12 +306,21 @@ function resolveDocumentCwd(current, requested, root, cloneDirectory) {
   return current === "." ? "." : current;
 }
 
+/**
+ * @param {string} root
+ * @param {string} relativePath
+ * @returns {boolean}
+ */
 function containedDirectoryExists(root, relativePath) {
   return resolveContainedPath(root, relativePath, {
     type: "directory"
   }).ok;
 }
 
+/**
+ * @param {string} command
+ * @returns {string | null}
+ */
 function clonedDirectory(command) {
   const parts = command.split(/\s+/);
   const explicit = parts[3] && !parts[3].startsWith("-") ? parts[3] : null;

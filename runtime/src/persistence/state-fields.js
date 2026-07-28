@@ -1,3 +1,14 @@
+import { types as nodeTypes } from "node:util";
+
+/**
+ * @typedef {{valid: false, field: string, reason: string}} ValidationIssue
+ * @typedef {(value: unknown, field: string) => ValidationIssue | null} Validator
+ * @typedef {Record<string, Validator>} ValidatorMap
+ * @typedef {{valid: true, field: null, reason: null} |
+ *   ValidationIssue} StateFieldValidation
+ */
+
+/** @type {string[]} */
 const SCAN_FIELDS = [
   "complete",
   "strategy",
@@ -27,7 +38,14 @@ const SCAN_FIELDS = [
   "git_diagnostic"
 ];
 
+/**
+ * @param {unknown} value
+ * @returns {StateFieldValidation}
+ */
 export function validateCurrentStateFields(value) {
+  if (!plainObject(value)) {
+    return invalid("root", "Expected an object.");
+  }
   return firstInvalid([
     record(value.repo, "repo", {
       name: string,
@@ -90,11 +108,17 @@ export function validateCurrentStateFields(value) {
   ]);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function scan(value) {
+  /** @type {ValidatorMap} */
   const rules = Object.fromEntries(
     SCAN_FIELDS.map((field) => [field, nonnegativeInteger])
   );
-  Object.assign(rules, {
+  /** @type {ValidatorMap} */
+  const overrides = {
     complete: boolean,
     strategy: string,
     truncated: boolean,
@@ -112,10 +136,15 @@ function scan(value) {
     budgets_reached: strings,
     git_observation_failed: boolean,
     git_diagnostic: nullableString
-  });
+  };
+  Object.assign(rules, overrides);
   return record(value, "scan", rules);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function git(value) {
   return record(value, "git", {
     found: boolean,
@@ -167,7 +196,12 @@ function git(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function commands(value) {
+  /** @type {Validator} */
   const commandArray = (items, field) => array(
     items,
     field,
@@ -190,6 +224,10 @@ function commands(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function codeIntelligence(value) {
   return record(value, "code_intelligence", {
     files_with_inbound_imports: nonnegativeInteger,
@@ -213,6 +251,10 @@ function codeIntelligence(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function tests(value) {
   return record(value, "tests", {
     found: boolean,
@@ -223,6 +265,11 @@ function tests(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} field
+ * @returns {ValidationIssue | null}
+ */
 function signal(value, field) {
   return record(value, field, {
     found: boolean,
@@ -237,7 +284,12 @@ function signal(value, field) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function currentState(value) {
+  /** @type {Validator} */
   const claims = (items, field) => array(
     items,
     field,
@@ -259,7 +311,12 @@ function currentState(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function verification(value) {
+  /** @type {Validator} */
   const observations = (items, field) => array(
     items,
     field,
@@ -285,6 +342,10 @@ function verification(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ValidationIssue | null}
+ */
 function configuration(value) {
   return record(value, "configuration", {
     found: boolean,
@@ -296,6 +357,13 @@ function configuration(value) {
   });
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} field
+ * @param {ValidatorMap} required
+ * @param {ValidatorMap} [optional]
+ * @returns {ValidationIssue | null}
+ */
 function record(value, field, required, optional = {}) {
   if (!plainObject(value)) {
     return invalid(field, "Expected an object.");
@@ -325,6 +393,12 @@ function record(value, field, required, optional = {}) {
   return null;
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} field
+ * @param {Validator} validator
+ * @returns {ValidationIssue | null}
+ */
 function array(value, field, validator) {
   if (!Array.isArray(value)) {
     return invalid(field, "Expected an array.");
@@ -336,81 +410,123 @@ function array(value, field, validator) {
   return null;
 }
 
+/** @type {Validator} */
 function strings(value, field) {
   return array(value, field, string);
 }
 
+/** @type {Validator} */
 function string(value, field) {
   return typeof value === "string"
     ? null
     : invalid(field, "Expected a string.");
 }
 
+/** @type {Validator} */
 function boolean(value, field) {
   return typeof value === "boolean"
     ? null
     : invalid(field, "Expected a boolean.");
 }
 
+/** @type {Validator} */
 function confidence(value, field) {
   return enumValue(value, ["known", "likely", "unknown"], field);
 }
 
+/**
+ * @param {unknown} value
+ * @param {string[]} values
+ * @param {string} [field]
+ * @returns {ValidationIssue | null}
+ */
 function enumValue(value, values, field = "value") {
-  return values.includes(value)
+  return typeof value === "string" && values.includes(value)
     ? null
     : invalid(field, `Expected one of: ${values.join(", ")}.`);
 }
 
+/** @type {Validator} */
 function nonnegativeInteger(value, field) {
-  return Number.isInteger(value) && value >= 0
+  return typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 0
     ? null
     : invalid(field, "Expected a nonnegative integer.");
 }
 
+/** @type {Validator} */
 function positiveInteger(value, field) {
-  return Number.isInteger(value) && value > 0
+  return typeof value === "number" &&
+      Number.isInteger(value) &&
+      value > 0
     ? null
     : invalid(field, "Expected a positive integer.");
 }
 
+/** @type {Validator} */
 function nullableString(value, field) {
   return value === null ? null : string(value, field);
 }
 
+/** @type {Validator} */
 function nullableBoolean(value, field) {
   return value === null ? null : boolean(value, field);
 }
 
+/** @type {Validator} */
 function nullableInteger(value, field) {
-  return value === null || Number.isInteger(value)
+  return value === null ||
+      (typeof value === "number" && Number.isInteger(value))
     ? null
     : invalid(field, "Expected an integer or null.");
 }
 
+/** @type {Validator} */
 function nullableNonnegativeInteger(value, field) {
   return value === null ? null : nonnegativeInteger(value, field);
 }
 
+/** @type {Validator} */
 function nullableHash(value, field) {
-  return value === null || /^[0-9a-f]{64}$/.test(value)
+  return value === null ||
+      (typeof value === "string" && /^[0-9a-f]{64}$/.test(value))
     ? null
     : invalid(field, "Expected a lowercase SHA-256 or null.");
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
 function plainObject(value) {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    return false;
+  }
+  return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+    (descriptor) => !descriptor.get && !descriptor.set
   );
 }
 
+/**
+ * @param {string} field
+ * @param {string} reason
+ * @returns {ValidationIssue}
+ */
 function invalid(field, reason) {
   return { valid: false, field, reason };
 }
 
+/**
+ * @param {(ValidationIssue | null)[]} issues
+ * @returns {StateFieldValidation}
+ */
 function firstInvalid(issues) {
   return issues.find(Boolean) || { valid: true, field: null, reason: null };
 }

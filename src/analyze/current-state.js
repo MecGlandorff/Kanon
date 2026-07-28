@@ -1,6 +1,52 @@
 import { scanLimitationReason } from "./utils.js";
 
+/**
+ * @typedef {import("./metadata.js").Purpose} Purpose
+ * @typedef {import("./findings.js").DeclaredCommands} DeclaredCommands
+ * @typedef {import("./entrypoints.js").EntrypointClaim} EntrypointClaim
+ * @typedef {import("./entrypoints.js").TodoObservation} TodoObservation
+ * @typedef {import("./project-signals.js").ProjectSignal} ProjectSignal
+ * @typedef {import("./project-signals.js").TestSignal} TestSignal
+ * @typedef {{
+ *   claim: string,
+ *   reason?: string,
+ *   evidence?: string[],
+ *   trust?: "repository-untrusted" | "kanon-generated",
+ *   confidence?: "known" | "likely" | "unknown"
+ * }} StateClaim
+ * @typedef {{
+ *   known: StateClaim[],
+ *   likely: StateClaim[],
+ *   unknown: StateClaim[],
+ *   stale_suspicious: StateClaim[],
+ *   suggested: StateClaim[]
+ * }} CurrentState
+ * @typedef {{
+ *   purpose: Purpose,
+ *   commands: DeclaredCommands,
+ *   configuration: {
+ *     command_execution: "ask" | "never",
+ *     warning: string | null,
+ *     evidence: string[]
+ *   },
+ *   likelyEntrypoints: EntrypointClaim[],
+ *   tests: TestSignal,
+ *   ci: ProjectSignal,
+ *   deploy: ProjectSignal,
+ *   release: ProjectSignal,
+ *   git: ReturnType<typeof import("../git.js").inspectGit>,
+ *   scan: import("../scanner/scan.js").ScanDiagnostics,
+ *   todos: TodoObservation[],
+ *   verification: import("../verify/index.js").VerificationResult
+ * }} CurrentStateInput
+ */
+
+/**
+ * @param {CurrentStateInput} input
+ * @returns {CurrentState}
+ */
 export function buildCurrentState(input) {
+  /** @type {CurrentState} */
   const state = {
     known: [],
     likely: [],
@@ -48,6 +94,11 @@ export function buildCurrentState(input) {
   return state;
 }
 
+/**
+ * @param {CurrentState} state
+ * @param {Purpose} purpose
+ * @returns {void}
+ */
 function addPurpose(state, purpose) {
   if (purpose.confidence === "known") {
     state.known.push({
@@ -64,8 +115,16 @@ function addPurpose(state, purpose) {
   }
 }
 
+/**
+ * @param {CurrentState} state
+ * @param {DeclaredCommands} commands
+ * @param {"ask" | "never"} executionPolicy
+ * @returns {void}
+ */
 function addCommands(state, commands, executionPolicy) {
-  for (const group of ["test", "run", "build", "dev"]) {
+  /** @type {(keyof DeclaredCommands)[]} */
+  const groups = ["test", "run", "build", "dev"];
+  for (const group of groups) {
     for (const command of commands[group]) {
       state[command.confidence === "known" ? "known" : "likely"].push({
         claim: `A ${group} command candidate is directly declared; execution success is Unknown.`,
@@ -83,6 +142,11 @@ function addCommands(state, commands, executionPolicy) {
   }
 }
 
+/**
+ * @param {StateClaim[]} known
+ * @param {CurrentStateInput} input
+ * @returns {void}
+ */
 function addKnownSignals(known, input) {
   if (input.tests.found) {
     known.push({
@@ -124,6 +188,11 @@ function addKnownSignals(known, input) {
   }
 }
 
+/**
+ * @param {StateClaim[]} unknown
+ * @param {CurrentStateInput} input
+ * @returns {void}
+ */
 function addUnknowns(unknown, input) {
   if (!input.commands.test.length) {
     unknown.push({
@@ -185,10 +254,14 @@ function addUnknowns(unknown, input) {
   }
 }
 
+/**
+ * @param {StateClaim[]} suggested
+ * @param {CurrentStateInput} input
+ * @returns {void}
+ */
 function addSuggestions(suggested, input) {
   const limitation = limitationSuffix(input);
   if (input.commands.test.length) {
-    const test = input.commands.test[0];
     suggested.push({
       claim:
         input.configuration.command_execution === "never"
@@ -241,7 +314,12 @@ function addSuggestions(suggested, input) {
   }
 }
 
+/**
+ * @param {CurrentStateInput} input
+ * @returns {string}
+ */
 function limitationSuffix(input) {
+  /** @type {string[]} */
   const reasons = [];
   if (!input.scan.complete) {
     reasons.push(scanLimitationReason(input.scan));
@@ -254,6 +332,10 @@ function limitationSuffix(input) {
     : "";
 }
 
+/**
+ * @param {{path: string}[]} items
+ * @returns {string}
+ */
 function paths(items) {
   return items.map((file) => file.path).join(", ");
 }

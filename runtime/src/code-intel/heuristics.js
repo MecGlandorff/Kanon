@@ -121,6 +121,10 @@ export const HEURISTIC_REGISTRY = Object.freeze([
   }
 ]);
 
+/**
+ * @param {string} id
+ * @returns {(typeof HEURISTIC_REGISTRY)[number]}
+ */
 export function registeredHeuristic(id) {
   const heuristic = HEURISTIC_REGISTRY.find((item) => item.id === id);
   if (!heuristic) {

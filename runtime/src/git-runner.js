@@ -7,9 +7,47 @@ import { spawnSync } from "node:child_process";
 export const DEFAULT_GIT_TIMEOUT_MS = 2_000;
 export const DEFAULT_GIT_OUTPUT_BYTES = 8 * 1024 * 1024;
 
+/** @type {string | undefined} */
 let emptyHooksPath;
+/** @type {string | undefined} */
 let emptyGitConfigPath;
 
+/**
+ * @typedef {{
+ *   timeoutMs?: number,
+ *   maxOutputBytes?: number,
+ *   cwd?: string,
+ *   gitBinary?: string,
+ *   prefixArgs?: string[],
+ *   noLazyFetch?: boolean,
+ *   env?: NodeJS.ProcessEnv,
+ *   input?: string | Buffer,
+ *   encoding?: BufferEncoding
+ * }} RunGitOptions
+ * @typedef {{
+ *   ok: boolean,
+ *   binary: string,
+ *   status: number | null,
+ *   signal: NodeJS.Signals | null,
+ *   stdout: string,
+ *   stderr: string,
+ *   timeout: boolean,
+ *   overflow: boolean,
+ *   output_bytes: number,
+ *   output_limit_bytes: number,
+ *   timeout_ms: number,
+ *   duration_ms: number,
+ *   error: string | null,
+ *   diagnostic: string
+ * }} GitRunResult
+ */
+
+/**
+ * @param {string | null | undefined} root
+ * @param {string[]} args
+ * @param {RunGitOptions} [options]
+ * @returns {GitRunResult}
+ */
 export function runGit(root, args, options = {}) {
   const timeoutMs = boundedInteger(
     options.timeoutMs,
@@ -69,22 +107,26 @@ export function runGit(root, args, options = {}) {
     : Buffer.from(result.stderr || "");
   const outputBytes = stdoutBuffer.length + stderrBuffer.length;
   const timedOut =
-    result.error?.code === "ETIMEDOUT" ||
+    errorCode(result.error) === "ETIMEDOUT" ||
     (
       result.signal !== null &&
       Date.now() - started >= timeoutMs
     );
   const overflowed =
-    result.error?.code === "ENOBUFS" ||
+    errorCode(result.error) === "ENOBUFS" ||
     outputBytes > maxOutputBytes;
-  const status = Number.isInteger(result.status) ? result.status : null;
-  const errorMessage = result.error?.message || null;
+  const status =
+    typeof result.status === "number" &&
+    Number.isInteger(result.status)
+      ? result.status
+      : null;
+  const errorMessage = errorMessageFor(result.error);
 
   return {
     ok: status === 0 && !timedOut && !overflowed && !result.error,
     binary: gitBinary,
     status,
-    signal: result.signal || null,
+    signal: result.signal ?? null,
     stdout: stdoutBuffer.toString(options.encoding || "utf8"),
     stderr: stderrBuffer.toString(options.encoding || "utf8"),
     timeout: timedOut,
@@ -104,6 +146,11 @@ export function runGit(root, args, options = {}) {
   };
 }
 
+/**
+ * @param {GitRunResult} result
+ * @param {string} [context]
+ * @returns {GitRunResult}
+ */
 export function assertGit(result, context = "Git command") {
   if (result.ok) {
     return result;
@@ -115,7 +162,13 @@ export function assertGit(result, context = "Git command") {
   );
 }
 
+/**
+ * @param {NodeJS.ProcessEnv} [extra]
+ * @param {boolean} [noLazyFetch]
+ * @returns {NodeJS.ProcessEnv}
+ */
 export function hardenedGitEnvironment(extra = {}, noLazyFetch = false) {
+  /** @type {NodeJS.ProcessEnv} */
   const env = {
     ...process.env,
     ...extra
@@ -148,6 +201,9 @@ export function hardenedGitEnvironment(extra = {}, noLazyFetch = false) {
   return env;
 }
 
+/**
+ * @returns {string}
+ */
 function getEmptyHooksPath() {
   if (emptyHooksPath) {
     return emptyHooksPath;
@@ -160,6 +216,9 @@ function getEmptyHooksPath() {
   return emptyHooksPath;
 }
 
+/**
+ * @returns {string}
+ */
 function getEmptyGitConfigPath() {
   if (emptyGitConfigPath) {
     return emptyGitConfigPath;
@@ -172,6 +231,11 @@ function getEmptyGitConfigPath() {
   return emptyGitConfigPath;
 }
 
+/**
+ * @param {string | undefined} explicit
+ * @param {string[]} rejectedRoots
+ * @returns {string}
+ */
 function resolveGitBinary(explicit, rejectedRoots) {
   if (explicit) {
     const resolved = path.resolve(explicit);
@@ -221,6 +285,9 @@ function resolveGitBinary(explicit, rejectedRoots) {
   );
 }
 
+/**
+ * @returns {string[]}
+ */
 function gitExecutableNames() {
   const extensions = String(
     process.env.PATHEXT || ".EXE;.CMD;.BAT"
@@ -232,6 +299,10 @@ function gitExecutableNames() {
   )];
 }
 
+/**
+ * @param {string} candidate
+ * @returns {boolean}
+ */
 function isExecutableFile(candidate) {
   try {
     const stat = fs.statSync(candidate);
@@ -250,6 +321,11 @@ function isExecutableFile(candidate) {
   }
 }
 
+/**
+ * @param {string} root
+ * @param {string} candidate
+ * @returns {boolean}
+ */
 function isWithin(root, candidate) {
   const relative = path.relative(root, candidate);
   return (
@@ -262,6 +338,16 @@ function isWithin(root, candidate) {
   );
 }
 
+/**
+ * @param {{
+ *   status: number | null,
+ *   signal: NodeJS.Signals | null,
+ *   timedOut: boolean,
+ *   overflowed: boolean,
+ *   errorMessage: string | null
+ * }} input
+ * @returns {string}
+ */
 function diagnosticFor(input) {
   if (input.timedOut) {
     return "Git observation timed out.";
@@ -280,8 +366,51 @@ function diagnosticFor(input) {
   return "Git observation failed.";
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {number}
+ */
 function boundedInteger(value, fallback, minimum, maximum) {
-  return Number.isInteger(value) && value >= minimum && value <= maximum
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+  )
     ? value
     : fallback;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorCode(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    ? error.code
+    : "";
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string | null}
+ */
+function errorMessageFor(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  )
+    ? error.message
+    : null;
 }

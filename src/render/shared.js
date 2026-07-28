@@ -6,6 +6,22 @@ import {
 } from "../trust.js";
 import { buildContinuityReport } from "../continuity/engine.js";
 
+/**
+ * @typedef {import("../analyze/findings.js").DeclaredCommand}
+ *   DeclaredCommand
+ * @typedef {import("../analyze/current-state.js").StateClaim} StateClaim
+ * @typedef {import("../verify/index.js").VerificationObservation}
+ *   VerificationObservation
+ * @typedef {ReturnType<typeof buildContinuityReport>} ContinuityReport
+ */
+
+/**
+ * @param {string[]} lines
+ * @param {string} label
+ * @param {DeclaredCommand[]} commands
+ * @param {"ask" | "never"} [executionPolicy]
+ * @returns {void}
+ */
 export function appendCommandGroup(
   lines,
   label,
@@ -33,6 +49,13 @@ export function appendCommandGroup(
   }
 }
 
+/**
+ * @param {string[]} lines
+ * @param {string} title
+ * @param {StateClaim[]} claims
+ * @param {number} limit
+ * @returns {void}
+ */
 export function appendClaimList(lines, title, claims, limit) {
   lines.push(`### ${title}`);
   if (!claims.length) {
@@ -53,6 +76,11 @@ export function appendClaimList(lines, title, claims, limit) {
   }
 }
 
+/**
+ * @param {string[]} lines
+ * @param {VerificationObservation[]} issues
+ * @returns {void}
+ */
 export function appendIssueList(lines, issues) {
   for (const issue of issues) {
     lines.push(
@@ -67,6 +95,17 @@ export function appendIssueList(lines, issues) {
   }
 }
 
+/**
+ * @param {string[]} lines
+ * @param {unknown} previous
+ * @param {unknown} current
+ * @param {{
+ *   continuity?: ContinuityReport,
+ *   previousWarning?: string | null,
+ *   handoff?: unknown
+ * }} [options]
+ * @returns {void}
+ */
 export function appendStateDiff(lines, previous, current, options = {}) {
   const report = options.continuity?.schema === "kanon-continuity-report-v1"
     ? options.continuity
@@ -91,7 +130,9 @@ export function appendStateDiff(lines, previous, current, options = {}) {
       "- No file-level changes detected from the last Kanon checkpoint."
     );
   }
-  for (const category of ["added", "changed", "contradicted"]) {
+  /** @type {("added" | "changed" | "contradicted")[]} */
+  const categories = ["added", "changed", "contradicted"];
+  for (const category of categories) {
     for (const observation of report.observations[category].slice(0, 8)) {
       const label =
         `${category.slice(0, 1).toUpperCase()}${category.slice(1)}`;
@@ -118,6 +159,13 @@ export function appendStateDiff(lines, previous, current, options = {}) {
   );
 }
 
+/**
+ * @param {string[]} lines
+ * @param {string} title
+ * @param {import("../continuity/engine.js").ContinuityObservation[]}
+ *   observations
+ * @returns {void}
+ */
 function appendContinuityCategory(lines, title, observations) {
   if (!observations.length) {
     return;
@@ -132,6 +180,15 @@ function appendContinuityCategory(lines, title, observations) {
   lines.push("");
 }
 
+/**
+ * @param {{
+ *   claim: string,
+ *   confidence: string,
+ *   trust?: string,
+ *   evidence?: string[]
+ * }} item
+ * @returns {string}
+ */
 export function formatClaim(item) {
   const prefix =
     item.trust === "repository-untrusted"
@@ -140,15 +197,29 @@ export function formatClaim(item) {
   return `- ${prefix}${escapeMarkdownText(item.claim)} (${escapeMarkdownText(item.confidence)})${formatEvidenceRefs(item.evidence)}`;
 }
 
+/**
+ * @param {string[]} [evidence]
+ * @returns {string}
+ */
 export function formatEvidenceRefs(evidence = []) {
   const refs = evidence.filter(Boolean).map(safeEvidenceId);
   return refs.length ? ` [${refs.join(", ")}]` : "";
 }
 
+/**
+ * @param {string[]} lines
+ * @param {unknown} excerpt
+ * @param {number} [indent]
+ * @returns {void}
+ */
 export function appendRepositoryExcerpt(lines, excerpt, indent = 2) {
   lines.push(...repositoryDataBlock(excerpt, indent));
 }
 
+/**
+ * @param {unknown} category
+ * @returns {string}
+ */
 export function labelForCategory(category) {
   if (category === "ci") {
     return "CI";
@@ -159,7 +230,12 @@ export function labelForCategory(category) {
     .join(" ");
 }
 
+/**
+ * @param {string} text
+ * @returns {Set<string>}
+ */
 export function collectEvidenceIds(text) {
+  /** @type {Set<string>} */
   const ids = new Set();
   const pattern = /e_[A-Za-z0-9]{14,64}_[0-9]{3,8}/g;
   let match;

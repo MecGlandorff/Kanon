@@ -5,6 +5,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import {
+  stableRuntimeArtifacts,
+  stableRuntimeCanonicalSources
+} from "../scripts/lib/artifact-files.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -13,6 +17,38 @@ const repoRoot = path.resolve(
 const packageManifest = readJson("package.json");
 const lockfile = readJson("package-lock.json");
 const typeConfig = readJson("tsconfig.json");
+const expectedIncludes = [
+  "bin/kanon.js",
+  "src/analyze.js",
+  "src/analyze/**/*.js",
+  "src/ask.js",
+  "src/ask/**/*.js",
+  "src/cli.js",
+  "src/cli/**/*.js",
+  "src/code-intel.js",
+  "src/code-intel/**/*.js",
+  "src/config.js",
+  "src/continuity/**/*.js",
+  "src/evidence.js",
+  "src/git-runner.js",
+  "src/git.js",
+  "src/path-security.js",
+  "src/persist.js",
+  "src/persistence/**/*.js",
+  "src/readme.js",
+  "src/render.js",
+  "src/render/ask.js",
+  "src/render/brief.js",
+  "src/render/continuity.js",
+  "src/render/shared.js",
+  "src/scanner.js",
+  "src/scanner/**/*.js",
+  "src/trust.js",
+  "src/verify.js",
+  "src/verify/**/*.js",
+  "src/version.js",
+  "src/v1/**/*.js"
+];
 
 test("checked-JS tooling is pinned and development-only", () => {
   assert.deepEqual(packageManifest.devDependencies, {
@@ -43,7 +79,11 @@ test("strict no-emit checked-JS options are non-decorative", () => {
   for (const option of [
     "allowJs",
     "checkJs",
+    "exactOptionalPropertyTypes",
+    "forceConsistentCasingInFileNames",
     "noEmit",
+    "noFallthroughCasesInSwitch",
+    "noImplicitReturns",
     "noUncheckedIndexedAccess",
     "strict",
     "strictNullChecks",
@@ -51,69 +91,22 @@ test("strict no-emit checked-JS options are non-decorative", () => {
   ]) {
     assert.equal(options[option], true, `${option} must remain enabled`);
   }
-  assert.deepEqual(typeConfig.include, [
-    "src/continuity/**/*.js",
-    "src/v1/**/*.js"
-  ]);
+  assert.deepEqual(typeConfig.include, expectedIncludes);
   assert.equal(typeConfig.exclude, undefined);
   assert.equal(options.skipLibCheck, undefined);
 });
 
-test("every canonical v1 production module is in the strict project", () => {
-  const productionFiles = listJavaScriptFiles(path.join(repoRoot, "src", "v1"));
+test("every shipped stable runtime module has one checked canonical source", () => {
+  const mappings = stableRuntimeArtifacts(repoRoot);
+  const sources = stableRuntimeCanonicalSources(repoRoot);
+  const targets = mappings.map(([, target]) => target).sort();
+  assert.equal(mappings.length, 86);
+  assert.equal(sources.length, 86);
+  assert.equal(new Set(targets).size, 86);
   assert.deepEqual(
-    productionFiles,
-    [
-      "src/v1/adapters/claude.js",
-      "src/v1/adapters/codex.js",
-      "src/v1/adapters/shared.js",
-      "src/v1/bin/kanon.js",
-      "src/v1/cli.js",
-      "src/v1/core/build-metadata.js",
-      "src/v1/core/handoff-store.js",
-      "src/v1/core/handoff.js",
-      "src/v1/core/plugin-data.js",
-      "src/v1/core/receipt-store.js",
-      "src/v1/core/receipt.js",
-      "src/v1/core/steer-state.js",
-      "src/v1/core/trust.js",
-      "src/v1/registry/cache.js",
-      "src/v1/registry/deprecation.js",
-      "src/v1/registry/sanitize.js",
-      "src/v1/registry/transport.js",
-      "src/v1/repository/git.js",
-      "src/v1/repository/inspect.js",
-      "src/v1/repository/read.js",
-      "src/v1/skills/aswitch.js",
-      "src/v1/skills/invoke.js",
-      "src/v1/skills/orient.js",
-      "src/v1/skills/resume.js",
-      "src/v1/skills/status.js",
-      "src/v1/skills/steer.js",
-      "src/v1/skills/verify.js"
-    ]
+    targets,
+    listJavaScriptFiles(path.join(repoRoot, "runtime"))
   );
-  for (const relative of productionFiles) {
-    const source = fs.readFileSync(path.join(repoRoot, relative), "utf8");
-    assert.match(source, /\/\*\*[\s\S]*@(?:param|returns|typedef)/);
-    assert.doesNotMatch(
-      source,
-      /@ts-(?:ignore|nocheck)|@(?:param|returns|type)\s*\{\s*any\b/
-    );
-  }
-  const continuityFiles = listJavaScriptFiles(
-    path.join(repoRoot, "src", "continuity")
-  );
-  assert.deepEqual(continuityFiles, ["src/continuity/engine.js"]);
-  const checkedProductionFiles = [...productionFiles, ...continuityFiles];
-  for (const relative of continuityFiles) {
-    const source = fs.readFileSync(path.join(repoRoot, relative), "utf8");
-    assert.match(source, /\/\*\*[\s\S]*@(?:param|returns|typedef)/);
-    assert.doesNotMatch(
-      source,
-      /@ts-(?:ignore|nocheck)|@(?:param|returns|type)\s*\{\s*any\b/
-    );
-  }
 
   const execution = spawnSync(
     process.execPath,
@@ -139,11 +132,22 @@ test("every canonical v1 production module is in the strict project", () => {
       .filter(Boolean)
       .map((file) => path.resolve(file))
   );
-  for (const relative of checkedProductionFiles) {
+  for (const [sourceRelative, targetRelative] of mappings) {
+    const sourcePath = path.join(repoRoot, sourceRelative);
+    const targetPath = path.join(repoRoot, targetRelative);
     assert.equal(
-      checked.has(path.join(repoRoot, relative)),
+      checked.has(sourcePath),
       true,
-      `${relative} must be checked`
+      `${sourceRelative} must be strictly checked`
+    );
+    assert.deepEqual(
+      fs.readFileSync(targetPath),
+      fs.readFileSync(sourcePath),
+      `${targetRelative} must be a byte-equivalent generated mirror`
+    );
+    assertNoUncheckedTypeEscapes(
+      sourceRelative,
+      fs.readFileSync(sourcePath, "utf8")
     );
   }
   assert.equal(
@@ -154,47 +158,7 @@ test("every canonical v1 production module is in the strict project", () => {
   );
 });
 
-test("historical compatibility stays outside the expanded stable v1 type claim", () => {
-  const legacyCompatibilityModules = [
-    "src/cli/index.js",
-    "src/index.js",
-    "src/persist.js",
-    "src/persistence/state.js",
-    "src/render/continuity.js",
-    "src/render/shared.js",
-    "src/scanner/scan.js"
-  ];
-  assert.deepEqual(typeConfig.include, [
-    "src/continuity/**/*.js",
-    "src/v1/**/*.js"
-  ]);
-  const execution = spawnSync(
-    process.execPath,
-    [
-      path.join(repoRoot, "node_modules", "typescript", "bin", "tsc"),
-      "--project",
-      path.join(repoRoot, "tsconfig.json"),
-      "--pretty",
-      "false",
-      "--listFilesOnly"
-    ],
-    {
-      cwd: repoRoot,
-      encoding: "utf8",
-      timeout: 30_000,
-      maxBuffer: 8 * 1024 * 1024
-    }
-  );
-  assert.equal(execution.status, 0, execution.stderr);
-  const checked = new Set(
-    execution.stdout
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .map((file) => path.resolve(file))
-  );
-  for (const relative of legacyCompatibilityModules) {
-    assert.equal(checked.has(path.join(repoRoot, relative)), false, relative);
-  }
+test("typed compatibility routes retain the approved public surface", () => {
   const metadata = readJson("runtime/build-metadata.json");
   assert.deepEqual(metadata.public_capabilities.skills, [
     "kanon",
@@ -250,6 +214,21 @@ test("release allowlist excludes type tooling and development metadata", () => {
 
 function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(repoRoot, relative), "utf8"));
+}
+
+function assertNoUncheckedTypeEscapes(relative, source) {
+  assert.doesNotMatch(source, /@ts-(?:ignore|nocheck)/, relative);
+  for (const match of source.matchAll(
+    /@(?:param|returns|type|typedef)\s*\{([^}\n]+)\}/g
+  )) {
+    const expression = (match[1] || "")
+      .replace(/"[^"]*"|'[^']*'/g, "");
+    assert.doesNotMatch(
+      expression,
+      /\bany\b/,
+      `${relative} must not use explicit any`
+    );
+  }
 }
 
 function listJavaScriptFiles(directory) {

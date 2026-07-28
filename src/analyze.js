@@ -15,6 +15,7 @@ import { selectRootReadme } from "./readme.js";
 import { verifyReadme } from "./verify.js";
 import { STATE_SCHEMA_VERSION, VERSION } from "./version.js";
 import { sanitizeRepositoryData } from "./trust.js";
+import { validatePersistedState } from "./persistence/state.js";
 import { buildCurrentState } from "./analyze/current-state.js";
 import { detectEntrypoints, detectTodos } from "./analyze/entrypoints.js";
 import { detectCommands, detectImportantFiles } from "./analyze/findings.js";
@@ -37,6 +38,60 @@ import {
   normalizeRequestedPath
 } from "./analyze/utils.js";
 
+/**
+ * @typedef {import("./scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {import("./scanner/read.js").ReadOptions} ReadOptions
+ * @typedef {{
+ *   runId?: string,
+ *   scan?: import("./scanner/scan.js").ScanOptions,
+ *   readmePath?: unknown,
+ *   inspectGit?: boolean
+ * }} AnalyzeOptions
+ * @typedef {{
+ *   readmeTarget: string | null,
+ *   readmeFile: ScannedFile | null,
+ *   readmeText: string,
+ *   readmeEvidence: string | null,
+ *   readmeFailure: import("./scanner/read.js").ReadFailure | null
+ * }} ReadmeInfo
+ * @typedef {{
+ *   resolvedRoot: string,
+ *   repoName: string,
+ *   languages: string[],
+ *   scanned: ReturnType<typeof scanRepo>,
+ *   evidence: EvidenceBook,
+ *   git: ReturnType<typeof inspectGit>,
+ *   purpose: import("./analyze/metadata.js").Purpose,
+ *   commands: import("./analyze/findings.js").DeclaredCommands,
+ *   importantFiles: {
+ *     path: string,
+ *     reason: string,
+ *     fan_in: number,
+ *     evidence: string[]
+ *   }[],
+ *   codeIntel: ReturnType<typeof inspectRepoCode>,
+ *   tests: import("./analyze/project-signals.js").TestSignal,
+ *   ci: import("./analyze/project-signals.js").ProjectSignal,
+ *   deploy: import("./analyze/project-signals.js").ProjectSignal,
+ *   release: import("./analyze/project-signals.js").ProjectSignal,
+ *   todos: import("./analyze/entrypoints.js").TodoObservation[],
+ *   currentState: import("./analyze/current-state.js").CurrentState,
+ *   verification: import("./verify/index.js").VerificationResult,
+ *   configuration: {
+ *     found: boolean,
+ *     valid: boolean,
+ *     warning: string | null,
+ *     invalid_field: string | null,
+ *     command_execution: "ask" | "never",
+ *     evidence: string[]
+ *   }
+ * }} BuildStateInput
+ */
+
+/**
+ * @param {string} [root]
+ * @param {AnalyzeOptions} [options]
+ */
 export function analyzeRepo(root = process.cwd(), options = {}) {
   const requestedRoot = path.resolve(root);
   const evidence = new EvidenceBook(options.runId);
@@ -65,6 +120,7 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
   const readBudget = createReadBudget(
     effectiveScanOptions.maxTotalTextBytes
   );
+  /** @type {ReadOptions} */
   const readOptions = {
     budget: readBudget,
     diagnostics: scanned.diagnostics,
@@ -170,7 +226,10 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
     evidence,
     scan: scanned.diagnostics,
     readOptions,
-    findTerm: (term, opts = {}) =>
+    findTerm: (
+      /** @type {unknown} */ term,
+      /** @type {import("./scanner/read.js").FindTextOptions} */ opts = {}
+    ) =>
       findTextReferences(resolvedRoot, files, term, {
         ...opts,
         ...readOptions
@@ -193,31 +252,37 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
   });
   scanned.diagnostics.total_text_bytes_read = readBudget.bytesRead;
   const repoName =
-    packageInfo?.json?.name ||
+    packageInfo?.name ||
     pyprojectInfo?.name ||
     path.basename(resolvedRoot);
+  const sanitizedState = sanitizeRepositoryData(buildState({
+    resolvedRoot,
+    repoName,
+    languages,
+    scanned,
+    evidence,
+    git,
+    purpose,
+    commands,
+    importantFiles,
+    codeIntel,
+    tests,
+    ci,
+    deploy,
+    release,
+    todos,
+    currentState,
+    verification,
+    configuration
+  }));
+  if (!isBuiltState(sanitizedState)) {
+    throw new Error(
+      "The sanitized analysis state failed its runtime schema boundary."
+    );
+  }
   return {
     root: resolvedRoot,
-    state: sanitizeRepositoryData(buildState({
-      resolvedRoot,
-      repoName,
-      languages,
-      scanned,
-      evidence,
-      git,
-      purpose,
-      commands,
-      importantFiles,
-      codeIntel,
-      tests,
-      ci,
-      deploy,
-      release,
-      todos,
-      currentState,
-      verification,
-      configuration
-    })),
+    state: sanitizedState,
     evidence: evidence.records,
     inspection: {
       files,
@@ -226,10 +291,18 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
   };
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {unknown} requestedPath
+ * @param {EvidenceBook} evidence
+ * @param {ReadOptions} readOptions
+ * @returns {ReadmeInfo}
+ */
 function readReadme(root, files, requestedPath, evidence, readOptions) {
   const readmeTarget = normalizeRequestedPath(requestedPath);
   let readmeFile = readmeTarget
-    ? findByPath(files, readmeTarget)
+    ? findByPath(files, readmeTarget) ?? null
     : selectRootReadme(files);
   let readmeResult = readmeFile
     ? readTextResult(root, readmeFile.path, readOptions)
@@ -242,7 +315,10 @@ function readReadme(root, files, requestedPath, evidence, readOptions) {
         path: readmeTarget,
         basename: path.posix.basename(readmeTarget),
         extension: path.posix.extname(readmeTarget).toLowerCase(),
-        text: true
+        size: readmeResult.size,
+        mtime_ms: null,
+        text: true,
+        sha256: null
       };
       readmeText = readmeResult.text;
     }
@@ -266,6 +342,9 @@ function readReadme(root, files, requestedPath, evidence, readOptions) {
   };
 }
 
+/**
+ * @param {BuildStateInput} input
+ */
 function buildState(input) {
   return {
     version: VERSION,
@@ -309,4 +388,12 @@ function buildState(input) {
     evidence_count: input.evidence.records.length,
     schema_version: STATE_SCHEMA_VERSION
   };
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is ReturnType<typeof buildState>}
+ */
+function isBuiltState(value) {
+  return validatePersistedState(value).valid;
 }

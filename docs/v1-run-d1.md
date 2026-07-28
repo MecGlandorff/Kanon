@@ -72,5 +72,178 @@ listed tests and the complete validation suite pass.
   scope. Generated synchronization, JavaScript syntax checks, installed
   exact-tarball conformance on the current host, and `git diff --check` passed.
   Raw-diff review found no remaining slice-14 P0 or P1.
-- Slice 15: not started in this record until slice 14 is accepted and
-  committed separately.
+- Slice 15: accepted. The focused type, artifact, compatibility, adversarial,
+  and scope command reported 129 tests: 127 passed, 0 failed, and 2 skipped
+  (PowerShell unavailable and the Windows-only junction proof). The complete
+  `npm run validate` command reported 216 tests: 214 passed, 0 failed, and 2
+  skipped for the same evidence-specific reasons. Strict checked-JavaScript
+  validation reported zero diagnostics across all 86 shipped canonical
+  runtime sources. Generated synchronization, JavaScript syntax, JSON parsing,
+  deterministic packing, installed-artifact conformance, and
+  `git diff --check` passed. Raw-diff review found no remaining slice-15 P0 or
+  P1.
+
+## Slice 15 stable runtime inventory
+
+Every installed executable JavaScript module maps to exactly one canonical
+source. `test/v1-types.test.js` requires all 86 canonical sources to appear in
+the strict TypeScript project, requires each generated runtime target to be
+byte-equivalent to its canonical source, and requires the target set to equal
+the complete JavaScript inventory under `runtime/`. The inventory comprises 27
+v1 modules and 59 compatibility modules.
+
+| Installed runtime module | Strictly checked canonical source |
+| --- | --- |
+| `runtime/adapters/claude.js` | `src/v1/adapters/claude.js` |
+| `runtime/adapters/codex.js` | `src/v1/adapters/codex.js` |
+| `runtime/adapters/shared.js` | `src/v1/adapters/shared.js` |
+| `runtime/bin/kanon-v1.js` | `src/v1/bin/kanon.js` |
+| `runtime/bin/kanon.js` | `bin/kanon.js` |
+| `runtime/cli.js` | `src/v1/cli.js` |
+| `runtime/core/build-metadata.js` | `src/v1/core/build-metadata.js` |
+| `runtime/core/handoff-store.js` | `src/v1/core/handoff-store.js` |
+| `runtime/core/handoff.js` | `src/v1/core/handoff.js` |
+| `runtime/core/plugin-data.js` | `src/v1/core/plugin-data.js` |
+| `runtime/core/receipt-store.js` | `src/v1/core/receipt-store.js` |
+| `runtime/core/receipt.js` | `src/v1/core/receipt.js` |
+| `runtime/core/steer-state.js` | `src/v1/core/steer-state.js` |
+| `runtime/core/trust.js` | `src/v1/core/trust.js` |
+| `runtime/registry/cache.js` | `src/v1/registry/cache.js` |
+| `runtime/registry/deprecation.js` | `src/v1/registry/deprecation.js` |
+| `runtime/registry/sanitize.js` | `src/v1/registry/sanitize.js` |
+| `runtime/registry/transport.js` | `src/v1/registry/transport.js` |
+| `runtime/repository/git.js` | `src/v1/repository/git.js` |
+| `runtime/repository/inspect.js` | `src/v1/repository/inspect.js` |
+| `runtime/repository/read.js` | `src/v1/repository/read.js` |
+| `runtime/skills/aswitch.js` | `src/v1/skills/aswitch.js` |
+| `runtime/skills/invoke.js` | `src/v1/skills/invoke.js` |
+| `runtime/skills/orient.js` | `src/v1/skills/orient.js` |
+| `runtime/skills/resume.js` | `src/v1/skills/resume.js` |
+| `runtime/skills/status.js` | `src/v1/skills/status.js` |
+| `runtime/skills/steer.js` | `src/v1/skills/steer.js` |
+| `runtime/skills/verify.js` | `src/v1/skills/verify.js` |
+| `runtime/src/analyze.js` | `src/analyze.js` |
+| `runtime/src/analyze/current-state.js` | `src/analyze/current-state.js` |
+| `runtime/src/analyze/entrypoints.js` | `src/analyze/entrypoints.js` |
+| `runtime/src/analyze/findings.js` | `src/analyze/findings.js` |
+| `runtime/src/analyze/metadata.js` | `src/analyze/metadata.js` |
+| `runtime/src/analyze/project-signals.js` | `src/analyze/project-signals.js` |
+| `runtime/src/analyze/utils.js` | `src/analyze/utils.js` |
+| `runtime/src/ask.js` | `src/ask.js` |
+| `runtime/src/ask/intent.js` | `src/ask/intent.js` |
+| `runtime/src/cli.js` | `src/cli.js` |
+| `runtime/src/cli/args.js` | `src/cli/args.js` |
+| `runtime/src/cli/index.js` | `src/cli/index.js` |
+| `runtime/src/cli/io.js` | `src/cli/io.js` |
+| `runtime/src/cli/todo.js` | `src/cli/todo.js` |
+| `runtime/src/code-intel.js` | `src/code-intel.js` |
+| `runtime/src/code-intel/command-utils.js` | `src/code-intel/command-utils.js` |
+| `runtime/src/code-intel/commands.js` | `src/code-intel/commands.js` |
+| `runtime/src/code-intel/constants.js` | `src/code-intel/constants.js` |
+| `runtime/src/code-intel/conventional-commands.js` | `src/code-intel/conventional-commands.js` |
+| `runtime/src/code-intel/curate-common.js` | `src/code-intel/curate-common.js` |
+| `runtime/src/code-intel/curate.js` | `src/code-intel/curate.js` |
+| `runtime/src/code-intel/documented-commands.js` | `src/code-intel/documented-commands.js` |
+| `runtime/src/code-intel/entrypoints.js` | `src/code-intel/entrypoints.js` |
+| `runtime/src/code-intel/heuristics.js` | `src/code-intel/heuristics.js` |
+| `runtime/src/code-intel/imports.js` | `src/code-intel/imports.js` |
+| `runtime/src/code-intel/index.js` | `src/code-intel/index.js` |
+| `runtime/src/code-intel/manifest-commands.js` | `src/code-intel/manifest-commands.js` |
+| `runtime/src/code-intel/rank.js` | `src/code-intel/rank.js` |
+| `runtime/src/code-intel/shared.js` | `src/code-intel/shared.js` |
+| `runtime/src/config.js` | `src/config.js` |
+| `runtime/src/continuity/engine.js` | `src/continuity/engine.js` |
+| `runtime/src/evidence.js` | `src/evidence.js` |
+| `runtime/src/git-runner.js` | `src/git-runner.js` |
+| `runtime/src/git.js` | `src/git.js` |
+| `runtime/src/path-security.js` | `src/path-security.js` |
+| `runtime/src/persist.js` | `src/persist.js` |
+| `runtime/src/persistence/safe-fs.js` | `src/persistence/safe-fs.js` |
+| `runtime/src/persistence/state-fields.js` | `src/persistence/state-fields.js` |
+| `runtime/src/persistence/state.js` | `src/persistence/state.js` |
+| `runtime/src/readme.js` | `src/readme.js` |
+| `runtime/src/render.js` | `src/render.js` |
+| `runtime/src/render/ask.js` | `src/render/ask.js` |
+| `runtime/src/render/brief.js` | `src/render/brief.js` |
+| `runtime/src/render/continuity.js` | `src/render/continuity.js` |
+| `runtime/src/render/shared.js` | `src/render/shared.js` |
+| `runtime/src/scanner.js` | `src/scanner.js` |
+| `runtime/src/scanner/ignore.js` | `src/scanner/ignore.js` |
+| `runtime/src/scanner/policy.js` | `src/scanner/policy.js` |
+| `runtime/src/scanner/read.js` | `src/scanner/read.js` |
+| `runtime/src/scanner/scan.js` | `src/scanner/scan.js` |
+| `runtime/src/scanner/shared.js` | `src/scanner/shared.js` |
+| `runtime/src/trust.js` | `src/trust.js` |
+| `runtime/src/verify.js` | `src/verify.js` |
+| `runtime/src/verify/claims.js` | `src/verify/claims.js` |
+| `runtime/src/verify/commands.js` | `src/verify/commands.js` |
+| `runtime/src/verify/index.js` | `src/verify/index.js` |
+| `runtime/src/verify/language.js` | `src/verify/language.js` |
+| `runtime/src/version.js` | `src/version.js` |
+
+The strict project enables `allowJs`, `checkJs`, `strict`,
+`strictNullChecks`, `useUnknownInCatchVariables`,
+`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noImplicitReturns`, `noFallthroughCasesInSwitch`, and `noEmit`. Runtime
+mirrors stay outside the project only because byte equivalence to the checked
+source is a deterministic build invariant.
+
+## Slice 15 correction and simplicity review
+
+- Strict typing began with 952 diagnostics across 50 compatibility files,
+  including 723 implicit-parameter diagnostics. The ratchet was completed
+  without `any`, `@ts-ignore`, `@ts-nocheck`, transpilation, runtime
+  dependencies, or an unchecked compatibility escape hatch.
+- Hostile compatibility state and option values now require own plain data
+  properties. Getter-bearing and proxy objects fail closed without invoking
+  user-defined getters or proxy traps.
+- Package export discovery now has explicit nesting and entry budgets, so
+  adversarial recursive metadata cannot consume unbounded traversal.
+- Values constructed by compatibility analysis are validated again before
+  crossing the persistence boundary. Invalid internal state is an explicit
+  failure rather than an unchecked write.
+- The 1,615-line Run C handoff core was reviewed helper-by-helper. Every
+  private helper is referenced and all eight exports are consumed by
+  `aswitch`; no dead validator, duplicate state model, or unused transition
+  was found. Schema-specific validation was retained because it binds
+  checksums, approvals, writes, and receiver classifications to distinct
+  measured failure modes. Repeated literal casts and two lookup constants
+  were removed, list normalization now narrows directly, and canonical
+  serialization rejects non-plain objects. No line-count-only refactor was
+  performed.
+
+## Slice 15 certification evidence
+
+- Focused tests: 129 total, 127 passed, 0 failed, 2 skipped.
+- Complete validation: 216 total, 214 passed, 0 failed, 2 skipped.
+- Strict checked JavaScript: 86 shipped canonical runtime modules, zero
+  diagnostics.
+- Generated artifact synchronization: 112 canonical generator outputs
+  synchronized; 86 runtime JavaScript mirrors are byte-equivalent to checked
+  sources.
+- Syntax and data parsing: 224 tracked JavaScript files passed `node --check`;
+  24 tracked JSON files parsed successfully.
+- Deterministic package: two independent 131-file packages produced identical
+  SHA-256
+  `4fdf74b10acefb3d8cef3bffbbdf9c9ee3f3cc0df85940d825136f9ac075218e`.
+- Installed artifact: all 41 conformance checks passed on Node 25.8.1,
+  macOS arm64, including all six stable skills, approved compatibility
+  wrappers, zero runtime dependencies, hardened Bash execution, and forbidden
+  surface exclusions.
+
+## Residual classifications
+
+- Known: the current macOS arm64 host passed Node, Git, Bash, generation,
+  strict typing, deterministic package, installation, and conformance proofs.
+- Unknown: native Ubuntu, Windows, and PowerShell execution were not observed
+  in this local run. Their declared CI jobs are not transferred as runtime
+  evidence.
+- Unknown: actual Codex and Claude plugin-data and lifecycle wiring remain
+  unproven; synthetic adapter context does not make persisted receipts
+  generally Current.
+- Stale / suspicious: none introduced by slices 14 or 15.
+- Suggested: run the declared cross-platform CI only after a later,
+  separately authorized candidate-freeze decision.
+- Residual: same-user path replacement between validation and use remains
+  where portable directory-file-descriptor-relative protection is
+  unavailable.

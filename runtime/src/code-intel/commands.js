@@ -9,6 +9,29 @@ import { addConventionalCommands } from "./conventional-commands.js";
 import { selectCommand } from "./command-utils.js";
 import { registeredHeuristic } from "./heuristics.js";
 
+/**
+ * @typedef {import("./command-utils.js").CommandCandidate} CommandCandidate
+ * @typedef {import("./shared.js").CodeSignal} CodeSignal
+ * @typedef {import("./shared.js").TextCache} TextCache
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {{
+ *   run: CommandCandidate[],
+ *   test: CommandCandidate[],
+ *   build: CommandCandidate[],
+ *   dev: CommandCandidate[]
+ * }} CommandCandidates
+ */
+
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {Map<string, ScannedFile>} fileMap
+ * @param {TextCache} texts
+ * @param {{
+ *   packageJson: unknown,
+ *   signals: Map<string, CodeSignal[]>
+ * }} options
+ */
 export function detectRepoCommands(root, files, fileMap, texts, options) {
   for (const heuristic of [
     "manifest-command",
@@ -17,6 +40,7 @@ export function detectRepoCommands(root, files, fileMap, texts, options) {
   ]) {
     registeredHeuristic(heuristic);
   }
+  /** @type {CommandCandidates} */
   const candidates = { run: [], test: [], build: [], dev: [] };
   const packageManager = detectPackageManager(files, options.packageJson);
   if (fileMap.has("go.mod")) {

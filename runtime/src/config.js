@@ -3,6 +3,59 @@ import { CONFIG_SCHEMA_VERSION } from "./version.js";
 
 const MAX_CONFIG_BYTES = 64 * 1024;
 
+/**
+ * @typedef {{
+ *   version: number,
+ *   command_execution: "ask" | "never",
+ *   scan: {
+ *     max_files: number,
+ *     max_entries: number,
+ *     max_file_bytes: number,
+ *     max_total_hash_bytes: number,
+ *     max_total_text_bytes: number,
+ *     max_elapsed_ms: number,
+ *     respect_git_ignore: boolean
+ *   },
+ *   git: {
+ *     timeout_ms: number,
+ *     max_output_bytes: number
+ *   },
+ *   inputs: {
+ *     max_state_bytes: number,
+ *     max_todo_bytes: number,
+ *     max_ignore_bytes: number
+ *   },
+ *   persistence: {
+ *     max_evidence_bytes: number,
+ *     max_evidence_records: number,
+ *     max_snapshots: number
+ *   }
+ * }} KanonConfig
+ * @typedef {{
+ *   maxFiles: number,
+ *   maxEntries: number,
+ *   maxFileBytes: number,
+ *   maxTotalHashBytes: number,
+ *   maxTotalTextBytes: number,
+ *   maxElapsedMs: number,
+ *   maxIgnoreBytes: number,
+ *   gitTimeoutMs: number,
+ *   gitMaxOutputBytes: number,
+ *   useGitIgnore: boolean
+ * }} EffectiveScanOptions
+ * @typedef {(value: unknown) => string | null} FieldRule
+ * @typedef {{
+ *   valid: true,
+ *   field: null,
+ *   reason: null
+ * } | {
+ *   valid: false,
+ *   field: string,
+ *   reason: string
+ * }} ConfigValidation
+ */
+
+/** @type {KanonConfig} */
 export const DEFAULT_CONFIG = deepFreeze({
   version: CONFIG_SCHEMA_VERSION,
   command_execution: "ask",
@@ -31,6 +84,7 @@ export const DEFAULT_CONFIG = deepFreeze({
   }
 });
 
+/** @type {Map<string, FieldRule>} */
 const FIELD_RULES = new Map([
   ["version", integerRule(CONFIG_SCHEMA_VERSION, CONFIG_SCHEMA_VERSION)],
   ["command_execution", enumRule(["ask", "never"])],
@@ -60,17 +114,25 @@ const FIELD_RULES = new Map([
   ["persistence.max_snapshots", integerRule(1, 1_000)]
 ]);
 
-const OBJECT_FIELDS = new Set([
+/** @type {("scan" | "git" | "inputs" | "persistence")[]} */
+const OBJECT_FIELDS = [
   "scan",
   "git",
   "inputs",
   "persistence"
-]);
+];
 
+/**
+ * @param {string} root
+ * @returns {KanonConfig}
+ */
 export function readKanonConfig(root) {
   return inspectKanonConfig(root).config;
 }
 
+/**
+ * @param {string} root
+ */
 export function inspectKanonConfig(root) {
   const read = readTextResult(root, ".kanon/config.json", {
     limit: MAX_CONFIG_BYTES + 1,
@@ -101,6 +163,7 @@ export function inspectKanonConfig(root) {
     );
   }
 
+  /** @type {unknown} */
   let parsed;
   try {
     parsed = JSON.parse(read.text);
@@ -130,6 +193,10 @@ export function inspectKanonConfig(root) {
   };
 }
 
+/**
+ * @param {unknown} value
+ * @returns {ConfigValidation}
+ */
 export function validateConfig(value) {
   if (!isPlainObject(value)) {
     return invalid(".kanon/config.json", "Its root value must be an object.");
@@ -139,7 +206,7 @@ export function validateConfig(value) {
   }
 
   for (const [key, fieldValue] of Object.entries(value)) {
-    if (OBJECT_FIELDS.has(key)) {
+    if (isObjectField(key)) {
       if (!isPlainObject(fieldValue)) {
         return invalid(key, `${key} must be an object.`);
       }
@@ -173,37 +240,67 @@ export function validateConfig(value) {
   return { valid: true, field: null, reason: null };
 }
 
+/**
+ * @param {KanonConfig | null | undefined} config
+ * @param {import("./scanner/scan.js").ScanOptions} [overrides]
+ * @returns {EffectiveScanOptions}
+ */
 export function scanOptionsFromConfig(config, overrides = {}) {
   const effective = config || DEFAULT_CONFIG;
   return {
-    maxFiles: effective.scan.max_files,
-    maxEntries: effective.scan.max_entries,
-    maxFileBytes: effective.scan.max_file_bytes,
-    maxTotalHashBytes: effective.scan.max_total_hash_bytes,
-    maxTotalTextBytes: effective.scan.max_total_text_bytes,
-    maxElapsedMs: effective.scan.max_elapsed_ms,
-    maxIgnoreBytes: effective.inputs.max_ignore_bytes,
-    gitTimeoutMs: effective.git.timeout_ms,
-    gitMaxOutputBytes: effective.git.max_output_bytes,
-    useGitIgnore: effective.scan.respect_git_ignore,
-    ...overrides
+    maxFiles: overrides.maxFiles ?? effective.scan.max_files,
+    maxEntries: overrides.maxEntries ?? effective.scan.max_entries,
+    maxFileBytes:
+      overrides.maxFileBytes ?? effective.scan.max_file_bytes,
+    maxTotalHashBytes:
+      overrides.maxTotalHashBytes ?? effective.scan.max_total_hash_bytes,
+    maxTotalTextBytes:
+      overrides.maxTotalTextBytes ?? effective.scan.max_total_text_bytes,
+    maxElapsedMs:
+      overrides.maxElapsedMs ?? effective.scan.max_elapsed_ms,
+    maxIgnoreBytes:
+      overrides.maxIgnoreBytes ?? effective.inputs.max_ignore_bytes,
+    gitTimeoutMs:
+      overrides.gitTimeoutMs ?? effective.git.timeout_ms,
+    gitMaxOutputBytes:
+      overrides.gitMaxOutputBytes ?? effective.git.max_output_bytes,
+    useGitIgnore:
+      overrides.useGitIgnore ?? effective.scan.respect_git_ignore
   };
 }
 
+/**
+ * @param {unknown} parsed
+ * @returns {KanonConfig}
+ */
 function mergeConfig(parsed) {
   const output = cloneDefaults();
-  output.version = parsed.version;
-  if (parsed.command_execution !== undefined) {
+  if (!isPlainObject(parsed)) {
+    return output;
+  }
+  if (typeof parsed.version === "number") {
+    output.version = parsed.version;
+  }
+  if (
+    parsed.command_execution === "ask" ||
+    parsed.command_execution === "never"
+  ) {
     output.command_execution = parsed.command_execution;
   }
   for (const key of OBJECT_FIELDS) {
-    if (parsed[key]) {
-      Object.assign(output[key], parsed[key]);
+    const section = parsed[key];
+    if (isPlainObject(section)) {
+      Object.assign(output[key], section);
     }
   }
   return output;
 }
 
+/**
+ * @param {string} field
+ * @param {string} reason
+ * @param {string} sourceStatus
+ */
 function invalidConfig(field, reason, sourceStatus) {
   return {
     config: cloneDefaults(),
@@ -217,14 +314,26 @@ function invalidConfig(field, reason, sourceStatus) {
   };
 }
 
+/**
+ * @param {number} minimum
+ * @param {number} maximum
+ * @returns {FieldRule}
+ */
 function integerRule(minimum, maximum) {
   return (value) => (
-    Number.isInteger(value) && value >= minimum && value <= maximum
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
       ? null
       : `Expected an integer between ${minimum} and ${maximum}.`
   );
 }
 
+/**
+ * @param {readonly unknown[]} values
+ * @returns {FieldRule}
+ */
 function enumRule(values) {
   return (value) => (
     values.includes(value)
@@ -233,20 +342,35 @@ function enumRule(values) {
   );
 }
 
+/**
+ * @returns {FieldRule}
+ */
 function booleanRule() {
   return (value) => (
     typeof value === "boolean" ? null : "Expected a boolean."
   );
 }
 
+/**
+ * @param {string} field
+ * @param {string} reason
+ * @returns {ConfigValidation}
+ */
 function invalid(field, reason) {
   return { valid: false, field, reason };
 }
 
+/**
+ * @returns {KanonConfig}
+ */
 function cloneDefaults() {
   return structuredClone(DEFAULT_CONFIG);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
 function isPlainObject(value) {
   return Boolean(
     value &&
@@ -256,18 +380,47 @@ function isPlainObject(value) {
   );
 }
 
+/**
+ * @param {Record<string, unknown>} value
+ * @param {string} field
+ * @returns {boolean}
+ */
 function hasField(value, field) {
   const [parent, child] = field.split(".");
-  return child
-    ? Object.hasOwn(value[parent] || {}, child)
-    : Object.hasOwn(value, parent);
+  if (parent === undefined) {
+    return false;
+  }
+  if (child === undefined) {
+    return Object.hasOwn(value, parent);
+  }
+  const section = value[parent];
+  return isPlainObject(section) && Object.hasOwn(section, child);
 }
 
+/**
+ * @param {string} value
+ * @returns {value is "scan" | "git" | "inputs" | "persistence"}
+ */
+function isObjectField(value) {
+  return (
+    value === "scan" ||
+    value === "git" ||
+    value === "inputs" ||
+    value === "persistence"
+  );
+}
+
+/**
+ * @template {object} T
+ * @param {T} value
+ * @returns {T}
+ */
 function deepFreeze(value) {
   for (const nested of Object.values(value)) {
     if (nested && typeof nested === "object") {
       deepFreeze(nested);
     }
   }
-  return Object.freeze(value);
+  Object.freeze(value);
+  return value;
 }

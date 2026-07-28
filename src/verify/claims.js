@@ -3,7 +3,14 @@ import { excerptAround, hasAffirmedMatch } from "./language.js";
 const CONTAINER_CLAIM =
   /\bdocker(?:file)?\b|\bdocker\s+compose\b|\bcontainer images?\b|\bcontaineri[sz]ed\b|\b(?:run|deploy|ship|support)\w*\s+(?:\w+\s+){0,2}containers?\b/i;
 
+/**
+ * @param {import("./index.js").VerificationContext & {
+ *   readmeFile: import("../scanner/read.js").ScannedFile
+ * }} context
+ * @returns {import("./index.js").VerificationObservation[]}
+ */
 export function observeFeatureClaims(context) {
+  /** @type {import("./index.js").VerificationObservation[]} */
   const unknowns = [];
   const text = context.readmeText;
   const readmePath = context.readmeFile.path;
@@ -81,6 +88,14 @@ export function observeFeatureClaims(context) {
   return unknowns;
 }
 
+/**
+ * @param {import("./index.js").VerificationContext} context
+ * @param {string} path
+ * @param {string} claim
+ * @param {string} observation
+ * @param {string} excerpt
+ * @returns {import("./index.js").VerificationObservation}
+ */
 function nonObservation(context, path, claim, observation, excerpt) {
   const evidence = context.evidence.add(
     "file",

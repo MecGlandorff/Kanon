@@ -3,13 +3,28 @@ import { IGNORED_DIRS } from "./policy.js";
 import { readTextResult } from "./read.js";
 import { normalizeRelPath } from "./shared.js";
 
+/**
+ * @typedef {{
+ *   negated: boolean,
+ *   regex: RegExp
+ * }} IgnoreRule
+ */
+
+/**
+ * @param {string} root
+ * @param {{timeoutMs?: number, maxOutputBytes?: number}} [options]
+ */
 export function listGitVisibleFiles(root, options = {}) {
   const result = runGit(
     root,
     ["ls-files", "-co", "--exclude-standard", "-z"],
     {
-      timeoutMs: options.timeoutMs,
-      maxOutputBytes: options.maxOutputBytes
+      ...(options.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: options.timeoutMs }),
+      ...(options.maxOutputBytes === undefined
+        ? {}
+        : { maxOutputBytes: options.maxOutputBytes })
     }
   );
   if (!result.ok) {
@@ -35,11 +50,21 @@ export function listGitVisibleFiles(root, options = {}) {
   };
 }
 
+/**
+ * @param {string} root
+ * @param {{
+ *   maxBytes?: number,
+ *   diagnostics?: import("./read.js").ReadDiagnostics
+ * }} [options]
+ * @returns {IgnoreRule[]}
+ */
 export function loadKanonIgnore(root, options = {}) {
   const result = readTextResult(root, ".kanonignore", {
     limit: options.maxBytes ?? 128 * 1024,
     budgetName: "max_ignore_bytes",
-    diagnostics: options.diagnostics,
+    ...(options.diagnostics === undefined
+      ? {}
+      : { diagnostics: options.diagnostics }),
     optional: true
   });
   if (!result.ok) {
@@ -50,9 +75,15 @@ export function loadKanonIgnore(root, options = {}) {
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith("#"))
       .map(compileIgnoreRule)
-      .filter(Boolean);
+      .filter((rule) => rule !== null);
 }
 
+/**
+ * @param {unknown} relPath
+ * @param {boolean} directory
+ * @param {IgnoreRule[]} rules
+ * @returns {boolean}
+ */
 export function isKanonIgnored(relPath, directory, rules) {
   const normalized = normalizeRelPath(relPath).replace(/\/+$/, "");
   let ignored = false;
@@ -65,12 +96,20 @@ export function isKanonIgnored(relPath, directory, rules) {
   return ignored;
 }
 
+/**
+ * @param {unknown} relPath
+ * @returns {boolean}
+ */
 export function shouldIgnorePath(relPath) {
   return normalizeRelPath(relPath)
     .split("/")
     .some((part) => IGNORED_DIRS.has(part));
 }
 
+/**
+ * @param {string} rawRule
+ * @returns {IgnoreRule | null}
+ */
 function compileIgnoreRule(rawRule) {
   const negated = rawRule.startsWith("!");
   let pattern = negated ? rawRule.slice(1) : rawRule;
@@ -88,10 +127,17 @@ function compileIgnoreRule(rawRule) {
   return { negated, regex: new RegExp(source) };
 }
 
+/**
+ * @param {string} pattern
+ * @returns {string}
+ */
 function globToRegex(pattern) {
   let output = "";
   for (let index = 0; index < pattern.length; index += 1) {
     const char = pattern[index];
+    if (char === undefined) {
+      continue;
+    }
     if (char === "*" && pattern[index + 1] === "*") {
       output += ".*";
       index += 1;

@@ -1,3 +1,8 @@
+/**
+ * @param {string} text
+ * @param {RegExp} pattern
+ * @returns {boolean}
+ */
 export function hasAffirmedMatch(text, pattern) {
   const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
   const matcher = new RegExp(pattern.source, flags);
@@ -10,6 +15,12 @@ export function hasAffirmedMatch(text, pattern) {
   return false;
 }
 
+/**
+ * @param {string} text
+ * @param {number} index
+ * @param {number} length
+ * @returns {boolean}
+ */
 export function isNegatedAt(text, index, length) {
   const sentenceStart = Math.max(
     text.lastIndexOf("\n", index - 1),
@@ -34,6 +45,11 @@ export function isNegatedAt(text, index, length) {
   );
 }
 
+/**
+ * @param {string} text
+ * @param {RegExp} pattern
+ * @returns {string}
+ */
 export function excerptAround(text, pattern) {
   const match = text.match(pattern);
   if (!match || match.index === undefined) {

@@ -1,5 +1,9 @@
 import path from "node:path";
 
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 export function firstHeadingOrLine(text) {
   const lines = String(text || "")
     .split(/\r?\n/)
@@ -9,6 +13,10 @@ export function firstHeadingOrLine(text) {
   return heading ? heading.replace(/^#\s+/, "").trim() : lines[0] || "";
 }
 
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
 export function normalizeRequestedPath(value) {
   if (!value) {
     return null;
@@ -21,12 +29,20 @@ export function normalizeRequestedPath(value) {
     normalized.startsWith("../") ||
     path.posix.isAbsolute(normalized)
   ) {
-    throw new Error(`README path must stay inside the repository: ${value}`);
+    throw new Error(
+      `README path must stay inside the repository: ${normalized}`
+    );
   }
   return normalized;
 }
 
+/**
+ * @template {{claim: string}} T
+ * @param {T[]} items
+ * @returns {T[]}
+ */
 export function uniqueClaims(items) {
+  /** @type {Set<string>} */
   const seen = new Set();
   return items.filter((item) => {
     if (seen.has(item.claim)) {
@@ -37,7 +53,12 @@ export function uniqueClaims(items) {
   });
 }
 
+/**
+ * @param {import("../scanner/scan.js").ScanDiagnostics} scan
+ * @returns {string}
+ */
 export function scanLimitationReason(scan) {
+  /** @type {string[]} */
   const reasons = [];
   for (const budget of scan.budgets_reached || []) {
     reasons.push(`the ${budget} budget was reached`);

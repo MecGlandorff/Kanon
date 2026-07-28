@@ -9,6 +9,12 @@ import { readStdin, writeStdout } from "./io.js";
 import { safeTerminalText } from "../trust.js";
 import { safeJsonStringify } from "../trust.js";
 
+/**
+ * @param {string} root
+ * @param {import("./args.js").ParsedArgs} parsed
+ * @param {import("./io.js").NormalizedIo} io
+ * @returns {Promise<void>}
+ */
 export async function runTodoCommand(root, parsed, io) {
   const action = parsed.positionals[0] || "list";
 

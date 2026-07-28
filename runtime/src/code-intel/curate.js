@@ -9,6 +9,9 @@ import {
 } from "./curate-common.js";
 import { registeredHeuristic } from "./heuristics.js";
 
+/** @typedef {import("./shared.js").RankedFile} RankedFile */
+
+/** @type {[string, string, string][]} */
 const ROOT_CONTRACTS = [
   ["package.json", "root-manifest", "root package manifest"],
   ["pyproject.toml", "root-manifest", "root Python manifest"],
@@ -20,6 +23,7 @@ const ROOT_CONTRACTS = [
   ["pnpm-workspace.yaml", "workspace-contract", "root workspace manifest"],
   ["lerna.json", "workspace-contract", "root workspace manifest"]
 ];
+/** @type {[string, string, string][]} */
 const WORKSPACE_TASKS = [
   ["nx.json", "workspace-contract", "root workspace task contract"],
   ["turbo.json", "workspace-contract", "root workspace task contract"]
@@ -32,7 +36,13 @@ const WORKSPACE_MARKERS = new Set([
   "turbo.json"
 ]);
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {{goModule?: string | null}} [context]
+ * @returns {RankedFile[]}
+ */
 export function curateRankedFiles(ranked, context = {}) {
+  /** @type {RankedFile[]} */
   const selected = [];
   const workspace = [...ROOT_CONTRACTS, ...WORKSPACE_TASKS].some(
     ([contract]) =>
@@ -133,10 +143,10 @@ export function curateRankedFiles(ranked, context = {}) {
       "manifest-declared executable"
     );
   }
-  if (primaryGoEntrypoint) {
+  if (primaryGoSelection) {
     addRegistered(
       selected,
-      primaryGoEntrypoint,
+      primaryGoSelection.item,
       primaryGoSelection.moduleNamed
         ? "module-named-entrypoint"
         : "executable-syntax",
@@ -235,11 +245,22 @@ export function curateRankedFiles(ranked, context = {}) {
   return finish(selected, ranked);
 }
 
+/**
+ * @param {RankedFile[]} selected
+ * @param {RankedFile | null | undefined} item
+ * @param {string} heuristicId
+ * @param {string} reason
+ * @returns {void}
+ */
 function addRegistered(selected, item, heuristicId, reason) {
   registeredHeuristic(heuristicId);
   add(selected, item, reason, heuristicId);
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @returns {RankedFile | null}
+ */
 function conventionalTestAnchor(ranked) {
   if (byPath(ranked, "Cargo.toml")) {
     return byPattern(
@@ -260,6 +281,11 @@ function conventionalTestAnchor(ranked) {
   return null;
 }
 
+/**
+ * @param {RankedFile[]} selected
+ * @param {RankedFile[]} ranked
+ * @returns {void}
+ */
 function addWorkspaceTasks(selected, ranked) {
   for (const [contract, heuristic, reason] of WORKSPACE_TASKS) {
     addRegistered(
@@ -271,6 +297,11 @@ function addWorkspaceTasks(selected, ranked) {
   }
 }
 
+/**
+ * @param {RankedFile[]} ranked
+ * @param {string | null | undefined} modulePath
+ * @returns {{item: RankedFile, moduleNamed: boolean} | null}
+ */
 function preferredGoEntrypoint(ranked, modulePath) {
   const entrypoints = primaryEntrypoints(ranked).filter((item) =>
     item.path.endsWith(".go")

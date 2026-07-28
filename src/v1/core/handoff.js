@@ -16,12 +16,6 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
 const SHA256 = /^[0-9a-f]{64}$/;
 const UNSAFE_PATH_CONTROLS =
   /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
-const HOSTS = Object.freeze(["codex-cli", "claude-code"]);
-const MODES = Object.freeze([
-  "last-plan",
-  "compacted",
-  "full-history"
-]);
 
 /**
  * @typedef {"codex-cli" | "claude-code" | "Unknown"} HandoffHost
@@ -289,15 +283,9 @@ export function normalizeAswitchRequest(value) {
       value: {
         schema: "kanon-aswitch-request-v1",
         operation: value.operation,
-        target_host: /** @type {"codex-cli" | "claude-code" | null} */ (
-          value.target_host
-        ),
-        payload_mode: /** @type {HandoffMode | null} */ (
-          value.payload_mode
-        ),
-        destination_root: /** @type {string | null} */ (
-          value.destination_root
-        ),
+        target_host: value.target_host,
+        payload_mode: value.payload_mode,
+        destination_root: value.destination_root,
         last_plan: value.last_plan,
         compacted: value.compacted,
         approval
@@ -398,6 +386,38 @@ export function buildHandoffRepositoryIdentity(canonicalRoot, git) {
           )
         )
     : [];
+  /** @type {HandoffRepositoryIdentity["recorded_commit"]} */
+  const recordedCommit = commitKnown && typeof git.head === "string"
+    ? {
+        status: "Known",
+        value: git.head,
+        provenance: "live-git",
+        trust: "repository-untrusted"
+      }
+    : {
+        status: "Unknown",
+        value: null,
+        provenance: "live-git",
+        trust: "repository-untrusted"
+      };
+  /** @type {HandoffRepositoryIdentity["change_set"]} */
+  const changeSet = changesKnown && git.change_count !== null
+    ? {
+        status: "Known",
+        sha256: sha256(canonicalJson(changes)),
+        count: git.change_count,
+        complete: true,
+        provenance: "live-git",
+        trust: "repository-untrusted"
+      }
+    : {
+        status: "Unknown",
+        sha256: null,
+        count: git.change_count_exact ? git.change_count : null,
+        complete: false,
+        provenance: "live-git",
+        trust: "repository-untrusted"
+      };
   return {
     canonical_root: {
       status: "Known",
@@ -405,44 +425,8 @@ export function buildHandoffRepositoryIdentity(canonicalRoot, git) {
       provenance: "live-canonicalization",
       trust: "repository-identity-untrusted"
     },
-    recorded_commit: commitKnown
-      ? {
-          status: /** @type {"Known"} */ ("Known"),
-          value: /** @type {string} */ (git.head),
-          provenance: /** @type {"live-git"} */ ("live-git"),
-          trust: /** @type {"repository-untrusted"} */ (
-            "repository-untrusted"
-          )
-        }
-      : {
-          status: /** @type {"Unknown"} */ ("Unknown"),
-          value: null,
-          provenance: /** @type {"live-git"} */ ("live-git"),
-          trust: /** @type {"repository-untrusted"} */ (
-            "repository-untrusted"
-          )
-        },
-    change_set: changesKnown
-      ? {
-          status: /** @type {"Known"} */ ("Known"),
-          sha256: sha256(canonicalJson(changes)),
-          count: /** @type {number} */ (git.change_count),
-          complete: /** @type {true} */ (true),
-          provenance: /** @type {"live-git"} */ ("live-git"),
-          trust: /** @type {"repository-untrusted"} */ (
-            "repository-untrusted"
-          )
-        }
-      : {
-          status: /** @type {"Unknown"} */ ("Unknown"),
-          sha256: null,
-          count: git.change_count_exact ? git.change_count : null,
-          complete: /** @type {false} */ (false),
-          provenance: /** @type {"live-git"} */ ("live-git"),
-          trust: /** @type {"repository-untrusted"} */ (
-            "repository-untrusted"
-          )
-        }
+    recorded_commit: recordedCommit,
+    change_set: changeSet
   };
 }
 
@@ -619,10 +603,9 @@ export function createHandoffEnvelope(preview, now) {
   ) {
     return invalidEnvelope();
   }
+  /** @type {Omit<HandoffEnvelope, "checksum">} */
   const unsigned = {
-    schema: /** @type {"kanon-agent-handoff-v1"} */ (
-      "kanon-agent-handoff-v1"
-    ),
+    schema: "kanon-agent-handoff-v1",
     created_at: now,
     preview_sha256: preview.preview_sha256,
     content_sha256: preview.content_sha256,
@@ -845,13 +828,12 @@ function normalizeCompacted(value, git) {
       git.change_count_exact &&
       !git.changes_truncated &&
       git.sensitive_changes_skipped === 0;
+    /** @type {GitValue[]} */
     const changed = changedKnown && git !== null
       ? git.changes.map((change) => ({
           value: change.path,
-          provenance: /** @type {"live-git"} */ ("live-git"),
-          trust: /** @type {"repository-untrusted"} */ (
-            "repository-untrusted"
-          )
+          provenance: "live-git",
+          trust: "repository-untrusted"
         }))
       : [];
     /** @type {CompactedHandoff} */
@@ -1068,8 +1050,7 @@ function validSource(value) {
   return (
     isPlainRecord(value) &&
     hasExactKeys(value, ["host", "provenance", "status"]) &&
-    (HOSTS.includes(/** @type {string} */ (value.host)) ||
-      value.host === "Unknown") &&
+    (isHost(value.host) || value.host === "Unknown") &&
     value.provenance === "active-adapter" &&
     (
       (value.host === "Unknown" && value.status === "Unknown") ||
@@ -1086,7 +1067,7 @@ function validTarget(value) {
   return (
     isPlainRecord(value) &&
     hasExactKeys(value, ["host", "provenance", "trust"]) &&
-    HOSTS.includes(/** @type {string} */ (value.host)) &&
+    isHost(value.host) &&
     value.provenance === "caller-selected" &&
     value.trust === "caller-untrusted"
   );
@@ -1452,23 +1433,23 @@ function normalizeApproval(value) {
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {value is "codex-cli" | "claude-code" | null}
  */
 function nullableHost(value) {
-  return value === null || HOSTS.includes(/** @type {string} */ (value));
+  return value === null || isHost(value);
 }
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {value is HandoffMode | null}
  */
 function nullableMode(value) {
-  return value === null || MODES.includes(/** @type {string} */ (value));
+  return value === null || isMode(value);
 }
 
 /**
  * @param {unknown} value
- * @returns {boolean}
+ * @returns {value is string | null}
  */
 function nullableSafePath(value) {
   return value === null || safePathText(value);
@@ -1511,13 +1492,16 @@ function normalizeList(value, maximumItems, maximumBytes) {
   if (!Array.isArray(value) || value.length > maximumItems) {
     return null;
   }
-  const selected = value.map((item) =>
-    normalizeText(item, maximumBytes)
-  );
-  if (selected.some((item) => item === null)) {
-    return null;
+  /** @type {string[]} */
+  const selected = [];
+  for (const item of value) {
+    const normalized = normalizeText(item, maximumBytes);
+    if (normalized === null) {
+      return null;
+    }
+    selected.push(normalized);
   }
-  return Array.from(new Set(/** @type {string[]} */ (selected)));
+  return Array.from(new Set(selected));
 }
 
 /**
@@ -1570,13 +1554,33 @@ function canonicalJson(value) {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;
   }
-  const record = /** @type {Record<string, unknown>} */ (value);
-  return `{${Object.keys(record)
+  if (!isPlainRecord(value)) {
+    throw new TypeError("Canonical JSON requires validated plain data.");
+  }
+  return `{${Object.keys(value)
     .sort(codeUnitCompare)
     .map((key) =>
-      `${JSON.stringify(key)}:${canonicalJson(record[key])}`
+      `${JSON.stringify(key)}:${canonicalJson(value[key])}`
     )
     .join(",")}}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is "codex-cli" | "claude-code"}
+ */
+function isHost(value) {
+  return value === "codex-cli" || value === "claude-code";
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is HandoffMode}
+ */
+function isMode(value) {
+  return value === "last-plan" ||
+    value === "compacted" ||
+    value === "full-history";
 }
 
 /**

@@ -18,6 +18,70 @@ const HARD_LIMITS = Object.freeze({
   maxElapsedMs: 30_000
 });
 
+/**
+ * @typedef {{
+ *   maxFiles?: number,
+ *   maxEntries?: number,
+ *   maxFileBytes?: number,
+ *   maxTotalHashBytes?: number,
+ *   maxTotalTextBytes?: number,
+ *   maxElapsedMs?: number,
+ *   maxIgnoreBytes?: number,
+ *   gitTimeoutMs?: number,
+ *   gitMaxOutputBytes?: number,
+ *   useGitIgnore?: boolean
+ * }} ScanOptions
+ * @typedef {{
+ *   path: string | null,
+ *   status: string,
+ *   code: string,
+ *   reason: string
+ * }} ScanPathFailure
+ * @typedef {{
+ *   complete: boolean,
+ *   strategy: "filesystem" | "git",
+ *   max_files: number,
+ *   max_entries: number,
+ *   max_file_bytes: number,
+ *   max_total_hash_bytes: number,
+ *   max_total_text_bytes: number,
+ *   max_elapsed_ms: number,
+ *   entries_visited: number,
+ *   total_bytes_hashed: number,
+ *   total_text_bytes_read: number,
+ *   elapsed_ms: number,
+ *   truncated: boolean,
+ *   unreadable_entries: number,
+ *   missing_tracked_files: number,
+ *   ignored_directories: number,
+ *   kanon_ignored_entries: number,
+ *   sensitive_files_skipped: number,
+ *   symlinks_skipped: number,
+ *   rejected_paths: number,
+ *   outside_root_paths: number,
+ *   path_failures: ScanPathFailure[],
+ *   path_failures_truncated: boolean,
+ *   budgets_reached: string[],
+ *   git_observation_failed: boolean,
+ *   git_diagnostic: string | null
+ * }} ScanDiagnostics
+ * @typedef {{
+ *   root: string,
+ *   files: import("./read.js").ScannedFile[],
+ *   fingerprints: {
+ *     path: string,
+ *     size: number,
+ *     sha256: string | null
+ *   }[],
+ *   diagnostics: ScanDiagnostics
+ * }} ScanResult
+ */
+
+/**
+ * @param {string} root
+ * @param {ScanOptions} [options]
+ * @returns {ScanResult}
+ */
 export function scanRepo(root, options = {}) {
   const rootResult = resolveContainedPath(root, ".", {
     allowRoot: true,
@@ -53,11 +117,13 @@ export function scanRepo(root, options = {}) {
     HARD_LIMITS.maxElapsedMs
   );
   const started = Date.now();
+  /** @type {import("./read.js").ScannedFile[]} */
   const files = [];
   const hashBudget = {
     maxBytes: maxTotalHashBytes,
     bytesHashed: 0
   };
+  /** @type {ScanDiagnostics} */
   const diagnostics = {
     complete: rootResult.ok,
     strategy: "filesystem",
@@ -92,14 +158,20 @@ export function scanRepo(root, options = {}) {
   }
   const kanonIgnoreRules = loadKanonIgnore(resolvedRoot, {
     diagnostics,
-    maxBytes: options.maxIgnoreBytes
+    ...(options.maxIgnoreBytes === undefined
+      ? {}
+      : { maxBytes: options.maxIgnoreBytes })
   });
 
   const gitListing = options.useGitIgnore === false
     ? null
     : listGitVisibleFiles(resolvedRoot, {
-        timeoutMs: options.gitTimeoutMs,
-        maxOutputBytes: options.gitMaxOutputBytes
+        ...(options.gitTimeoutMs === undefined
+          ? {}
+          : { timeoutMs: options.gitTimeoutMs }),
+        ...(options.gitMaxOutputBytes === undefined
+          ? {}
+          : { maxOutputBytes: options.gitMaxOutputBytes })
       });
   if (gitListing?.ok) {
     diagnostics.strategy = "git";
@@ -129,6 +201,11 @@ export function scanRepo(root, options = {}) {
 
   return finish();
 
+  /**
+   * @param {string} absDir
+   * @param {string} relDir
+   * @returns {void}
+   */
   function walk(absDir, relDir) {
     if (budgetExceeded()) {
       return;
@@ -186,6 +263,10 @@ export function scanRepo(root, options = {}) {
     }
   }
 
+  /**
+   * @param {string} relPath
+   * @returns {boolean}
+   */
   function addFile(relPath) {
     if (isKanonIgnored(relPath, false, kanonIgnoreRules)) {
       diagnostics.kanon_ignored_entries += 1;
@@ -253,6 +334,9 @@ export function scanRepo(root, options = {}) {
     return true;
   }
 
+  /**
+   * @returns {boolean}
+   */
   function visitEntryBudget() {
     if (budgetExceeded()) {
       return false;
@@ -265,6 +349,9 @@ export function scanRepo(root, options = {}) {
     return true;
   }
 
+  /**
+   * @returns {boolean}
+   */
   function budgetExceeded() {
     if (Date.now() - started > maxElapsedMs) {
       reachBudget("max_elapsed_ms");
@@ -273,17 +360,34 @@ export function scanRepo(root, options = {}) {
     return diagnostics.truncated;
   }
 
+  /**
+   * @param {string} name
+   * @returns {void}
+   */
   function reachBudget(name) {
     diagnostics.truncated = true;
     noteBudget(name);
   }
 
+  /**
+   * @param {string} name
+   * @returns {void}
+   */
   function noteBudget(name) {
     if (!diagnostics.budgets_reached.includes(name)) {
       diagnostics.budgets_reached.push(name);
     }
   }
 
+  /**
+   * @param {{
+   *   status: string,
+   *   relativePath: string | null,
+   *   code: string,
+   *   reason: string
+   * }} result
+   * @returns {void}
+   */
   function recordPathFailure(result) {
     if (diagnostics.path_failures.length < 50) {
       diagnostics.path_failures.push({
@@ -304,6 +408,9 @@ export function scanRepo(root, options = {}) {
     }
   }
 
+  /**
+   * @returns {ScanResult}
+   */
   function finish() {
     diagnostics.total_bytes_hashed = hashBudget.bytesHashed;
     diagnostics.elapsed_ms = Date.now() - started;
@@ -328,8 +435,18 @@ export function scanRepo(root, options = {}) {
   }
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} maximum
+ * @returns {number}
+ */
 function boundedOption(value, fallback, maximum) {
-  return Number.isInteger(value) && value > 0
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value > 0
+  )
     ? Math.min(value, maximum)
     : fallback;
 }

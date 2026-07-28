@@ -18,11 +18,28 @@ import {
   getText
 } from "./shared.js";
 
+/**
+ * @typedef {import("./shared.js").CodeSignal} CodeSignal
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ */
+
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {{
+ *   readOptions?: NonNullable<Parameters<typeof getText>[2]>["readOptions"],
+ *   packageJson?: unknown
+ * }} [options]
+ */
 export function inspectRepoCode(root, files, options = {}) {
+  /** @type {Map<string, ScannedFile>} */
   const fileMap = new Map(files.map((file) => [file.path, file]));
   const texts = createTextCache(options.readOptions || {});
+  /** @type {Map<string, Set<string>>} */
   const importers = new Map();
+  /** @type {Map<string, Set<string>>} */
   const references = new Map();
+  /** @type {Map<string, CodeSignal[]>} */
   const signals = new Map();
   const modulePath = readGoModule(root, fileMap, texts);
 
@@ -63,7 +80,9 @@ export function inspectRepoCode(root, files, options = {}) {
     references,
     signals
   }, {
-    packageJson: options.packageJson,
+    ...(options.packageJson === undefined
+      ? {}
+      : { packageJson: options.packageJson }),
     goModule: modulePath
   });
   return {

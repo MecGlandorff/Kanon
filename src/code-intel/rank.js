@@ -6,12 +6,30 @@ import {
 import { curateRankedFiles } from "./curate.js";
 import { depth, unique } from "./shared.js";
 
+/**
+ * @typedef {import("./shared.js").CodeSignal} CodeSignal
+ * @typedef {import("./shared.js").RankedFile} RankedFile
+ * @typedef {{path: string, text: boolean}} RankedInputFile
+ */
+
+/**
+ * @param {RankedInputFile[]} files
+ * @param {{
+ *   signals: Map<string, CodeSignal[]>,
+ *   importers: Map<string, Set<string>>,
+ *   references: Map<string, Set<string>>
+ * }} intel
+ * @param {{packageJson?: unknown, goModule?: string | null}} [context]
+ * @returns {RankedFile[]}
+ */
 export function rankImportantFiles(files, intel, context = {}) {
+  /** @type {RankedFile[]} */
   const ranked = [];
   for (const file of files) {
     if (!file.text || GENERATED_FILE.test(file.path) || /\.map$/.test(file.path)) {
       continue;
     }
+    /** @type {string[]} */
     const reasons = [];
     const signals = intel.signals.get(file.path) || [];
     const fanIn = intel.importers.get(file.path)?.size || 0;
@@ -55,9 +73,18 @@ export function rankImportantFiles(files, intel, context = {}) {
       b.fan_in - a.fan_in ||
       a.path.localeCompare(b.path)
   );
-  return curateRankedFiles(ranked, context);
+  return curateRankedFiles(ranked, {
+    ...(context.goModule === undefined
+      ? {}
+      : { goModule: context.goModule })
+  });
 }
 
+/**
+ * @param {string} relPath
+ * @param {string[]} reasons
+ * @returns {number}
+ */
 function baseImportance(relPath, reasons) {
   const lower = relPath.toLowerCase();
   const basename = path.posix.basename(lower);
@@ -71,7 +98,7 @@ function baseImportance(relPath, reasons) {
     ["justfile", 132]
   ]);
   if (!relPath.includes("/") && exact.has(lower)) {
-    score += exact.get(lower);
+    score += exact.get(lower) ?? 0;
     reasons.push("root project/build metadata");
   }
   if (/^readme(?:\.[^.]+)?$/i.test(basename)) {

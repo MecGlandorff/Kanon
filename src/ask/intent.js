@@ -1,3 +1,9 @@
+/**
+ * @typedef {"documentation" | "git" | "test" | "run" | "purpose" |
+ *   "search" | "mixed" | "unsupported"} QuestionIntent
+ */
+
+/** @type {{intent: QuestionIntent, patterns: RegExp[]}[]} */
 const INTENT_RULES = [
   {
     intent: "documentation",
@@ -37,6 +43,10 @@ const INTENT_RULES = [
   }
 ];
 
+/**
+ * @param {unknown} question
+ * @returns {QuestionIntent}
+ */
 export function classifyQuestionIntent(question) {
   const normalized = String(question || "").trim().toLowerCase();
   if (extractLiteralSearch(question)) {
@@ -54,6 +64,10 @@ export function classifyQuestionIntent(question) {
   return matches[0] || "unsupported";
 }
 
+/**
+ * @param {unknown} question
+ * @returns {string | null}
+ */
 export function extractLiteralSearch(question) {
   const value = String(question || "").trim();
   const match = value.match(

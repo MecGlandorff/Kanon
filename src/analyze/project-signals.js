@@ -1,6 +1,31 @@
 import { readText } from "../scanner.js";
 
+/**
+ * @typedef {import("../scanner/read.js").ScannedFile} ScannedFile
+ * @typedef {import("./metadata.js").PackageInfo} PackageInfo
+ * @typedef {import("./metadata.js").PyprojectInfo} PyprojectInfo
+ * @typedef {import("./metadata.js").PythonHints} PythonHints
+ * @typedef {{
+ *   found: boolean,
+ *   files: {path: string, evidence: string}[]
+ * }} ProjectSignal
+ * @typedef {{
+ *   found: boolean,
+ *   files: string[],
+ *   count: number,
+ *   frameworks: string[],
+ *   evidence: string[]
+ * }} TestSignal
+ */
+
+/**
+ * @param {ScannedFile[]} files
+ * @param {PackageInfo | null} packageInfo
+ * @param {PyprojectInfo | null} pyprojectInfo
+ * @returns {string[]}
+ */
 export function detectLanguages(files, packageInfo, pyprojectInfo) {
+  /** @type {Set<string>} */
   const languages = new Set();
   if (
     packageInfo ||
@@ -22,6 +47,11 @@ export function detectLanguages(files, packageInfo, pyprojectInfo) {
   return Array.from(languages);
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @returns {ProjectSignal}
+ */
 export function detectCi(files, evidence) {
   const matches = files.filter(
     (file) =>
@@ -33,6 +63,11 @@ export function detectCi(files, evidence) {
   return evidenceFiles(matches, evidence, "config", "CI configuration found.");
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @returns {ProjectSignal}
+ */
 export function detectDeployment(files, evidence) {
   const patterns = [
     /^Dockerfile$/,
@@ -56,6 +91,13 @@ export function detectDeployment(files, evidence) {
   );
 }
 
+/**
+ * @param {string} root
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {NonNullable<Parameters<typeof readText>[2]>} [readOptions]
+ * @returns {ProjectSignal}
+ */
 export function detectRelease(root, files, evidence, readOptions = {}) {
   const matches = files.filter((file) => {
     if (
@@ -83,6 +125,10 @@ export function detectRelease(root, files, evidence, readOptions = {}) {
   );
 }
 
+/**
+ * @param {string} text
+ * @returns {boolean}
+ */
 function hasReleaseWorkflowSignal(text) {
   return (
     /\brefs\/tags\//.test(text) ||
@@ -95,6 +141,14 @@ function hasReleaseWorkflowSignal(text) {
   );
 }
 
+/**
+ * @param {ScannedFile[]} files
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {PackageInfo | null} packageInfo
+ * @param {PyprojectInfo | null} pyprojectInfo
+ * @param {PythonHints | null} pythonInfo
+ * @returns {TestSignal}
+ */
 export function detectTests(
   files,
   evidence,
@@ -109,12 +163,17 @@ export function detectTests(
       /test_.*\.py$/.test(file.path) ||
       /_test\.py$/.test(file.path)
   );
+  /** @type {string[]} */
   const testEvidence = [];
   if (testFiles.length > 0) {
+    const firstTest = testFiles[0];
+    if (!firstTest) {
+      throw new Error("Test-file selection changed unexpectedly.");
+    }
     testEvidence.push(
       evidence.add(
         "test",
-        testFiles[0].path,
+        firstTest.path,
         `${testFiles.length} test-like file(s) found.`,
         testFiles.slice(0, 12).map((file) => file.path).join(", ")
       )
@@ -125,7 +184,7 @@ export function detectTests(
     Boolean(pythonInfo?.pytestConfig) ||
     Boolean(pythonInfo?.mentionsPytest);
   const hasPackageTest =
-    Boolean(packageInfo?.scripts?.test) &&
+    typeof packageInfo?.scripts.test === "string" &&
     !/(?:no test specified|not implemented|exit\s+1)/i.test(
       packageInfo.scripts.test
     );
@@ -141,6 +200,13 @@ export function detectTests(
   };
 }
 
+/**
+ * @param {ScannedFile[]} matches
+ * @param {import("../evidence.js").EvidenceBook} evidence
+ * @param {string} kind
+ * @param {string} claim
+ * @returns {ProjectSignal}
+ */
 function evidenceFiles(matches, evidence, kind, claim) {
   return {
     found: matches.length > 0,

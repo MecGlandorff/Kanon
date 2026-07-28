@@ -8,8 +8,14 @@ import {
   formatEvidenceRefs
 } from "./shared.js";
 
+/**
+ * @param {ReturnType<typeof import("../analyze.js").analyzeRepo>} analysis
+ * @param {{deep?: boolean}} [options]
+ * @returns {string}
+ */
 export function renderBrief(analysis, options = {}) {
   const state = analysis.state;
+  /** @type {string[]} */
   const lines = [];
   lines.push("# Kanon Repo Brief");
   lines.push("");

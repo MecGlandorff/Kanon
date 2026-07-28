@@ -6,8 +6,35 @@ import {
   escapeMarkdownText
 } from "./shared.js";
 
+/**
+ * @typedef {ReturnType<typeof import("../analyze.js").analyzeRepo>} Analysis
+ * @typedef {{
+ *   number: number,
+ *   done: boolean,
+ *   text: string,
+ *   details: string[],
+ *   line: number,
+ *   trust: "repository-untrusted"
+ * }} KanonTodo
+ * @typedef {{
+ *   todos?: KanonTodo[],
+ *   stateWarning?: string | null,
+ *   todoWarning?: string | null,
+ *   handoffWarning?: string | null,
+ *   handoff?: unknown,
+ *   continuity?: ReturnType<
+ *     typeof import("../continuity/engine.js").buildContinuityReport
+ *   >
+ * }} ResumeOptions
+ */
+
+/**
+ * @param {Analysis} analysis
+ * @returns {string}
+ */
 export function renderVerify(analysis) {
   const verification = analysis.state.verification;
+  /** @type {string[]} */
   const lines = [];
   lines.push("# Kanon Verify");
   lines.push("");
@@ -54,9 +81,16 @@ export function renderVerify(analysis) {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * @param {Analysis} analysis
+ * @param {Record<string, unknown> | null} [previousState]
+ * @param {ResumeOptions} [options]
+ * @returns {string}
+ */
 export function renderResume(analysis, previousState = null, options = {}) {
   const state = analysis.state;
   const openTodos = (options.todos || []).filter((todo) => !todo.done);
+  /** @type {string[]} */
   const lines = [];
   lines.push("# Resume This Repo");
   lines.push("");
@@ -65,11 +99,12 @@ export function renderResume(analysis, previousState = null, options = {}) {
   );
   lines.push("");
 
-  for (const warning of [
+  const warnings = [
     options.stateWarning,
     options.todoWarning,
     options.handoffWarning
-  ].filter(Boolean)) {
+  ].filter((warning) => typeof warning === "string");
+  for (const warning of warnings) {
     lines.push(`Warning: ${escapeMarkdownText(warning)}`);
   }
   if (
@@ -84,15 +119,25 @@ export function renderResume(analysis, previousState = null, options = {}) {
     lines.push("No previous .kanon/STATE.json checkpoint found.");
     lines.push("");
   } else {
+    const previousGeneratedAt =
+      typeof previousState.generated_at === "string"
+        ? previousState.generated_at
+        : "unknown";
     lines.push(
-      `Last Kanon checkpoint: ${codeSpan(previousState.generated_at || "unknown")}`
+      `Last Kanon checkpoint: ${codeSpan(previousGeneratedAt)}`
     );
     lines.push(`Current analysis: ${codeSpan(state.generated_at)}`);
     lines.push("");
     appendStateDiff(lines, previousState, state, {
-      continuity: options.continuity,
-      handoff: options.handoff,
-      previousWarning: options.stateWarning
+      ...(options.continuity === undefined
+        ? {}
+        : { continuity: options.continuity }),
+      ...(options.handoff === undefined
+        ? {}
+        : { handoff: options.handoff }),
+      ...(options.stateWarning === undefined
+        ? {}
+        : { previousWarning: options.stateWarning })
     });
   }
 
@@ -136,8 +181,14 @@ export function renderResume(analysis, previousState = null, options = {}) {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * @param {KanonTodo[]} todos
+ * @param {{all?: boolean}} [options]
+ * @returns {string}
+ */
 export function renderTodoList(todos, options = {}) {
   const visible = options.all ? todos : todos.filter((todo) => !todo.done);
+  /** @type {string[]} */
   const lines = [];
   lines.push("# Kanon Todos");
   lines.push("");

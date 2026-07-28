@@ -27,6 +27,11 @@ import { helpText, parseArgs } from "./args.js";
 import { normalizeIo, writeStdout } from "./io.js";
 import { runTodoCommand } from "./todo.js";
 
+/**
+ * @param {string[]} [argv]
+ * @param {import("./io.js").IoOptions} [ioOptions]
+ * @returns {Promise<void>}
+ */
 export async function runCli(argv = [], ioOptions = {}) {
   const io = normalizeIo(ioOptions);
   const parsed = parseArgs(argv);

@@ -1,7 +1,34 @@
+import { types as nodeTypes } from "node:util";
 import { readContainedText } from "./safe-fs.js";
 import { STATE_SCHEMA_VERSION } from "../version.js";
 import { validateCurrentStateFields } from "./state-fields.js";
 
+/**
+ * @typedef {Record<string, unknown>} PersistedState
+ * @typedef {{maxBytes?: number}} InspectionOptions
+ * @typedef {{
+ *   state: PersistedState | null,
+ *   found: boolean,
+ *   valid: boolean,
+ *   warning: string | null
+ * }} StateInspection
+ * @typedef {{
+ *   handoff: {
+ *     found: boolean,
+ *     valid: boolean,
+ *     status: string,
+ *     bytes: number
+ *   },
+ *   warning: string | null
+ * }} HandoffInspection
+ * @typedef {{valid: true, field: null, reason: null} | {
+ *   valid: false,
+ *   field: string,
+ *   reason: string
+ * }} StateValidation
+ */
+
+/** @type {Set<string>} */
 const CURRENT_FIELDS = new Set([
   "version",
   "run_id",
@@ -29,8 +56,43 @@ const CURRENT_FIELDS = new Set([
 const DEFAULT_HANDOFF_BYTES = 256 * 1024;
 const MAX_HANDOFF_BYTES = 2 * 1024 * 1024;
 
+/** @type {[string, "string" | "object" | "array" | "integer"][]} */
+const REQUIRED_FIELDS = [
+  ["version", "string"],
+  ["run_id", "string"],
+  ["generated_at", "string"],
+  ["repo", "object"],
+  ["scan", "object"],
+  ["git", "object"],
+  ["purpose", "object"],
+  ["commands", "object"],
+  ["important_files", "array"],
+  ["code_intelligence", "object"],
+  ["tests", "object"],
+  ["ci", "object"],
+  ["deployment", "object"],
+  ["release", "object"],
+  ["todos", "array"],
+  ["current_state", "object"],
+  ["verification", "object"],
+  ["configuration", "object"],
+  ["command_execution", "object"],
+  ["files", "object"],
+  ["evidence_count", "integer"]
+];
+
+/**
+ * @param {string} root
+ * @param {unknown} [options]
+ * @returns {StateInspection}
+ */
 export function inspectPreviousState(root, options = {}) {
-  const maximumBytes = options.maxBytes ?? 2 * 1024 * 1024;
+  const maximumBytes = inspectionLimit(options, 2 * 1024 * 1024);
+  if (maximumBytes === null) {
+    return invalidState(
+      "STATE.json was not inspected because its read limit was invalid."
+    );
+  }
   const read = readContainedText(
     root,
     ".kanon/STATE.json",
@@ -51,6 +113,7 @@ export function inspectPreviousState(root, options = {}) {
     );
   }
 
+  /** @type {unknown} */
   let parsed;
   try {
     parsed = JSON.parse(read.text);
@@ -63,10 +126,16 @@ export function inspectPreviousState(root, options = {}) {
       `STATE.json was ignored at ${validation.field}: ${validation.reason}`
     );
   }
+  if (!plainObject(parsed)) {
+    return invalidState("STATE.json was ignored because its root is invalid.");
+  }
+  const schemaVersion = typeof parsed.schema_version === "number"
+    ? parsed.schema_version
+    : 1;
   return {
     state: {
       ...parsed,
-      schema_version: parsed.schema_version ?? 1
+      schema_version: schemaVersion
     },
     found: true,
     valid: true,
@@ -74,21 +143,17 @@ export function inspectPreviousState(root, options = {}) {
   };
 }
 
+/**
+ * @param {string} root
+ * @param {unknown} [options]
+ * @returns {HandoffInspection}
+ */
 export function inspectPreviousHandoff(root, options = {}) {
-  const maximumBytes =
-    options &&
-    typeof options === "object" &&
-    !Array.isArray(options) &&
-    (
-      options.maxBytes === undefined ||
-      (
-        Number.isSafeInteger(options.maxBytes) &&
-        options.maxBytes > 0 &&
-        options.maxBytes <= MAX_HANDOFF_BYTES
-      )
-    )
-      ? options.maxBytes ?? DEFAULT_HANDOFF_BYTES
-      : null;
+  const maximumBytes = inspectionLimit(
+    options,
+    DEFAULT_HANDOFF_BYTES,
+    MAX_HANDOFF_BYTES
+  );
   if (maximumBytes === null) {
     return {
       handoff: {
@@ -153,12 +218,17 @@ export function inspectPreviousHandoff(root, options = {}) {
   };
 }
 
+/**
+ * @param {unknown} value
+ * @returns {StateValidation}
+ */
 export function validatePersistedState(value) {
   if (!plainObject(value)) {
     return invalid("root", "Expected an object.");
   }
   const version = value.schema_version ?? 1;
   if (
+    typeof version !== "number" ||
     !Number.isInteger(version) ||
     version < 1 ||
     version > STATE_SCHEMA_VERSION
@@ -178,39 +248,25 @@ export function validatePersistedState(value) {
       return invalid(key, `Unknown current-schema field: ${key}.`);
     }
   }
-  for (const [field, type] of [
-    ["version", "string"],
-    ["run_id", "string"],
-    ["generated_at", "string"],
-    ["repo", "object"],
-    ["scan", "object"],
-    ["git", "object"],
-    ["purpose", "object"],
-    ["commands", "object"],
-    ["important_files", "array"],
-    ["code_intelligence", "object"],
-    ["tests", "object"],
-    ["ci", "object"],
-    ["deployment", "object"],
-    ["release", "object"],
-    ["todos", "array"],
-    ["current_state", "object"],
-    ["verification", "object"],
-    ["configuration", "object"],
-    ["command_execution", "object"],
-    ["files", "object"],
-    ["evidence_count", "integer"]
-  ]) {
+  for (const [field, type] of REQUIRED_FIELDS) {
     if (!hasType(value[field], type)) {
       return invalid(field, `Expected ${type}.`);
     }
   }
-  if (!Number.isFinite(Date.parse(value.generated_at))) {
+  if (
+    typeof value.generated_at !== "string" ||
+    !Number.isFinite(Date.parse(value.generated_at))
+  ) {
     return invalid("generated_at", "Expected an ISO timestamp.");
   }
   return validateCurrentStateFields(value);
 }
 
+/**
+ * @param {unknown} value
+ * @param {"string" | "object" | "array" | "integer"} type
+ * @returns {boolean}
+ */
 function hasType(value, type) {
   if (type === "array") {
     return Array.isArray(value);
@@ -219,20 +275,60 @@ function hasType(value, type) {
     return plainObject(value);
   }
   if (type === "integer") {
-    return Number.isInteger(value) && value >= 0;
+    return typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 0;
   }
   return typeof value === type;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
 function plainObject(value) {
-  return Boolean(
-    value &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    return false;
+  }
+  return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+    (descriptor) => !descriptor.get && !descriptor.set
   );
 }
 
+/**
+ * @param {unknown} options
+ * @param {number} fallback
+ * @param {number} [maximum]
+ * @returns {number | null}
+ */
+function inspectionLimit(options, fallback, maximum = 8 * 1024 * 1024) {
+  if (!plainObject(options)) {
+    return null;
+  }
+  if (Object.keys(options).some((key) => key !== "maxBytes")) {
+    return null;
+  }
+  if (options.maxBytes === undefined) {
+    return fallback;
+  }
+  return typeof options.maxBytes === "number" &&
+      Number.isSafeInteger(options.maxBytes) &&
+      options.maxBytes > 0 &&
+      options.maxBytes <= maximum
+    ? options.maxBytes
+    : null;
+}
+
+/**
+ * @param {string} warning
+ * @returns {StateInspection}
+ */
 function invalidState(warning) {
   return {
     state: null,
@@ -242,10 +338,16 @@ function invalidState(warning) {
   };
 }
 
+/**
+ * @param {string} field
+ * @param {string} reason
+ * @returns {StateValidation}
+ */
 function invalid(field, reason) {
   return { valid: false, field, reason };
 }
 
+/** @returns {StateValidation} */
 function valid() {
   return { valid: true, field: null, reason: null };
 }

@@ -99,6 +99,10 @@ const SENSITIVE_NAMES = new Set([
   "secrets.json"
 ]);
 
+/**
+ * @param {unknown} relPath
+ * @returns {boolean}
+ */
 export function isSensitivePath(relPath) {
   const normalized = normalizeRelPath(relPath);
   const basename = path.posix.basename(normalized).toLowerCase();
@@ -117,6 +121,11 @@ export function isSensitivePath(relPath) {
   );
 }
 
+/**
+ * @param {string} rel
+ * @param {string} basename
+ * @returns {boolean}
+ */
 export function isTextFile(rel, basename) {
   if (TEXT_NAMES.has(basename)) {
     return true;

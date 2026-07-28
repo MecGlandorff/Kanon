@@ -1,6 +1,21 @@
 import path from "node:path";
+import { types as nodeTypes } from "node:util";
 import { addSignal, getText, normalizeRelPath, parseCargoBinPaths } from "./shared.js";
 
+/**
+ * @typedef {import("./shared.js").CodeSignal} CodeSignal
+ * @typedef {import("./shared.js").TextCache} TextCache
+ * @typedef {{path: string, basename: string}} CodeFile
+ * @typedef {Map<string, CodeFile>} FileMap
+ * @typedef {Map<string, CodeSignal[]>} SignalMap
+ * @typedef {[string, "binary" | "export"]} PackageTarget
+ */
+
+/**
+ * @param {string} relPath
+ * @param {string} text
+ * @returns {CodeSignal | null}
+ */
 export function detectEntrypointSignal(relPath, text) {
   const extension = path.posix.extname(relPath).toLowerCase();
   if (
@@ -57,6 +72,14 @@ export function detectEntrypointSignal(relPath, text) {
   return null;
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {SignalMap} signals
+ * @param {unknown} packageJson
+ * @returns {void}
+ */
 export function addManifestEntrypoints(
   root,
   fileMap,
@@ -75,6 +98,14 @@ export function addManifestEntrypoints(
   addDjangoDeclarations(root, fileMap, texts, signals);
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {SignalMap} signals
+ * @param {unknown} rootPackageJson
+ * @returns {void}
+ */
 function addPackageManifestTargets(
   root,
   fileMap,
@@ -94,6 +125,7 @@ function addPackageManifestTargets(
     ) {
       continue;
     }
+    /** @type {unknown} */
     let manifest = directory === "." ? rootPackageJson : null;
     if (!manifest) {
       try {
@@ -125,7 +157,15 @@ function addPackageManifestTargets(
   }
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {SignalMap} signals
+ * @returns {void}
+ */
 function addCargoManifestTargets(root, fileMap, texts, signals) {
+  /** @type {{directory: string, text: string, packageName: string | null}[]} */
   const manifests = [];
   for (const file of fileMap.values()) {
     if (file.basename !== "Cargo.toml") {
@@ -175,19 +215,21 @@ function addCargoManifestTargets(root, fileMap, texts, signals) {
       });
     }
   }
-  const libraries = new Map(
-    manifests
-      .filter((item) => item.packageName)
-      .map((item) => {
-        const target = normalizeRelPath(
-          item.directory === "."
-            ? "src/lib.rs"
-            : path.posix.join(item.directory, "src/lib.rs")
-        );
-        return [item.packageName, fileMap.has(target) ? target : null];
-      })
-      .filter(([, target]) => target)
-  );
+  /** @type {Map<string, string>} */
+  const libraries = new Map();
+  for (const item of manifests) {
+    if (!item.packageName) {
+      continue;
+    }
+    const target = normalizeRelPath(
+      item.directory === "."
+        ? "src/lib.rs"
+        : path.posix.join(item.directory, "src/lib.rs")
+    );
+    if (fileMap.has(target)) {
+      libraries.set(item.packageName, target);
+    }
+  }
   for (const [packageName, target] of libraries) {
     const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(
@@ -212,6 +254,13 @@ function addCargoManifestTargets(root, fileMap, texts, signals) {
   }
 }
 
+/**
+ * @param {string} root
+ * @param {FileMap} fileMap
+ * @param {TextCache} texts
+ * @param {SignalMap} signals
+ * @returns {void}
+ */
 function addDjangoDeclarations(root, fileMap, texts, signals) {
   for (const file of fileMap.values()) {
     if (file.basename !== "manage.py") {
@@ -282,15 +331,20 @@ function addDjangoDeclarations(root, fileMap, texts, signals) {
   }
 }
 
+/**
+ * @param {unknown} manifest
+ * @returns {PackageTarget[]}
+ */
 function packageTargets(manifest) {
-  if (!manifest || typeof manifest !== "object") {
+  if (!plainRecord(manifest)) {
     return [];
   }
+  /** @type {PackageTarget[]} */
   const output = [];
   const bin = manifest.bin;
   if (typeof bin === "string") {
     output.push([bin, "binary"]);
-  } else if (bin && typeof bin === "object") {
+  } else if (plainRecord(bin)) {
     for (const target of Object.values(bin)) {
       if (typeof target === "string") {
         output.push([target, "binary"]);
@@ -306,16 +360,38 @@ function packageTargets(manifest) {
   return output;
 }
 
-function collectExportStrings(value, output) {
+/**
+ * @param {unknown} value
+ * @param {PackageTarget[]} output
+ * @param {number} [depth]
+ * @param {{entries: number}} [budget]
+ * @returns {void}
+ */
+function collectExportStrings(
+  value,
+  output,
+  depth = 0,
+  budget = { entries: 0 }
+) {
+  if (depth > 16 || budget.entries >= 256) {
+    return;
+  }
   if (typeof value === "string") {
     output.push([value, "export"]);
-  } else if (value && typeof value === "object") {
+    budget.entries += 1;
+  } else if (plainRecord(value)) {
     for (const nested of Object.values(value)) {
-      collectExportStrings(nested, output);
+      collectExportStrings(nested, output, depth + 1, budget);
     }
   }
 }
 
+/**
+ * @param {string} directory
+ * @param {unknown} target
+ * @param {FileMap} fileMap
+ * @returns {string | null}
+ */
 function resolveManifestTarget(directory, target, fileMap) {
   if (typeof target !== "string" || target.includes("*")) {
     return null;
@@ -338,6 +414,12 @@ function resolveManifestTarget(directory, target, fileMap) {
   ) || null;
 }
 
+/**
+ * @param {string} directory
+ * @param {string | null | undefined} moduleName
+ * @param {FileMap} fileMap
+ * @returns {string | null}
+ */
 function resolvePythonModule(directory, moduleName, fileMap) {
   if (!moduleName || !/^[A-Za-z_][\w.]*$/.test(moduleName)) {
     return null;
@@ -350,4 +432,23 @@ function resolvePythonModule(directory, moduleName, fileMap) {
     normalizeRelPath(path.posix.join(directory, modulePath, "__init__.py"))
   ];
   return candidates.find((candidate) => fileMap.has(candidate)) || null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function plainRecord(value) {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    nodeTypes.isProxy(value) ||
+    Object.getPrototypeOf(value) !== Object.prototype
+  ) {
+    return false;
+  }
+  return Object.values(Object.getOwnPropertyDescriptors(value)).every(
+    (descriptor) => !descriptor.get && !descriptor.set
+  );
 }

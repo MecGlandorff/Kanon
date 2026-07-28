@@ -1,4 +1,26 @@
+/**
+ * @typedef {{
+ *   json: boolean,
+ *   deep: boolean,
+ *   help: boolean,
+ *   version: boolean,
+ *   stdin: boolean,
+ *   all: boolean,
+ *   root: string | null
+ * }} CliFlags
+ * @typedef {{
+ *   command: string | null,
+ *   flags: CliFlags,
+ *   positionals: string[]
+ * }} ParsedArgs
+ */
+
+/**
+ * @param {string[]} argv
+ * @returns {ParsedArgs}
+ */
 export function parseArgs(argv) {
+  /** @type {CliFlags} */
   const flags = {
     json: false,
     deep: false,
@@ -8,11 +30,16 @@ export function parseArgs(argv) {
     all: false,
     root: null
   };
+  /** @type {string[]} */
   const positionals = [];
+  /** @type {string | null} */
   let command = null;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === undefined) {
+      throw new Error("CLI argument input was incomplete.");
+    }
 
     if (arg === "--json") {
       flags.json = true;
@@ -28,10 +55,11 @@ export function parseArgs(argv) {
       flags.version = true;
     } else if (arg === "--root") {
       index += 1;
-      flags.root = argv[index];
-      if (!flags.root) {
+      const root = argv[index];
+      if (!root) {
         throw new Error("--root requires a path");
       }
+      flags.root = root;
     } else if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     } else if (!command) {
@@ -44,6 +72,7 @@ export function parseArgs(argv) {
   return { command, flags, positionals };
 }
 
+/** @returns {string} */
 export function todoHelpText() {
   return `Kanon todo commands:
   kanon todo list [--all] [--json] [--root PATH]
@@ -53,6 +82,7 @@ export function todoHelpText() {
 `;
 }
 
+/** @returns {string} */
 export function helpText() {
   return `Kanon - repo continuity for AI coding agents
 

@@ -9,10 +9,45 @@ const FAILURE_STATUSES = new Set([
 ]);
 
 /**
+ * @typedef {"missing" | "outside-root" | "rejected" | "unreadable"}
+ *   ContainedFailureStatus
+ * @typedef {{
+ *   allowRoot?: boolean,
+ *   type?: "any" | "file" | "directory"
+ * }} ContainedPathPolicy
+ * @typedef {{
+ *   ok: true,
+ *   status: "ok",
+ *   root: string,
+ *   path: string,
+ *   relativePath: string,
+ *   stat: fs.Stats
+ * }} ContainedPathSuccess
+ * @typedef {{
+ *   ok: false,
+ *   status: ContainedFailureStatus,
+ *   root: string | null,
+ *   path: string | null,
+ *   relativePath: string | null,
+ *   reason: string,
+ *   code: string,
+ *   existingParent?: string,
+ *   missingComponent?: string
+ * }} ContainedPathFailure
+ * @typedef {ContainedPathSuccess | ContainedPathFailure}
+ *   ContainedPathResult
+ */
+
+/**
  * Resolve a repository-relative path without following repository-controlled
  * links. The returned path is useful only while the checked filesystem state
  * remains unchanged; a same-user concurrent replacement is a documented
  * residual threat unless the caller keeps directory file descriptors open.
+ *
+ * @param {unknown} root
+ * @param {unknown} relativePath
+ * @param {ContainedPathPolicy} [policy]
+ * @returns {ContainedPathResult}
  */
 export function resolveContainedPath(root, relativePath, policy = {}) {
   const rootResult = resolveRoot(root);
@@ -60,13 +95,13 @@ export function resolveContainedPath(root, relativePath, policy = {}) {
   }
 
   let current = rootResult.root;
-  for (let index = 0; index < parsed.parts.length; index += 1) {
-    current = path.join(current, parsed.parts[index]);
+  for (const [index, part] of parsed.parts.entries()) {
+    current = path.join(current, part);
     let stat;
     try {
       stat = fs.lstatSync(current);
     } catch (error) {
-      if (error?.code === "ENOENT") {
+      if (errorCode(error) === "ENOENT") {
         return {
           ok: false,
           status: "missing",
@@ -74,7 +109,7 @@ export function resolveContainedPath(root, relativePath, policy = {}) {
           path: candidate,
           relativePath: parsed.relativePath,
           existingParent: path.dirname(current),
-          missingComponent: parsed.parts[index],
+          missingComponent: part,
           reason: "The requested path does not exist.",
           code: "PATH_MISSING"
         };
@@ -84,7 +119,7 @@ export function resolveContainedPath(root, relativePath, policy = {}) {
         rootResult.root,
         parsed.relativePath,
         "A path component could not be inspected.",
-        error?.code || "LSTAT_FAILED",
+        errorCode(error) || "LSTAT_FAILED",
         candidate
       );
     }
@@ -109,7 +144,7 @@ export function resolveContainedPath(root, relativePath, policy = {}) {
         rootResult.root,
         parsed.relativePath,
         "A path component could not be canonicalized.",
-        error?.code || "REALPATH_FAILED",
+        errorCode(error) || "REALPATH_FAILED",
         candidate
       );
     }
@@ -171,23 +206,48 @@ export function resolveContainedPath(root, relativePath, policy = {}) {
   throw new Error("Unreachable contained-path resolution state.");
 }
 
+/**
+ * @param {unknown} root
+ * @param {unknown} relativePath
+ * @param {ContainedPathPolicy} [policy]
+ * @returns {ContainedPathSuccess}
+ */
 export function assertContainedPath(root, relativePath, policy = {}) {
   const result = resolveContainedPath(root, relativePath, policy);
   if (!result.ok) {
-    const error = new Error(
-      `${relativePath}: ${result.reason} (${result.status})`
+    const error = Object.assign(
+      new Error(
+        `${String(relativePath)}: ${result.reason} (${result.status})`
+      ),
+      {
+        code: result.code,
+        pathResult: result
+      }
     );
-    error.code = result.code;
-    error.pathResult = result;
     throw error;
   }
   return result;
 }
 
+/**
+ * @param {unknown} result
+ * @returns {result is ContainedPathFailure}
+ */
 export function isContainedFailure(result) {
-  return Boolean(result && FAILURE_STATUSES.has(result.status));
+  return Boolean(
+    result &&
+    typeof result === "object" &&
+    "status" in result &&
+    typeof result.status === "string" &&
+    FAILURE_STATUSES.has(result.status)
+  );
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {string}
+ */
 export function sanitizeFilenameComponent(value, fallback = "snapshot") {
   const normalized = String(value || "")
     .normalize("NFKC")
@@ -201,6 +261,10 @@ export function sanitizeFilenameComponent(value, fallback = "snapshot") {
     : candidate;
 }
 
+/**
+ * @param {unknown} root
+ * @returns {ContainedPathResult}
+ */
 function resolveRoot(root) {
   let resolved;
   try {
@@ -237,15 +301,24 @@ function resolveRoot(root) {
     };
   } catch (error) {
     return failure(
-      error?.code === "ENOENT" ? "missing" : "unreadable",
+      errorCode(error) === "ENOENT" ? "missing" : "unreadable",
       resolved,
       null,
       "The repository root could not be canonicalized.",
-      error?.code || "ROOT_REALPATH_FAILED"
+      errorCode(error) || "ROOT_REALPATH_FAILED"
     );
   }
 }
 
+/**
+ * @param {unknown} value
+ * @param {ContainedPathPolicy} policy
+ * @returns {{
+ *   ok: true,
+ *   parts: string[],
+ *   relativePath: string
+ * } | ContainedPathFailure}
+ */
 function parseRelativePath(value, policy) {
   if (typeof value !== "string" || value.includes("\0")) {
     return failure(
@@ -299,6 +372,11 @@ function parseRelativePath(value, policy) {
   };
 }
 
+/**
+ * @param {fs.Stats} stat
+ * @param {"any" | "file" | "directory"} type
+ * @returns {boolean}
+ */
 function matchesType(stat, type) {
   if (type === "any") {
     return stat.isFile() || stat.isDirectory();
@@ -312,6 +390,11 @@ function matchesType(stat, type) {
   throw new Error(`Unknown contained-path type policy: ${type}`);
 }
 
+/**
+ * @param {string} root
+ * @param {string} candidate
+ * @returns {boolean}
+ */
 function isWithin(root, candidate) {
   const relative = path.relative(root, candidate);
   return relative === "" || (
@@ -321,7 +404,16 @@ function isWithin(root, candidate) {
   );
 }
 
+/**
+ * @param {string} left
+ * @param {string} right
+ * @returns {boolean}
+ */
 function samePath(left, right) {
+  /**
+   * @param {string} value
+   * @returns {string}
+   */
   const normalize = (value) => {
     const resolved = path.resolve(value);
     return process.platform === "win32" ? resolved.toLowerCase() : resolved;
@@ -329,12 +421,25 @@ function samePath(left, right) {
   return normalize(left) === normalize(right);
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function realpath(value) {
   return fs.realpathSync.native
     ? fs.realpathSync.native(value)
     : fs.realpathSync(value);
 }
 
+/**
+ * @param {ContainedFailureStatus} status
+ * @param {string | null} root
+ * @param {string | null} relativePath
+ * @param {string} reason
+ * @param {string} code
+ * @param {string | null} [targetPath]
+ * @returns {ContainedPathFailure}
+ */
 function failure(status, root, relativePath, reason, code, targetPath = null) {
   return {
     ok: false,
@@ -345,4 +450,19 @@ function failure(status, root, relativePath, reason, code, targetPath = null) {
     reason,
     code
   };
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorCode(error) {
+  return (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    ? error.code
+    : "";
 }
