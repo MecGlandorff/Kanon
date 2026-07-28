@@ -3,11 +3,14 @@ import {
   completeKanonTodo,
   readKanonTodos
 } from "../persist.js";
-import { renderTodoList } from "../render.js";
+import { readKanonConfig } from "../config.js";
+import { renderTodoList } from "../render/continuity.js";
 import { todoHelpText } from "./args.js";
 import { readStdin, writeStdout } from "./io.js";
-import { safeTerminalText } from "../trust.js";
-import { safeJsonStringify } from "../trust.js";
+import {
+  safeJsonStringify,
+  safeTerminalText
+} from "../trust.js";
 
 /**
  * @param {string} root
@@ -30,7 +33,7 @@ export async function runTodoCommand(root, parsed, io) {
 
   if (action === "add") {
     const text = parsed.flags.stdin
-      ? await readStdin(io)
+      ? await readStdin(io, readKanonConfig(root).inputs.max_todo_bytes)
       : parsed.positionals.slice(1).join(" ");
     const result = addKanonTodo(root, text);
     if (parsed.flags.json) {

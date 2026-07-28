@@ -9,8 +9,7 @@ import {
 import {
   inspectKanonTodos,
   inspectPreviousHandoff,
-  inspectPreviousState,
-  writeKanonOutputs
+  inspectPreviousState
 } from "../persist.js";
 import { renderAsk } from "../render/ask.js";
 import { renderBrief } from "../render/brief.js";
@@ -18,14 +17,11 @@ import {
   renderResume,
   renderVerify
 } from "../render/continuity.js";
-import {
-  safeJsonStringify,
-  safeTerminalText
-} from "../trust.js";
+import { safeJsonStringify } from "../trust.js";
 import { VERSION } from "../version.js";
 import { helpText, parseArgs } from "./args.js";
 import { normalizeIo, writeStdout } from "./io.js";
-import { runTodoCommand } from "./todo.js";
+import { runWriteCommand } from "./write.js";
 
 /**
  * @param {string[]} [argv]
@@ -145,26 +141,9 @@ export async function runCli(argv = [], ioOptions = {}) {
     }
 
     case "todo":
-      await runTodoCommand(root, parsed, io);
+    case "refresh":
+      await runWriteCommand(root, parsed, io);
       return;
-
-    case "refresh": {
-      const analysis = analyzeRepo(root);
-      const result = writeKanonOutputs(analysis, {
-        deep: parsed.flags.deep
-      });
-      writeStdout(
-        io,
-        `Kanon refreshed ${safeTerminalText(result.kanonDir)}\n`
-      );
-      for (const file of result.written) {
-        writeStdout(io, `- ${file}\n`);
-      }
-      for (const warning of result.warnings || []) {
-        writeStdout(io, `Warning: ${safeTerminalText(warning)}\n`);
-      }
-      return;
-    }
 
     default:
       throw new Error(`Unknown command: ${parsed.command}\n\n${helpText()}`);

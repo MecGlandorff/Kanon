@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  collectRuntimeDependencies,
   stableRuntimeArtifacts,
   stableRuntimeCanonicalSources
 } from "../scripts/lib/artifact-files.js";
@@ -19,6 +20,7 @@ const lockfile = readJson("package-lock.json");
 const typeConfig = readJson("tsconfig.json");
 const expectedIncludes = [
   "bin/kanon.js",
+  "bin/kanon-write.js",
   "src/analyze.js",
   "src/analyze/**/*.js",
   "src/ask.js",
@@ -100,9 +102,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 86);
-  assert.equal(sources.length, 86);
-  assert.equal(new Set(targets).size, 86);
+  assert.equal(mappings.length, 81);
+  assert.equal(sources.length, 81);
+  assert.equal(new Set(targets).size, 81);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -181,6 +183,34 @@ test("typed compatibility routes retain the approved public surface", () => {
       fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
       true
     );
+  }
+});
+
+test("shipped compatibility closure contains only explicit write consumers", () => {
+  const closure = new Set([
+    "bin/kanon-write.js",
+    ...collectRuntimeDependencies(repoRoot)
+  ]);
+  assert.equal(closure.size, 54);
+  for (const required of [
+    "bin/kanon-write.js",
+    "src/analyze.js",
+    "src/cli/write.js",
+    "src/cli/todo.js",
+    "src/persist.js"
+  ]) {
+    assert.equal(closure.has(required), true, required);
+  }
+  for (const removed of [
+    "bin/kanon.js",
+    "src/ask.js",
+    "src/ask/intent.js",
+    "src/cli.js",
+    "src/cli/index.js",
+    "src/render.js",
+    "src/render/ask.js"
+  ]) {
+    assert.equal(closure.has(removed), false, removed);
   }
 });
 

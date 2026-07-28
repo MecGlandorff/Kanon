@@ -646,7 +646,7 @@ function scanRepository(root, coverage) {
         }
         const selected = resolveRepositoryPath(root, relative, "directory");
         if (!selected.ok) {
-          recordPathFailure(coverage, selected);
+          recordReadFailure(coverage, selected);
           continue;
         }
         pending.push({ absolute: selected.path, relative });
@@ -681,7 +681,7 @@ function scanRepository(root, coverage) {
       }
       const selected = resolveRepositoryPath(root, relative, "file");
       if (!selected.ok) {
-        recordPathFailure(coverage, selected);
+        recordReadFailure(coverage, selected);
         continue;
       }
       let digest = null;
@@ -1265,13 +1265,7 @@ function fingerprintEvidence(
           sha256: file.sha256,
           truncated: file.sha256 === null
         }))
-    ].map((item) => ({
-      kind: item.kind,
-      path: item.path,
-      size: item.size,
-      sha256: item.sha256,
-      truncated: item.truncated
-    })),
+    ],
     coverage: {
       complete: coverage.complete,
       instruction_complete: coverage.instruction_complete,
@@ -1675,15 +1669,6 @@ function recordReadFailure(coverage, result) {
     samplePath(coverage.unreadable_path_samples, result.relative_path || "");
   }
   coverage.diagnostics.push(result.diagnostic);
-}
-
-/**
- * @param {InspectionCoverage} coverage
- * @param {{status: string, relative_path: string | null, diagnostic: string}} result
- * @returns {void}
- */
-function recordPathFailure(coverage, result) {
-  recordReadFailure(coverage, result);
 }
 
 /**

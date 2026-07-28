@@ -44,8 +44,25 @@ test("dual-host manifests are separate and share skills plus one runtime root", 
     "#kanon-continuity": "./src/continuity/engine.js"
   });
   assert.equal(fs.existsSync(path.join(repoRoot, "skills", "kanon", "runtime")), false);
-  assert.equal(fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon.js")), true);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon-write.js")),
+    true
+  );
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon.js")),
+    false
+  );
   assert.equal(fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon-v1.js")), true);
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "runtime", "bin", "kanon-dispatch")),
+    true
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(repoRoot, "runtime", "bin", "kanon-dispatch.ps1")
+    ),
+    true
+  );
 });
 
 test("embedded metadata exposes only accurate notice-mode capabilities", () => {
@@ -285,6 +302,10 @@ test("package builder uses an exact production allowlist", () => {
   assert.equal(actual.includes("runtime/core/notice.js"), false);
   assert.equal(actual.includes("runtime/package.json"), true);
   assert.equal(actual.includes("runtime/build-metadata.json"), true);
+  assert.equal(actual.includes("runtime/bin/kanon-dispatch"), true);
+  assert.equal(actual.includes("runtime/bin/kanon-dispatch.ps1"), true);
+  assert.equal(actual.includes("runtime/bin/kanon-write.js"), true);
+  assert.equal(actual.includes("runtime/bin/kanon.js"), false);
   assert.equal(actual.includes("runtime/core/plugin-data.js"), true);
   assert.equal(actual.includes("runtime/core/receipt-store.js"), true);
   assert.equal(actual.includes("runtime/core/handoff.js"), true);

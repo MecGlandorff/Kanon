@@ -1224,22 +1224,19 @@ function validTransfer(value) {
  * @returns {boolean}
  */
 function validLastPlanPayload(value) {
-  if (
-    !isPlainRecord(value) ||
-    !hasExactKeys(value, [
+  return (
+    isPlainRecord(value) &&
+    hasExactKeys(value, [
       "plan",
       "provenance",
       "schema",
       "trust"
-    ]) ||
-    value.schema !== "kanon-last-plan-handoff-v1" ||
-    value.provenance !== "caller-supplied-explicit-steer-state" ||
-    value.trust !== "caller-untrusted" ||
-    !isSteerState(value.plan)
-  ) {
-    return false;
-  }
-  return true;
+    ]) &&
+    value.schema === "kanon-last-plan-handoff-v1" &&
+    value.provenance === "caller-supplied-explicit-steer-state" &&
+    value.trust === "caller-untrusted" &&
+    isSteerState(value.plan)
+  );
 }
 
 /**

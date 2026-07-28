@@ -5,7 +5,8 @@ import {
   buildContinuityArtifactMetadata,
   buildContinuityReport
 } from "./continuity/engine.js";
-import { renderBrief, renderResume } from "./render.js";
+import { renderBrief } from "./render/brief.js";
+import { renderResume } from "./render/continuity.js";
 import {
   sanitizeFilenameComponent
 } from "./path-security.js";

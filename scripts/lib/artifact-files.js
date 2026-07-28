@@ -14,9 +14,24 @@ export const PUBLIC_COMMANDS = Object.freeze([
   "verify"
 ]);
 
+export const COMPATIBILITY_WRITE_COMMANDS = Object.freeze([
+  "refresh",
+  "todo"
+]);
+
 export const IMPLEMENTED_STABLE_SKILLS = Object.freeze(
   IMPLEMENTED_PUBLIC_SKILLS.filter((skill) => skill !== "kanon")
 );
+
+export const COMPATIBILITY_RUNTIME_ARTIFACT = Object.freeze([
+  "bin/kanon-write.js",
+  "runtime/bin/kanon-write.js"
+]);
+
+export const SHARED_WRAPPER_ARTIFACTS = Object.freeze([
+  "runtime/bin/kanon-dispatch",
+  "runtime/bin/kanon-dispatch.ps1"
+]);
 
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
@@ -48,7 +63,10 @@ export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/skills/verify.js", "runtime/skills/verify.js"]
 ]);
 
-export function collectRuntimeDependencies(repoRoot, entry = "bin/kanon.js") {
+export function collectRuntimeDependencies(
+  repoRoot,
+  entry = COMPATIBILITY_RUNTIME_ARTIFACT[0]
+) {
   const pending = [entry];
   const visited = new Set();
   const sources = new Set();
@@ -97,7 +115,7 @@ export function collectRuntimeDependencies(repoRoot, entry = "bin/kanon.js") {
  */
 export function stableRuntimeArtifacts(repoRoot) {
   const compatibility = [
-    ["bin/kanon.js", "runtime/bin/kanon.js"],
+    [...COMPATIBILITY_RUNTIME_ARTIFACT],
     ...collectRuntimeDependencies(repoRoot).map(
       (source) => [source, `runtime/${source}`]
     )
@@ -124,6 +142,7 @@ export function publicSkillFiles(repoRoot) {
     "runtime/package.json",
     "runtime/build-metadata.json",
     ...stableRuntimeArtifacts(repoRoot).map(([, target]) => target),
+    ...SHARED_WRAPPER_ARTIFACTS,
     "skills/kanon/SKILL.md",
     "skills/kanon/LICENSE",
     "skills/kanon/agents/openai.yaml",

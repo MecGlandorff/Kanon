@@ -180,6 +180,21 @@ function inspectPackage(root, input) {
       ).isFile(),
       "shared hardened plugin-data, receipt, and handoff modules are shipped"
     ));
+    checks.push(result(
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-dispatch")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-dispatch.ps1")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-write.js")
+      ).isFile() &&
+      !fs.existsSync(
+        path.join(root, "runtime", "bin", "kanon.js")
+      ),
+      "shared fixed-command dispatch and narrow compatibility write runtime are shipped"
+    ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))
       .sort();
@@ -392,6 +407,27 @@ function exerciseWrappersInFixture(packageRoot, fixture) {
   }
   const scripts = path.join(packageRoot, "skills", "kanon", "scripts");
   const family = process.platform === "win32" ? "powershell" : "bash";
+  const rejected = family === "powershell"
+    ? spawnPowerShell(
+        path.join(
+          packageRoot,
+          "runtime",
+          "bin",
+          "kanon-dispatch.ps1"
+        ),
+        ["unsupported"],
+        fixture,
+        true
+      )
+    : spawnSync(
+        path.join(packageRoot, "runtime", "bin", "kanon-dispatch"),
+        ["unsupported"],
+        runOptions(fixture, true)
+      );
+  checks.push(result(
+    rejected.status === 127 && !fs.existsSync(hostileNodeMarker),
+    "shared dispatch rejects unknown commands before PATH resolution"
+  ));
   for (const command of PUBLIC_COMMANDS) {
     checks.push(
       exerciseWrapper(

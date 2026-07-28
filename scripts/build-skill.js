@@ -4,10 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  COMPATIBILITY_RUNTIME_ARTIFACT,
+  COMPATIBILITY_WRITE_COMMANDS,
   collectRuntimeDependencies,
   embeddedBuildMetadata,
   IMPLEMENTED_STABLE_SKILLS,
   PUBLIC_COMMANDS,
+  SHARED_WRAPPER_ARTIFACTS,
   V1_RUNTIME_ARTIFACTS
 } from "./lib/artifact-files.js";
 
@@ -17,7 +20,7 @@ const checkOnly = process.argv.includes("--check");
 const commands = PUBLIC_COMMANDS;
 const artifacts = [];
 
-artifacts.push(copyArtifact("bin/kanon.js", "runtime/bin/kanon.js", 0o755));
+artifacts.push(copyArtifact(...COMPATIBILITY_RUNTIME_ARTIFACT, 0o755));
 for (const sourceRelative of collectRuntimeDependencies(root)) {
   artifacts.push(
     copyArtifact(
@@ -46,18 +49,30 @@ for (const relative of [
   });
 }
 
+artifacts.push({
+  target: path.join(root, SHARED_WRAPPER_ARTIFACTS[0]),
+  relative: SHARED_WRAPPER_ARTIFACTS[0],
+  contents: bashDispatcher(),
+  mode: 0o755
+});
+artifacts.push({
+  target: path.join(root, SHARED_WRAPPER_ARTIFACTS[1]),
+  relative: SHARED_WRAPPER_ARTIFACTS[1],
+  contents: powershellDispatcher(),
+  mode: 0o644
+});
+
 for (const command of commands) {
-  const stableRead = ["ask", "brief", "resume", "verify"].includes(command);
   artifacts.push({
     target: path.join(skillRoot, "scripts", `kanon-${command}`),
     relative: `skills/kanon/scripts/kanon-${command}`,
-    contents: bashWrapper(command, stableRead),
+    contents: bashWrapper(command),
     mode: 0o755
   });
   artifacts.push({
     target: path.join(skillRoot, "scripts", `kanon-${command}.ps1`),
     relative: `skills/kanon/scripts/kanon-${command}.ps1`,
-    contents: powershellWrapper(command, stableRead),
+    contents: powershellWrapper(command),
     mode: 0o644
   });
 }
@@ -66,13 +81,13 @@ for (const skill of IMPLEMENTED_STABLE_SKILLS) {
   artifacts.push({
     target: path.join(stableRoot, "scripts", `kanon-${skill}`),
     relative: `skills/${skill}/scripts/kanon-${skill}`,
-    contents: bashWrapper(skill, true),
+    contents: bashWrapper(skill),
     mode: 0o755
   });
   artifacts.push({
     target: path.join(stableRoot, "scripts", `kanon-${skill}.ps1`),
     relative: `skills/${skill}/scripts/kanon-${skill}.ps1`,
-    contents: powershellWrapper(skill, true),
+    contents: powershellWrapper(skill),
     mode: 0o644
   });
 }
@@ -193,15 +208,12 @@ function readFile(filePath) {
   }
 }
 
-function bashWrapper(command, stable) {
+function bashWrapper(command) {
   return `#!/bin/bash -p
 set -euo pipefail
 
 unset BASH_ENV ENV CDPATH GLOBIGNORE
-unset NODE_OPTIONS NODE_PATH NODE_REDIRECT_WARNINGS NODE_REPL_HISTORY
-unset NODE_V8_COVERAGE NODE_COMPILE_CACHE NODE_DEBUG NODE_DEBUG_NATIVE
 
-COMMAND="${command}"
 SCRIPT_SOURCE="\${BASH_SOURCE[0]}"
 case "$SCRIPT_SOURCE" in
   */*) SCRIPT_PARENT="\${SCRIPT_SOURCE%/*}" ;;
@@ -215,12 +227,58 @@ PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || {
   echo "Kanon could not resolve its installed plugin directory." >&2
   exit 127
 }
-LOCAL_KANON="$PLUGIN_ROOT/runtime/bin/${
-  stable ? "kanon-v1.js" : "kanon.js"
-}"
+DISPATCH="$PLUGIN_ROOT/runtime/bin/kanon-dispatch"
+if [[ -L "$DISPATCH" || ! -f "$DISPATCH" || ! -x "$DISPATCH" ]]; then
+  echo "Kanon shared dispatch runtime is unavailable or unsafe." >&2
+  echo "Reinstall the complete self-contained Kanon plugin." >&2
+  exit 127
+fi
 
-if [[ ! -f "$LOCAL_KANON" ]]; then
-  echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
+exec "$DISPATCH" "${command}" "$@"
+`;
+}
+
+function bashDispatcher() {
+  const stablePattern = stableRuntimeCommands().join("|");
+  const writePattern = COMPATIBILITY_WRITE_COMMANDS.join("|");
+  return `#!/bin/bash -p
+set -euo pipefail
+
+unset BASH_ENV ENV CDPATH GLOBIGNORE
+unset NODE_OPTIONS NODE_PATH NODE_REDIRECT_WARNINGS NODE_REPL_HISTORY
+unset NODE_V8_COVERAGE NODE_COMPILE_CACHE NODE_DEBUG NODE_DEBUG_NATIVE
+
+if (( $# < 1 )); then
+  echo "Kanon requires a fixed supported command." >&2
+  exit 127
+fi
+COMMAND="$1"
+shift
+case "$COMMAND" in
+  ${stablePattern}) RUNTIME_NAME="kanon-v1.js" ;;
+  ${writePattern}) RUNTIME_NAME="kanon-write.js" ;;
+  *)
+    echo "Kanon refused an unsupported dispatch command." >&2
+    exit 127
+    ;;
+esac
+
+SCRIPT_SOURCE="\${BASH_SOURCE[0]}"
+case "$SCRIPT_SOURCE" in
+  */*) SCRIPT_PARENT="\${SCRIPT_SOURCE%/*}" ;;
+  *) SCRIPT_PARENT="." ;;
+esac
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_PARENT" 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed dispatch directory." >&2
+  exit 127
+}
+PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../.." 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed plugin directory." >&2
+  exit 127
+}
+LOCAL_KANON="$SCRIPT_DIR/$RUNTIME_NAME"
+if [[ -L "$LOCAL_KANON" || ! -f "$LOCAL_KANON" ]]; then
+  echo "Kanon skill runtime is unavailable or unsafe." >&2
   echo "Reinstall the complete self-contained Kanon plugin." >&2
   exit 127
 fi
@@ -301,21 +359,71 @@ PATH="$SAFE_PATH" exec "$NODE_PATH" "$LOCAL_KANON" "$COMMAND" "$@"
 `;
 }
 
-function powershellWrapper(command, stable) {
+function powershellWrapper(command) {
   return `$ErrorActionPreference = "Stop"
 
-$KanonCommand = "${command}"
-$PluginRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "../../..") -ErrorAction Stop).Path.TrimEnd(
+$PluginRoot = (Microsoft.PowerShell.Management\\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\\Join-Path $PSScriptRoot "../../..") -ErrorAction Stop).Path.TrimEnd(
+  [System.IO.Path]::DirectorySeparatorChar,
+  [System.IO.Path]::AltDirectorySeparatorChar
+)
+$Dispatch = Microsoft.PowerShell.Management\\Join-Path $PluginRoot "runtime/bin/kanon-dispatch.ps1"
+if (-not (Microsoft.PowerShell.Management\\Test-Path -LiteralPath $Dispatch -PathType Leaf)) {
+  [Console]::Error.WriteLine("Kanon shared dispatch runtime is unavailable or unsafe.")
+  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon plugin.")
+  exit 127
+}
+$DispatchItem = Microsoft.PowerShell.Management\\Get-Item -LiteralPath $Dispatch -ErrorAction Stop
+if ($DispatchItem.LinkType) {
+  [Console]::Error.WriteLine("Kanon shared dispatch runtime is unavailable or unsafe.")
+  exit 127
+}
+
+& $Dispatch "${command}" @args
+exit $LASTEXITCODE
+`;
+}
+
+function powershellDispatcher() {
+  const stableCommands = stableRuntimeCommands()
+    .map((command) => JSON.stringify(command))
+    .join(", ");
+  const writeCommands = COMPATIBILITY_WRITE_COMMANDS
+    .map((command) => JSON.stringify(command))
+    .join(", ");
+  return `$ErrorActionPreference = "Stop"
+
+if ($args.Count -lt 1) {
+  [Console]::Error.WriteLine("Kanon requires a fixed supported command.")
+  exit 127
+}
+$KanonCommand = [string]$args[0]
+$KanonArguments = if ($args.Count -gt 1) {
+  @($args[1..($args.Count - 1)])
+} else {
+  @()
+}
+$StableCommands = @(${stableCommands})
+$WriteCommands = @(${writeCommands})
+if ($StableCommands -ccontains $KanonCommand) {
+  $RuntimeName = "kanon-v1.js"
+} elseif ($WriteCommands -ccontains $KanonCommand) {
+  $RuntimeName = "kanon-write.js"
+} else {
+  [Console]::Error.WriteLine("Kanon refused an unsupported dispatch command.")
+  exit 127
+}
+
+$PluginRoot = (Microsoft.PowerShell.Management\\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\\Join-Path $PSScriptRoot "../..") -ErrorAction Stop).Path.TrimEnd(
   [System.IO.Path]::DirectorySeparatorChar,
   [System.IO.Path]::AltDirectorySeparatorChar
 )
 $PluginPrefix = $PluginRoot + [System.IO.Path]::DirectorySeparatorChar
-$LocalKanon = Join-Path $PluginRoot "runtime/bin/${
-  stable ? "kanon-v1.js" : "kanon.js"
-}"
-
-if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
-  [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
+$LocalKanon = Microsoft.PowerShell.Management\\Join-Path $PSScriptRoot $RuntimeName
+$LocalKanonItem = Microsoft.PowerShell.Management\\Get-Item -LiteralPath $LocalKanon -ErrorAction Stop
+if (-not $LocalKanonItem.PSIsContainer -and -not $LocalKanonItem.LinkType) {
+  $LocalKanon = $LocalKanonItem.FullName
+} else {
+  [Console]::Error.WriteLine("Kanon skill runtime is unavailable or unsafe.")
   [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon plugin.")
   exit 127
 }
@@ -326,7 +434,7 @@ if ($null -eq $PathValue -or $PathValue.Length -gt 32768) {
   exit 127
 }
 
-$RepositoryRoot = (Resolve-Path -LiteralPath (Get-Location).Path -ErrorAction Stop).Path.TrimEnd(
+$RepositoryRoot = (Microsoft.PowerShell.Management\\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\\Get-Location).Path -ErrorAction Stop).Path.TrimEnd(
   [System.IO.Path]::DirectorySeparatorChar,
   [System.IO.Path]::AltDirectorySeparatorChar
 )
@@ -337,7 +445,7 @@ foreach ($PathEntry in $PathValue.Split([System.IO.Path]::PathSeparator)) {
     continue
   }
   try {
-    $PathDirectory = (Resolve-Path -LiteralPath $PathEntry -ErrorAction Stop).Path
+    $PathDirectory = (Microsoft.PowerShell.Management\\Resolve-Path -LiteralPath $PathEntry -ErrorAction Stop).Path
   } catch {
     continue
   }
@@ -381,7 +489,7 @@ if ($null -eq $NodeCandidate) {
   exit 127
 }
 
-$NodeItem = Get-Item -LiteralPath $NodeCandidate -ErrorAction Stop
+$NodeItem = Microsoft.PowerShell.Management\\Get-Item -LiteralPath $NodeCandidate -ErrorAction Stop
 $NodePath = $NodeItem.FullName
 if ($NodeItem.LinkType) {
   $ResolveLinkTarget = $NodeItem.PSObject.Methods["ResolveLinkTarget"]
@@ -439,7 +547,7 @@ try {
     exit 127
   }
 
-  & $NodePath $LocalKanon $KanonCommand @args
+  & $NodePath $LocalKanon $KanonCommand @KanonArguments
   $KanonExitCode = $LASTEXITCODE
 } finally {
   $env:PATH = $OriginalPath
@@ -454,4 +562,15 @@ try {
 
 exit $KanonExitCode
 `;
+}
+
+function stableRuntimeCommands() {
+  return Array.from(
+    new Set([
+      ...PUBLIC_COMMANDS.filter(
+        (command) => !COMPATIBILITY_WRITE_COMMANDS.includes(command)
+      ),
+      ...IMPLEMENTED_STABLE_SKILLS
+    ])
+  ).sort();
 }

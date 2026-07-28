@@ -2,10 +2,7 @@
 set -euo pipefail
 
 unset BASH_ENV ENV CDPATH GLOBIGNORE
-unset NODE_OPTIONS NODE_PATH NODE_REDIRECT_WARNINGS NODE_REPL_HISTORY
-unset NODE_V8_COVERAGE NODE_COMPILE_CACHE NODE_DEBUG NODE_DEBUG_NATIVE
 
-COMMAND="steer"
 SCRIPT_SOURCE="${BASH_SOURCE[0]}"
 case "$SCRIPT_SOURCE" in
   */*) SCRIPT_PARENT="${SCRIPT_SOURCE%/*}" ;;
@@ -19,84 +16,11 @@ PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || {
   echo "Kanon could not resolve its installed plugin directory." >&2
   exit 127
 }
-LOCAL_KANON="$PLUGIN_ROOT/runtime/bin/kanon-v1.js"
-
-if [[ ! -f "$LOCAL_KANON" ]]; then
-  echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
+DISPATCH="$PLUGIN_ROOT/runtime/bin/kanon-dispatch"
+if [[ -L "$DISPATCH" || ! -f "$DISPATCH" || ! -x "$DISPATCH" ]]; then
+  echo "Kanon shared dispatch runtime is unavailable or unsafe." >&2
   echo "Reinstall the complete self-contained Kanon plugin." >&2
   exit 127
 fi
 
-PATH_VALUE="${PATH-}"
-if (( ${#PATH_VALUE} > 32768 )); then
-  echo "Kanon refused an oversized executable search path." >&2
-  exit 127
-fi
-
-REPOSITORY_ROOT="$(pwd -P)"
-SAFE_PATH=""
-IFS=':' read -r -a PATH_ENTRIES <<< "$PATH_VALUE"
-for PATH_ENTRY in "${PATH_ENTRIES[@]}"; do
-  if [[ "$PATH_ENTRY" != /* ]]; then
-    continue
-  fi
-  PATH_DIRECTORY="$(CDPATH= cd -- "$PATH_ENTRY" 2>/dev/null && pwd -P)" || continue
-  if [[ "$PATH_DIRECTORY" == "$REPOSITORY_ROOT" || "$PATH_DIRECTORY" == "$REPOSITORY_ROOT/"* ]]; then
-    continue
-  fi
-  if [[ "$PATH_DIRECTORY" == "$PLUGIN_ROOT" || "$PATH_DIRECTORY" == "$PLUGIN_ROOT/"* ]]; then
-    continue
-  fi
-  SAFE_PATH="${SAFE_PATH:+$SAFE_PATH:}$PATH_DIRECTORY"
-done
-
-NODE_CANDIDATE="$(PATH="$SAFE_PATH" type -P node || true)"
-if [[ -z "$NODE_CANDIDATE" || "$NODE_CANDIDATE" != /* || "$NODE_CANDIDATE" == *$'\n'* ]]; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25." >&2
-  exit 127
-fi
-
-NODE_PATH=""
-for REALPATH_BINARY in /usr/bin/realpath /bin/realpath; do
-  if [[ -x "$REALPATH_BINARY" ]]; then
-    NODE_PATH="$("$REALPATH_BINARY" -- "$NODE_CANDIDATE" 2>/dev/null || true)"
-    break
-  fi
-done
-if [[ -z "$NODE_PATH" ]]; then
-  if [[ -L "$NODE_CANDIDATE" ]]; then
-    echo "Kanon could not safely resolve the Node.js executable." >&2
-    exit 127
-  fi
-  NODE_PARENT="${NODE_CANDIDATE%/*}"
-  NODE_NAME="${NODE_CANDIDATE##*/}"
-  if [[ -z "$NODE_PARENT" || "$NODE_PARENT" == "$NODE_CANDIDATE" || -z "$NODE_NAME" ]]; then
-    echo "Kanon could not safely resolve the Node.js executable." >&2
-    exit 127
-  fi
-  NODE_DIRECTORY="$(CDPATH= cd -- "$NODE_PARENT" 2>/dev/null && pwd -P)" || {
-    echo "Kanon could not safely resolve the Node.js executable." >&2
-    exit 127
-  }
-  NODE_PATH="$NODE_DIRECTORY/$NODE_NAME"
-fi
-if [[ ! -f "$NODE_PATH" || ! -x "$NODE_PATH" || "$NODE_PATH" == *$'\n'* ]]; then
-  echo "Kanon could not safely resolve the Node.js executable." >&2
-  exit 127
-fi
-if [[ "$NODE_PATH" == "$REPOSITORY_ROOT" || "$NODE_PATH" == "$REPOSITORY_ROOT/"* ]]; then
-  echo "Kanon refused a repository-controlled Node.js executable." >&2
-  exit 127
-fi
-if [[ "$NODE_PATH" == "$PLUGIN_ROOT" || "$NODE_PATH" == "$PLUGIN_ROOT/"* ]]; then
-  echo "Kanon refused a plugin-controlled Node.js executable." >&2
-  exit 127
-fi
-
-NODE_MAJOR="$(PATH="$SAFE_PATH" "$NODE_PATH" -p 'process.versions.node.split(".")[0]')"
-if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $(PATH="$SAFE_PATH" "$NODE_PATH" --version)." >&2
-  exit 127
-fi
-
-PATH="$SAFE_PATH" exec "$NODE_PATH" "$LOCAL_KANON" "$COMMAND" "$@"
+exec "$DISPATCH" "steer" "$@"
