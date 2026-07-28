@@ -1,0 +1,99 @@
+{
+  "schema": "kanon-paired-ablation-config-v1",
+  "candidate": {
+    "commit": "74208b9a21652f2e99d41000881f66e73d7eceeb",
+    "version": "0.4.0-rc.1",
+    "artifact_sha256": "89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a",
+    "installed_conformance_checks": 43
+  },
+  "corpus": {
+    "manifest_sha256": "4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92",
+    "revisions_sha256": "f92a3940d2dfdafbae10118b19f4aaf0a2a3aa7107542b19fe1e12ead20b5ff8",
+    "case_count": 30,
+    "evaluation_role": "development",
+    "labels_location": "control-plane-only"
+  },
+  "prompt": {
+    "source": "eval/PAIRED_ABLATION.md",
+    "sha256": "191c8ae67446fb84857a4c80e2f9fbca2bbaaa826d16799982866f475edcdb82",
+    "bytes": 556
+  },
+  "answer_schema": {
+    "source": "eval/paired-answer.schema.json",
+    "sha256": "0e0270bf4a2457f7dafc89acaa5db745287cef8200dcf84df4dbc45ad9167183",
+    "bytes": 1960
+  },
+  "randomization": {
+    "seed_hex": "eb15108f7b7505b4fc0fad4a970ee6cce2a55f0e8d7d12da953dc4fe1cd3bf47",
+    "seed_commitment_sha256": "d94fc9b9c321dfaaea24c379cd43f8aef70e7ccde04642c55a9ee10a5e0d36b2",
+    "repetitions": 3,
+    "arms": [
+      "plain",
+      "kanon"
+    ],
+    "expected_primary_runs": 180
+  },
+  "controls": {
+    "model": {
+      "id": "gpt-5.6-sol",
+      "snapshot": null,
+      "snapshot_status": "Unknown",
+      "reasoning_effort": "max"
+    },
+    "codex_surface": {
+      "kind": "codex-cli-exec-json",
+      "version": "0.145.0",
+      "version_status": "Known"
+    },
+    "max_model_turns_per_run": 1,
+    "max_input_tokens_per_run": 32768,
+    "max_output_tokens_per_run": 4096,
+    "max_wall_clock_ms_per_run": 300000,
+    "max_tool_calls_per_run": 24,
+    "concurrency": 1,
+    "scored_attempt_retries": 0,
+    "filesystem": {
+      "inspected_checkout": "read-only",
+      "git_metadata": "absent",
+      "kanon_outputs": "absent-both-arms",
+      "labels": "outside-inspected-checkout",
+      "prior_outputs": "outside-inspected-checkout",
+      "repository_code_execution": "forbidden"
+    },
+    "network": "disabled-except-model-api",
+    "environment": {
+      "inheritance": "explicit-allowlist",
+      "allowed_names": [
+        "CODEX_HOME",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "NO_COLOR",
+        "PATH",
+        "TEMP",
+        "TMP",
+        "TMPDIR"
+      ],
+      "serialized_secret_values": false
+    },
+    "subprocess": {
+      "executable_policy": "canonical-absolute-outside-repository",
+      "sandbox": "read-only",
+      "approval_policy": "never",
+      "ephemeral": true,
+      "json_events": true,
+      "prompt_transport": "stdin",
+      "output_schema": "strict-json"
+    }
+  },
+  "storage": {
+    "maximum_bytes": 8589934592,
+    "raw_answer_maximum_bytes": 65536
+  },
+  "bootstrap": {
+    "method": "paired-repository-cluster-bootstrap",
+    "iterations": 10000,
+    "confidence": 0.95
+  }
+}

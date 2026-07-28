@@ -4,15 +4,17 @@
 
 This is an in-sample frozen compatibility sample, not a population-level capability estimate.
 
-Raw report: `eval/results/development-0.4.0-rc.1.json`
+Raw report: `eval/results/development-0.4.0-rc.1-d2a-74208b9a.json`
 
-Raw report SHA-256: `1a7d22263822faada2e7bca583308dbc1fdad718839165d6636e69ba97756c60`
+Raw report SHA-256: `747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3`
 
-Generated: `2026-07-26T19:41:07.447Z`
+Generated: `2026-07-28T22:07:52.691Z`
 
-Candidate: `865cd838411635760f6b79a23432bbcde472b7df` at `0.4.0-rc.1` (worktree clean: `false`)
+Candidate: `74208b9a21652f2e99d41000881f66e73d7eceeb` at `0.4.0-rc.1` (worktree clean: `false`)
 
-Analyzer: `0.4.0-rc.1` (source-tree)
+Analyzer: `0.4.0-rc.1` (installed-artifact)
+
+Artifact SHA-256: `89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a` (conformance: `true`)
 
 Corpus SHA-256: `4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92`
 

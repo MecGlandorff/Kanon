@@ -7,6 +7,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   atomicWriteContained
 } from "../src/persistence/safe-fs.js";
+import { runGit } from "../src/git-runner.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import {
@@ -46,7 +47,16 @@ try {
     assertNoCorpusOverlap(corpus, developmentCorpus);
     assertReleasePolicyMatches(corpus, developmentCorpus);
     assertFrozenReleaseCandidate(repoRoot, corpus);
-    artifactOptions = await loadReleaseArtifact(options, corpus);
+    artifactOptions = await loadBoundArtifact(options, {
+      commit: corpus.release.candidate_commit,
+      version: corpus.release.candidate_version
+    });
+  } else if (hasArtifactOption(options)) {
+    validateDevelopmentArtifactInvocation(options);
+    artifactOptions = await loadBoundArtifact(
+      options,
+      observeDevelopmentIdentity(repoRoot)
+    );
   }
 
   const run = await runCorpus(corpus, {
@@ -121,7 +131,7 @@ function validateReleaseInvocation(options, corpus) {
   }
 }
 
-async function loadReleaseArtifact(options, corpus) {
+async function loadBoundArtifact(options, candidate) {
   const artifactSha256 = sha256BoundedFile(
     options.artifactTarball,
     128 * 1024 * 1024
@@ -130,24 +140,38 @@ async function loadReleaseArtifact(options, corpus) {
     options.conformanceReport,
     2 * 1024 * 1024
   );
+  if (conformance.schema !== "kanon-artifact-conformance-v1") {
+    throw new Error("Unsupported artifact conformance report schema.");
+  }
   if (conformance.artifact_sha256 !== artifactSha256) {
     throw new Error(
       "Conformance report artifact hash does not match the tarball."
     );
   }
   if (
-    conformance.candidate_commit !== corpus.release.candidate_commit ||
-    conformance.candidate_version !== corpus.release.candidate_version
+    conformance.candidate_commit !== candidate.commit ||
+    conformance.candidate_version !== candidate.version
   ) {
     throw new Error(
-      "Conformance report candidate identity does not match the corpus."
+      "Conformance report candidate identity does not match the selected candidate."
     );
+  }
+  if (conformance.passed !== true) {
+    throw new Error("Artifact conformance did not pass.");
   }
 
   const artifactRoot = canonicalDirectory(options.artifactRoot);
+  if (
+    typeof conformance.installed_package_root !== "string" ||
+    canonicalDirectory(conformance.installed_package_root) !== artifactRoot
+  ) {
+    throw new Error(
+      "Conformance report installed root does not match --artifact-root."
+    );
+  }
   const analyzer = resolveContainedPath(
     artifactRoot,
-    "skills/kanon/runtime/src/analyze.js",
+    "runtime/src/analyze.js",
     { type: "file" }
   );
   if (!analyzer.ok) {
@@ -164,7 +188,7 @@ async function loadReleaseArtifact(options, corpus) {
   return {
     analyzerModule: analyzer.path,
     analyzerSource: "installed-artifact",
-    analyzerVersion: corpus.release.candidate_version,
+    analyzerVersion: candidate.version,
     artifactSha256,
     artifactConformance: {
       applicable: true,
@@ -175,6 +199,61 @@ async function loadReleaseArtifact(options, corpus) {
       report: conformance
     }
   };
+}
+
+function hasArtifactOption(options) {
+  return Boolean(
+    options.artifactTarball ||
+    options.artifactRoot ||
+    options.conformanceReport
+  );
+}
+
+function validateDevelopmentArtifactInvocation(options) {
+  for (const [field, flag] of [
+    [options.artifactTarball, "--artifact-tarball"],
+    [options.artifactRoot, "--artifact-root"],
+    [options.conformanceReport, "--conformance-report"]
+  ]) {
+    if (!field) {
+      throw new Error(
+        `Artifact-bound development evaluation requires ${flag}.`
+      );
+    }
+  }
+}
+
+function observeDevelopmentIdentity(root) {
+  const manifest = readBoundedJson(
+    path.join(root, "package.json"),
+    64 * 1024
+  );
+  const commit = readGitScalar(root, ["rev-parse", "HEAD"]);
+  if (!/^[0-9a-f]{40}$/.test(commit)) {
+    throw new Error(
+      "Artifact-bound development evaluation requires a known full HEAD."
+    );
+  }
+  if (
+    typeof manifest.version !== "string" ||
+    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(manifest.version)
+  ) {
+    throw new Error(
+      "Artifact-bound development evaluation requires a semantic package version."
+    );
+  }
+  return { commit, version: manifest.version };
+}
+
+function readGitScalar(root, args) {
+  const result = runGit(root, args, {
+    maxOutputBytes: 64 * 1024,
+    timeoutMs: 5_000
+  });
+  if (!result.ok) {
+    throw new Error("Unable to observe the development candidate identity.");
+  }
+  return result.stdout.trim();
 }
 
 function parseArgs(argv) {
@@ -314,10 +393,12 @@ Development options:
   --json-output <path>            Write the raw report atomically
   --require-role <role>           Require development or release
 
-Required for release:
-  --expected-corpus-sha256 <sha>  Frozen manifest identity
+Required together for an artifact-bound development run or release:
   --artifact-tarball <path>       Exact packed artifact
   --artifact-root <path>          Empty-prefix installation of that artifact
   --conformance-report <path>     Wrapper/read/write conformance report
+
+Additionally required for release:
+  --expected-corpus-sha256 <sha>  Frozen manifest identity
 `;
 }

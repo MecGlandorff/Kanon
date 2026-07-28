@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kanon paired-ablation final answer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "important_files",
+    "run",
+    "test"
+  ],
+  "properties": {
+    "important_files": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+          }
+        }
+      }
+    },
+    "run": {
+      "$ref": "#/$defs/command"
+    },
+    "test": {
+      "$ref": "#/$defs/command"
+    }
+  },
+  "$defs": {
+    "command": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "cwd",
+            "command"
+          ],
+          "properties": {
+            "status": {
+              "const": "prediction"
+            },
+            "cwd": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?![A-Za-z]:[\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+            },
+            "command": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "abstain"
+            },
+            "cwd": {
+              "const": ""
+            },
+            "command": {
+              "const": ""
+            }
+          }
+        }
+      ]
+    }
+  }
+}

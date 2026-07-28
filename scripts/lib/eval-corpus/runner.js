@@ -220,10 +220,12 @@ export function analyzeCase(
       cwd: repositoryRoot,
       encoding: "utf8",
       env: {
-        ...process.env,
         LANG: "C",
         LC_ALL: "C",
         NO_COLOR: "1",
+        TEMP: os.tmpdir(),
+        TMP: os.tmpdir(),
+        TMPDIR: os.tmpdir(),
         TZ: "UTC"
       },
       input: JSON.stringify({

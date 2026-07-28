@@ -18,7 +18,11 @@ import {
   validateCorpus,
   wilsonInterval
 } from "../scripts/lib/eval-corpus.js";
+import {
+  repositoryCacheName
+} from "../scripts/lib/eval-corpus/checkout.js";
 import { HEURISTIC_REGISTRY } from "../src/code-intel/heuristics.js";
+import { runGit } from "../src/git-runner.js";
 import { validateDevelopmentReport } from "../scripts/lib/development-report.js";
 import { npmInvocation } from "../scripts/lib/npm-runner.js";
 import { makeFixture, readJson, sha256File } from "./helpers.js";
@@ -493,6 +497,161 @@ test("per-case analysis timeout is enforced by process isolation", () => {
       ),
     /timed out after 250 ms/
   );
+});
+
+test("analysis workers inherit no arbitrary parent secret environment", () => {
+  const root = makeFixture({
+    "analyzer.mjs": `
+      export function analyzeRepo() {
+        if (process.env.KANON_SECRET_SENTINEL) {
+          throw new Error("secret environment inherited");
+        }
+        return {
+          state: {
+            version: "0.4.0-rc.1",
+            important_files: [],
+            commands: { run: [], test: [] },
+            scan: { complete: true }
+          }
+        };
+      }
+    `
+  });
+  const previous = process.env.KANON_SECRET_SENTINEL;
+  process.env.KANON_SECRET_SENTINEL = "must-not-cross";
+  try {
+    const result = analyzeCase(
+      path.join(root, "analyzer.mjs"),
+      root,
+      { revision: "a".repeat(40) },
+      2_000
+    );
+    assert.equal(result.state.version, "0.4.0-rc.1");
+  } finally {
+    if (previous === undefined) {
+      delete process.env.KANON_SECRET_SENTINEL;
+    } else {
+      process.env.KANON_SECRET_SENTINEL = previous;
+    }
+  }
+});
+
+test("artifact-bound development evaluation loads the shipped runtime path", () => {
+  const root = makeFixture({}, "kanon-development-artifact-");
+  const artifactRoot = path.join(root, "artifact-root");
+  const analyzerDirectory = path.join(
+    artifactRoot,
+    "runtime",
+    "src"
+  );
+  const cacheRoot = path.join(root, "cache");
+  fs.mkdirSync(analyzerDirectory, { recursive: true });
+  fs.mkdirSync(cacheRoot);
+  const item = corpus.cases[0];
+  const acceptedRun = item.labels.run?.accepted?.[0];
+  const acceptedTest = item.labels.test?.accepted?.[0];
+  fs.writeFileSync(
+    path.join(analyzerDirectory, "analyze.js"),
+    `export function analyzeRepo() {
+      return ${JSON.stringify({
+        state: {
+          version: "0.4.0-rc.1",
+          important_files: item.labels.important_files.map(
+            (label) => ({ path: label.path })
+          ),
+          commands: {
+            run: acceptedRun ? [acceptedRun] : [],
+            test: acceptedTest ? [acceptedTest] : []
+          },
+          scan: { complete: true }
+        }
+      })};
+    }\n`
+  );
+  const cached = path.join(
+    cacheRoot,
+    repositoryCacheName(item.repository, item.revision)
+  );
+  fs.mkdirSync(cached);
+  const tarball = path.join(root, "candidate.tgz");
+  fs.writeFileSync(tarball, "fixture artifact");
+  const head = runGit(repoRoot, ["rev-parse", "HEAD"], {
+    timeoutMs: 5_000,
+    maxOutputBytes: 64 * 1024
+  });
+  assert.equal(head.ok, true, head.diagnostic);
+  const conformance = path.join(root, "conformance.json");
+  fs.writeFileSync(
+    conformance,
+    `${JSON.stringify({
+      schema: "kanon-artifact-conformance-v1",
+      candidate_commit: head.stdout.trim(),
+      candidate_version: "0.4.0-rc.1",
+      artifact_sha256: sha256File(tarball),
+      installed_package_root: fs.realpathSync(artifactRoot),
+      checks: [],
+      passed: true,
+      reasons: []
+    })}\n`
+  );
+  const output = path.join(root, "development.json");
+  const invocation = spawnSync(
+    process.execPath,
+    [
+      "scripts/eval-corpus.js",
+      "--require-role",
+      "development",
+      "--repo",
+      item.id,
+      "--no-fetch",
+      "--cache",
+      cacheRoot,
+      "--artifact-tarball",
+      tarball,
+      "--artifact-root",
+      artifactRoot,
+      "--conformance-report",
+      conformance,
+      "--json-output",
+      output
+    ],
+    commandOptions(20_000)
+  );
+  assert.ok(
+    invocation.status === 0 || invocation.status === 1,
+    invocation.stderr
+  );
+  const report = readJson(output);
+  assert.equal(report.analyzer.source, "installed-artifact");
+  assert.equal(report.artifact.sha256, sha256File(tarball));
+  assert.equal(report.artifact.conformance.passed, true);
+  assert.equal(report.results.length, 1);
+  assert.equal(report.results[0].analysis_error, null);
+
+  const substitutedRoot = path.join(root, "substituted-root");
+  fs.mkdirSync(substitutedRoot);
+  const substituted = spawnSync(
+    process.execPath,
+    [
+      "scripts/eval-corpus.js",
+      "--require-role",
+      "development",
+      "--repo",
+      item.id,
+      "--no-fetch",
+      "--cache",
+      cacheRoot,
+      "--artifact-tarball",
+      tarball,
+      "--artifact-root",
+      substitutedRoot,
+      "--conformance-report",
+      conformance
+    ],
+    commandOptions(20_000)
+  );
+  assert.equal(substituted.status, 2);
+  assert.match(substituted.stderr, /installed root does not match/);
 });
 
 test("incomplete scans are reported but only block release evaluation", () => {

@@ -22,6 +22,7 @@
     "conform:artifact": "node scripts/conform-artifact.js",
     "eval:corpus": "node scripts/eval-corpus.js",
     "eval:dev": "node scripts/eval-corpus.js --require-role development",
+    "eval:paired:rehearse": "node scripts/paired-ablation.js",
     "eval:release": "node scripts/eval-corpus.js --corpus eval/release-corpus.json --require-role release",
     "results:dev": "node scripts/render-results.js",
     "test": "node --test",
