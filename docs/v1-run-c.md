@@ -1,7 +1,7 @@
 # Kanon v1 Run C implementation record
 
-**Status:** Run C is in progress on `release/v.1.0.0`. Product slices 9 and
-10 are accepted; slices 11 through 13 remain unimplemented in this record. This is
+**Status:** Run C is in progress on `release/v.1.0.0`. Product slices 9 through
+11 are accepted; slices 12 and 13 remain unimplemented in this record. This is
 not a release claim and does not authorize slice 14.
 
 The authoritative contract is [`V_1design.md`](../V_1design.md), including
@@ -181,3 +181,82 @@ a hostile `toJSON` function is not invoked.
   verify work before any completion claim.
 
 No P0 or P1 remains for slice 10.
+
+## Slice 11 — consent-driven aswitch handoff
+
+### Accepted behavior
+
+- Both host adapters expose `aswitch` through the shared stable envelope and
+  exact-version deprecation check.
+- `kanon-aswitch-request-v1` is a bounded 64 KiB standard-input request with
+  exactly one preview, write, or receive operation. Raw handoff content never
+  enters process arguments.
+- A missing target produces an explicit target-selection state. The skill
+  always offers exactly Last plan, Compacted structured handoff, and
+  Full-history archive. Last plan is the default; compacted becomes
+  recommended when no validated caller-supplied steer plan is available.
+  Full-history remains experimental and unavailable in this slice.
+- `kanon-aswitch-preview-v1` displays the selected payload, provenance, trust,
+  source coverage, omissions, destination, and suggested next action. Its
+  SHA-256 binds the canonical plan and destination.
+- A write occurs only when a `kanon-aswitch-approval-v1` caller assertion of
+  explicit approval exactly matches the preview. The approval is never
+  treated as host proof or execution authorization.
+- `kanon-agent-handoff-v1` is capped at 64 KiB and written atomically only to a
+  content-derived filename in an existing canonical, user-selected external
+  directory. Each destination is capped at eight Kanon handoffs and 256
+  inspected entries. The repository remains byte-for-byte read-only.
+- Last-plan carries only the bounded steer state plus essential repository
+  identity. Compacted handoff separates goal, caller-asserted decisions,
+  constraints, live-work claim, evidence claims, directly observed changed
+  paths, validation claims, Unknowns, remaining plan, and a Suggested next
+  step. Free text remains `caller-untrusted`.
+- Receive validates schema, semantic SHA-256, content-derived filename,
+  canonical root, recorded commit, complete normalized change-set
+  fingerprint, and target host. Complete matches are `Current`; a known
+  mismatch is `Stale`; unavailable evidence is `Unknown`.
+- No process is launched. The manual fallback is a structured `Suggested`
+  command model with executable resolution `Unknown`; its one argument
+  contains only Kanon's fixed bootstrap and the safe handoff path.
+
+### Correction loop and validation evidence
+
+The principal review added a transferred-steer-state validator, rebound every
+preview before envelope creation, rejected hostile nested plan access, made
+Unknown changed-file sets empty, capped per-destination file and enumeration
+resources, and removed an overclaim that Windows ACL privacy was Known.
+Linked, overlapping, noncanonical, over-capacity, malformed, oversized, and
+approval-mismatched destinations fail closed without a repository write.
+
+- Focused aswitch, stable-skill, adversarial, plugin, type, wrapper, and scope
+  tests: 75 tests, 74 passed, 1 PowerShell availability check skipped,
+  0 failed.
+- Strict checked JavaScript passed with zero diagnostics; generated
+  synchronization produced 112 artifacts and the subsequent check passed.
+- Full `npm run validate`: 205 tests, 203 passed, 2 platform proofs skipped,
+  0 failed.
+- Both plugin validators, JavaScript syntax, JSON parsing, package allowlist,
+  installed-artifact conformance, and `git diff --check` passed. The
+  pre-commit package contained 131 allowlisted entries; installed-artifact
+  conformance passed 38 of 38 checks with artifact SHA-256
+  `312be2497783068b131d1b29e0f6570018b02822b523bccc641d969a4f58fe57`.
+
+### Residual classification
+
+- **Known:** both adapter paths implement identical bounded request schemas,
+  preview/write consent gates, manual fallback structure, and receiving
+  comparisons. The exact installed artifact exercises the stable wrapper.
+- **Likely:** a host agent following the skill contract can show the preview
+  and obtain actual user consent; runtime evidence proves only the bounded
+  caller assertion, not the human interaction.
+- **Unknown:** manual executable resolution and host acceptance are untested;
+  Windows ACL privacy equivalence is unavailable; a missing latest plan is not
+  evidence that none exists; and incomplete Git state prevents `Current`.
+- **Stale / suspicious:** earlier Run C statements that `aswitch` is absent
+  are superseded. A known receiving mismatch is explicitly Stale.
+- **Suggested:** use the manual command only after user review, and refresh the
+  handoff or obtain explicit approval before continuing from Stale or Unknown.
+
+Same-user replacement between destination validation and atomic rename remains
+a residual race where portable descriptor-relative traversal is unavailable.
+The checksum detects change, not authorship. No P0 or P1 remains for slice 11.

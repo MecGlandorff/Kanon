@@ -168,8 +168,17 @@ function inspectPackage(root, input) {
       ).isFile() &&
       fs.statSync(
         path.join(root, "runtime", "core", "receipt-store.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "handoff.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "handoff-store.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "skills", "aswitch.js")
       ).isFile(),
-      "shared hardened plugin-data and receipt-store modules are shipped"
+      "shared hardened plugin-data, receipt, and handoff modules are shipped"
     ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))
@@ -221,8 +230,10 @@ function inspectPackage(root, input) {
       "experimental improve/refactor modules are absent"
     ));
     checks.push(result(
-      !all.some((file) => /(?:^|\/)aswitch(?:\/|[.-])/.test(file)),
-      "unimplemented aswitch capability is absent"
+      !all.some((file) =>
+        /(?:^|\/)(?:terminal-launch|full-history)(?:\/|[.-])/.test(file)
+      ),
+      "unimplemented terminal-launch and full-history surfaces are absent"
     ));
   } catch (error) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
@@ -412,16 +423,77 @@ function exerciseWrapper(wrapper, command, family, fixture, surface) {
   const execution = family === "powershell"
     ? spawnPowerShell(wrapper, args, fixture, true, input)
     : spawnSync(wrapper, args, runOptions(fixture, true, input));
+  const semantic = execution.status === 0
+    ? validateStableJsonWrapper(command, execution.stdout)
+    : { ok: false, diagnostic: "" };
+  const passed = execution.status === 0 && semantic.ok;
   return {
     name: `${family} ${surface} wrapper ${command}`,
-    passed: execution.status === 0,
+    passed,
     reason:
-      execution.status === 0
-        ? `${family} ${surface} wrapper ${command} passed`
+      passed
+        ? `${family} ${surface} wrapper ${command} passed${
+            semantic.diagnostic ? `: ${semantic.diagnostic}` : ""
+          }`
         : `${family} ${surface} wrapper ${command} failed: ${
-            execution.stderr?.trim() || execution.status
+            semantic.diagnostic ||
+            execution.stderr?.trim() ||
+            execution.status
           }`
   };
+}
+
+function validateStableJsonWrapper(command, stdout) {
+  if (command !== "steer" && command !== "aswitch") {
+    return { ok: true, diagnostic: "" };
+  }
+  try {
+    const output = JSON.parse(stdout);
+    const baseValid =
+      output?.schema === "kanon-stable-skill-result-v1" &&
+      output.skill === command &&
+      output.host?.mode === "notice" &&
+      output.host.enforcement === false;
+    if (!baseValid) {
+      return {
+        ok: false,
+        diagnostic: `${command} output failed the stable result contract`
+      };
+    }
+    if (command === "steer") {
+      const valid =
+        output.report?.schema === "kanon-steer-report-v1" &&
+        output.report.state?.schema === "kanon-steer-state-v1" &&
+        output.report.state.authorization === false;
+      return {
+        ok: valid,
+        diagnostic: valid
+          ? "validated non-authorizing steer result"
+          : "steer output failed the state contract"
+      };
+    }
+    const modes = output.report?.payload_options?.map(
+      (option) => option?.mode
+    );
+    const valid =
+      output.report?.schema === "kanon-aswitch-report-v1" &&
+      output.report.stage === "AwaitingTarget" &&
+      output.report.authorization === false &&
+      output.report.automatic_launch === false &&
+      JSON.stringify(modes) ===
+        JSON.stringify(["last-plan", "compacted", "full-history"]);
+    return {
+      ok: valid,
+      diagnostic: valid
+        ? "validated consent-gated aswitch result"
+        : "aswitch output failed the handoff contract"
+    };
+  } catch {
+    return {
+      ok: false,
+      diagnostic: `${command} output was not valid JSON`
+    };
+  }
 }
 
 function wrapperName(command, family) {
@@ -444,12 +516,15 @@ function wrapperArguments(command) {
   if (command === "steer") {
     return ["--state-stdin", "--json"];
   }
+  if (command === "aswitch") {
+    return ["--request-stdin", "--json"];
+  }
   return command === "brief" ? ["--json"] : [];
 }
 
 function wrapperInput(command) {
-  return command === "steer"
-    ? `${JSON.stringify({
+  if (command === "steer") {
+    return `${JSON.stringify({
         schema: "kanon-steer-request-v1",
         phase: "understand",
         desired_outcome: "verify installed artifact behavior",
@@ -464,8 +539,21 @@ function wrapperInput(command) {
         },
         required_verification: ["observe wrapper status"],
         stop_or_redirect_reasons: []
-      })}\n`
-    : undefined;
+      })}\n`;
+  }
+  if (command === "aswitch") {
+    return `${JSON.stringify({
+      schema: "kanon-aswitch-request-v1",
+      operation: "preview",
+      target_host: null,
+      payload_mode: null,
+      destination_root: null,
+      last_plan: null,
+      compacted: null,
+      approval: null
+    })}\n`;
+  }
+  return undefined;
 }
 
 function spawnPowerShell(

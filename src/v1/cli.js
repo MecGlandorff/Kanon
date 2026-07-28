@@ -14,6 +14,7 @@ const MAX_ARGUMENTS = 64;
 const MAX_ARGUMENT_BYTES = 16 * 1024;
 const MAX_RECEIPT_INPUT_BYTES = 16 * 1024;
 const MAX_STEER_STATE_INPUT_BYTES = 32 * 1024;
+const MAX_ASWITCH_REQUEST_INPUT_BYTES = 64 * 1024;
 
 /**
  * @typedef {{
@@ -25,6 +26,7 @@ const MAX_STEER_STATE_INPUT_BYTES = 32 * 1024;
  *     version: boolean,
  *     receipt_stdin: boolean,
  *     state_stdin: boolean,
+ *     request_stdin: boolean,
  *     root: string | null,
  *     task: string | null
  *   }
@@ -70,6 +72,13 @@ export async function runStableCli(argvInput, ioInput = {}) {
         "Steer state"
       )
     : undefined;
+  const aswitchRequest = parsed.flags.request_stdin
+    ? await readBoundedJson(
+        ioInput.stdin || process.stdin,
+        MAX_ASWITCH_REQUEST_INPUT_BYTES,
+        "Aswitch request"
+      )
+    : undefined;
   const invocation = {
     schema: /** @type {"kanon-stable-invocation-v1"} */ (
       "kanon-stable-invocation-v1"
@@ -79,7 +88,10 @@ export async function runStableCli(argvInput, ioInput = {}) {
     ...(routed.task === undefined ? {} : { task: routed.task }),
     ...(routed.target === undefined ? {} : { target: routed.target }),
     ...(receipt === undefined ? {} : { receipt }),
-    ...(steerState === undefined ? {} : { steer_state: steerState })
+    ...(steerState === undefined ? {} : { steer_state: steerState }),
+    ...(aswitchRequest === undefined
+      ? {}
+      : { aswitch_request: aswitchRequest })
   };
   const host = selectHost(environment);
   const result =
@@ -127,6 +139,7 @@ function parseArguments(argv) {
     version: false,
     receipt_stdin: false,
     state_stdin: false,
+    request_stdin: false,
     root: null,
     task: null
   };
@@ -149,6 +162,8 @@ function parseArguments(argv) {
       flags.receipt_stdin = true;
     } else if (argument === "--state-stdin") {
       flags.state_stdin = true;
+    } else if (argument === "--request-stdin") {
+      flags.request_stdin = true;
     } else if (argument === "--root" || argument === "--task") {
       const value = argv[index + 1];
       if (!isBoundedString(value, argument === "--root" ? 8_192 : 2_048)) {
@@ -174,7 +189,7 @@ function parseArguments(argv) {
 /**
  * @param {ParsedArguments} parsed
  * @returns {{
- *   skill: "orient" | "resume" | "verify" | "status" | "steer",
+ *   skill: "orient" | "resume" | "verify" | "status" | "steer" | "aswitch",
  *   task?: string,
  *   target?: string
  * }}
@@ -182,15 +197,19 @@ function parseArguments(argv) {
 function routeCommand(parsed) {
   const command = parsed.command;
   if (
-    parsed.flags.receipt_stdin &&
-    parsed.flags.state_stdin
+    Number(parsed.flags.receipt_stdin) +
+      Number(parsed.flags.state_stdin) +
+      Number(parsed.flags.request_stdin) > 1
   ) {
     throw new Error(
-      "Receipt and steer-state stdin modes cannot be combined."
+      "Receipt, steer-state, and aswitch-request stdin modes cannot be combined."
     );
   }
   if (parsed.flags.state_stdin && command !== "steer") {
     throw new Error("--state-stdin is available only for steer.");
+  }
+  if (parsed.flags.request_stdin && command !== "aswitch") {
+    throw new Error("--request-stdin is available only for aswitch.");
   }
   if (command === "orient" || command === "brief") {
     return {
@@ -247,6 +266,20 @@ function routeCommand(parsed) {
       );
     }
     return { skill: "steer" };
+  }
+  if (command === "aswitch") {
+    if (
+      parsed.positionals.length > 0 ||
+      parsed.flags.task !== null ||
+      parsed.flags.receipt_stdin ||
+      parsed.flags.state_stdin ||
+      !parsed.flags.request_stdin
+    ) {
+      throw new Error(
+        "aswitch requires exactly --request-stdin and accepts no task, receipt, state, or positional input."
+      );
+    }
+    return { skill: "aswitch" };
   }
   if (command === "ask") {
     const question = sanitizeDisplayText(
@@ -412,6 +445,7 @@ Usage:
   kanon verify [README.md] [--task TEXT] [--receipt-stdin] [--json] [--root PATH]
   kanon status [--receipt-stdin] [--json] [--root PATH]
   kanon steer --state-stdin [--json] [--root PATH]
+  kanon aswitch --request-stdin [--json] [--root PATH]
 
 Compatibility read aliases:
   brief -> orient
@@ -422,5 +456,6 @@ Compatibility read aliases:
 Refresh and todo remain explicit v0.4 continuity writes. Notice mode is
 advisory, enforcement is false, and unavailable host state remains Unknown.
 Steer records one bounded state and performs no action or agent management.
+Aswitch previews before any write and never launches a process automatically.
 `;
 }

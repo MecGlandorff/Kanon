@@ -225,9 +225,8 @@ test("Run C slice 10 exposes only thin non-orchestrating steer", () => {
   assert.match(scope, /Run C slice 10 implementation status/);
   assert.match(
     scope,
-    /generated plugin exposes `kanon`, `orient`, `resume`, `status`, `verify`,\s+and `steer`/
+    /This slice did not implement `aswitch`, terminal launch, or full-history/
   );
-  assert.match(scope, /`aswitch` is absent/);
   assert.match(runC, /Slice 10 — thin steer/);
   assert.match(runC, /kanon-steer-request-v1/);
   assert.match(runC, /kanon-steer-state-v1/);
@@ -241,5 +240,35 @@ test("Run C slice 10 exposes only thin non-orchestrating steer", () => {
   assert.doesNotMatch(
     runC,
     /steer[^.\n]*(?:orchestrates?|manages? agents?|claims? completion)/i
+  );
+});
+
+test("Run C slice 11 exposes consented handoff without launch or ownership", () => {
+  assert.match(scope, /Run C slice 11 implementation status/);
+  assert.match(
+    scope,
+    /offers\s+exactly Last plan, Compacted structured handoff, and experimental Full-history/
+  );
+  assert.match(scope, /Last plan is the default/);
+  assert.match(scope, /kanon-aswitch-approval-v1/);
+  assert.match(scope, /capped at eight Kanon handoffs and 256 inspected entries/);
+  assert.match(
+    scope,
+    /checks the exact schema, semantic checksum,\s+content-derived filename, canonical repository root, recorded commit,\s+complete normalized Git change-set fingerprint, and target host/
+  );
+  assert.match(scope, /directly\s+observed mismatch is `Stale`/);
+  assert.match(scope, /unavailable comparison remains `Unknown`/);
+  assert.match(scope, /No executable is resolved or launched in slice 11/);
+  assert.match(
+    scope,
+    /argument contains only a fixed bootstrap plus the safe handoff\s+path, never raw handoff content/
+  );
+  assert.match(runC, /Slice 11 — consent-driven aswitch handoff/);
+  assert.match(runC, /kanon-aswitch-preview-v1/);
+  assert.match(runC, /kanon-agent-handoff-v1/);
+  assert.match(runC, /No P0 or P1 remains for slice 11/);
+  assert.doesNotMatch(
+    runC,
+    /aswitch[^.\n]*(?:automatically launches|claims repository ownership|grants execution authority)/i
   );
 });

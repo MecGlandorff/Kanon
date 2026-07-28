@@ -52,6 +52,18 @@ not shell arguments. Caller evidence references remain Unknown. The state
 model performs no repository execution, plan action, verification, agent
 management, persistence, or implicit scope expansion.
 
+Aswitch payloads are supplied only through bounded exact-schema JSON standard
+input. Preview and write are separate explicit operations, the approval digest
+must match the exact preview, and the only write target is a content-derived
+file in an existing canonical user-selected directory outside the repository.
+The runtime caps each destination at eight Kanon handoffs and 256 inspected
+directory entries. Windows ACL privacy remains Unknown. Raw handoff content
+never enters process arguments. Slice 11 performs no executable
+resolution or launch; its manual command model is Suggested and explicitly
+unverified. Receiving validation treats a known checksum, canonical-root,
+commit, or complete change-set mismatch as Stale and an unavailable comparison
+as Unknown.
+
 ## Git observation
 
 Every Git invocation disables optional locks, terminal prompts, system/global

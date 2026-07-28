@@ -5,7 +5,7 @@ classifications where applicable. Repository-derived strings are marked
 `trust: "repository-untrusted"` in structured evidence and rendered as inert
 data.
 
-## Stable reports through slice 10
+## Stable reports through slice 11
 
 - Orient: canonical repository, instruction-first bounded evidence, Git
   observation, limitations, and a minimal context receipt.
@@ -19,8 +19,13 @@ data.
   constraints, user decisions, caller evidence references, Unknowns, one next
   slice, required verification, and stop or redirect reasons beside the shared
   continuity report. It performs no action and makes no completion claim.
+- Aswitch: one preview, write, or receive transition. The preview binds a
+  selected bounded payload to a canonical private external destination. A
+  write requires the matching caller assertion of explicit approval. Receive
+  validates schema, checksum, canonical root, commit, and complete Git
+  change-set fingerprint before classifying `Current`, `Stale`, or `Unknown`.
 
-All five use `kanon-stable-skill-result-v1`, consult the shared exact-version
+All six use `kanon-stable-skill-result-v1`, consult the shared exact-version
 deprecation checker, and preserve unavailable evidence as Unknown.
 
 The `kanon-context-receipt-v2` object contains only its schema,

@@ -45,13 +45,16 @@ working directory:
   `orient` or `verify`.
 
 The root plugin also exposes the stable `orient`, `resume`, `verify`, `status`,
-and `steer` skills. Notice mode is advisory and enforcement is false. An
-explicit orient invocation may persist the versioned context receipt only in
-validated plugin data outside the repository; receipt evaluation occurs only
-during explicit Kanon invocations and is never enforcement or authorization.
-Steer maintains one bounded state beside the shared continuity report; it
-does not execute a plan step, manage agents, persist a second project memory,
-or claim completion.
+`steer`, and `aswitch` skills. Notice mode is advisory and enforcement is
+false. An explicit orient invocation may persist the versioned context receipt
+only in validated plugin data outside the repository; receipt evaluation
+occurs only during explicit Kanon invocations and is never enforcement or
+authorization. Steer maintains one bounded state beside the shared continuity
+report; it does not execute a plan step, manage agents, persist a second
+project memory, or claim completion. Aswitch requires a preview-bound caller
+assertion of explicit approval before writing one bounded external handoff. It
+never launches a process; receiving validation keeps known mismatches Stale
+and unavailable comparisons Unknown.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove

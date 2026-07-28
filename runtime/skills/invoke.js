@@ -18,6 +18,7 @@ import {
   canonicalizeRepositoryRoot,
   isSafeRelativePath
 } from "../repository/read.js";
+import { runAswitch } from "./aswitch.js";
 import { runOrient } from "./orient.js";
 import { runResume } from "./resume.js";
 import { runStatus } from "./status.js";
@@ -27,7 +28,7 @@ import { runVerify } from "./verify.js";
 const MAX_DATE_MS = 8_640_000_000_000_000;
 
 /**
- * @typedef {"orient" | "resume" | "verify" | "status" | "steer"} StableSkill
+ * @typedef {"orient" | "resume" | "verify" | "status" | "steer" | "aswitch"} StableSkill
  * @typedef {"codex-cli" | "claude-code" | "Unknown"} InvocationHost
  * @typedef {{
  *   schema: "kanon-stable-invocation-v1",
@@ -36,7 +37,8 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *   task?: string,
  *   target?: string,
  *   receipt?: unknown,
- *   steer_state?: unknown
+ *   steer_state?: unknown,
+ *   aswitch_request?: unknown
  * }} StableInvocation
  * @typedef {{
  *   host: InvocationHost,
@@ -64,7 +66,7 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *   deprecation: Awaited<ReturnType<typeof checkExactVersionDeprecation>>,
  *   report: ReturnType<typeof runOrient> | ReturnType<typeof runResume> |
  *     ReturnType<typeof runVerify> | ReturnType<typeof runStatus> |
- *     ReturnType<typeof runSteer> | {
+ *     ReturnType<typeof runSteer> | ReturnType<typeof runAswitch> | {
  *       schema: "kanon-invalid-invocation-v1",
  *       ok: false,
  *       status: "Unknown",
@@ -199,6 +201,21 @@ export async function executeStableInvocation(rawInput, context) {
         sharedContext
       );
       break;
+    case "aswitch":
+      report = runAswitch(
+        {
+          root: stableInput.root,
+          request: stableInput.aswitch_request
+        },
+        {
+          host,
+          ...(context.git_runner === undefined
+            ? {}
+            : { git_runner: context.git_runner }),
+          ...(validNow(context.now) ? { now: context.now } : {})
+        }
+      );
+      break;
   }
   return envelope(
     stableInput.skill,
@@ -273,7 +290,8 @@ function validateInvocation(value) {
       value.skill !== "resume" &&
       value.skill !== "verify" &&
       value.skill !== "status" &&
-      value.skill !== "steer"
+      value.skill !== "steer" &&
+      value.skill !== "aswitch"
     ) ||
     !isBoundedString(value.root, 8_192) ||
     (
@@ -291,6 +309,7 @@ function validateInvocation(value) {
     return invalidInvocation();
   }
   const allowed = [
+    "aswitch_request",
     "receipt",
     "root",
     "schema",
@@ -337,6 +356,24 @@ function validateInvocation(value) {
   ) {
     return invalidInvocation();
   }
+  if (
+    value.skill === "aswitch" &&
+    (
+      value.aswitch_request === undefined ||
+      value.receipt !== undefined ||
+      value.steer_state !== undefined ||
+      value.target !== undefined ||
+      value.task !== undefined
+    )
+  ) {
+    return invalidInvocation();
+  }
+  if (
+    value.skill !== "aswitch" &&
+    value.aswitch_request !== undefined
+  ) {
+    return invalidInvocation();
+  }
   return {
     ok: true,
     value: {
@@ -348,7 +385,10 @@ function validateInvocation(value) {
       ...(value.receipt === undefined ? {} : { receipt: value.receipt }),
       ...(value.steer_state === undefined
         ? {}
-        : { steer_state: value.steer_state })
+        : { steer_state: value.steer_state }),
+      ...(value.aswitch_request === undefined
+        ? {}
+        : { aswitch_request: value.aswitch_request })
     }
   };
 }
@@ -390,6 +430,8 @@ function defaultTask(skill, target) {
       return "status";
     case "steer":
       return "steer one bounded implementation slice";
+    case "aswitch":
+      return "prepare or receive one consented handoff";
   }
 }
 

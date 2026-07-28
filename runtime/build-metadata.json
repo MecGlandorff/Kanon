@@ -14,7 +14,8 @@
       "resume",
       "status",
       "verify",
-      "steer"
+      "steer",
+      "aswitch"
     ],
     "hosts": {
       "codex-cli": {

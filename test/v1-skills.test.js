@@ -554,10 +554,33 @@ test("status reports exact embedded capability state without inventing hook intr
 
 test("every stable invocation consults deprecation even when input is malformed", async () => {
   const calls = [];
-  for (const skill of ["orient", "resume", "verify", "status"]) {
+  for (const skill of [
+    "orient",
+    "resume",
+    "verify",
+    "status",
+    "steer",
+    "aswitch"
+  ]) {
     const root = makeFixture({ "README.md": "# Fixture\n" });
     await invokeCodexSkill(
-      stableInvocation(skill, root),
+      stableInvocation(skill, root, {
+        ...(skill === "steer" ? { steer_state: null } : {}),
+        ...(skill === "aswitch"
+          ? {
+              aswitch_request: {
+                schema: "kanon-aswitch-request-v1",
+                operation: "preview",
+                target_host: null,
+                payload_mode: null,
+                destination_root: null,
+                last_plan: null,
+                compacted: null,
+                approval: null
+              }
+            }
+          : {})
+      }),
       adapterContext(calls)
     );
   }
@@ -565,14 +588,14 @@ test("every stable invocation consults deprecation even when input is malformed"
     { schema: "wrong", skill: "orient" },
     adapterContext(calls)
   );
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 7);
   assert.equal(malformed.skill, "Unknown");
   assert.equal(malformed.status, "Unknown");
   assert.equal(malformed.report.enforcement, false);
   assert.equal(malformed.deprecation.status, "Current");
 });
 
-test("the checked CLI preserves narrow compatibility routes and rejects unimplemented skills", async () => {
+test("the checked CLI preserves narrow compatibility routes and rejects unimplemented surfaces", async () => {
   const root = makeFixture({
     "README.md": "# Fixture purpose\n",
     "package.json": JSON.stringify({ name: "fixture" })
@@ -589,7 +612,7 @@ test("the checked CLI preserves narrow compatibility routes and rejects unimplem
     assert.equal(parsed.version, PACKAGE_VERSION);
   }
   await assert.rejects(
-    () => captureCli(runStableCli, ["aswitch", "--root", root]),
+    () => captureCli(runStableCli, ["full-history", "--root", root]),
     /Unknown command/
   );
   await assert.rejects(

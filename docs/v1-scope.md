@@ -2,9 +2,9 @@
 
 **Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
 receipt-only amendments, additive Run B recovery status through product
-slice 8, and accepted Run C implementation status through slice 10. This file
-is not a release claim. Run C may implement slices 11 through 13; this record
-does not claim that those slices are complete.
+slice 8, and accepted Run C implementation status through slice 11. This file
+is not a release claim. Run C may implement slices 12 and 13; this record does
+not claim that those slices are complete.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
 including its explicitly authorized 2026-07-28 amendment. This companion
@@ -36,10 +36,10 @@ or human review.
 
 Codex CLI and Claude Code CLI have the two validated stable host adapters.
 Run B slice 8 implements the four read skills `orient`, `resume`, `verify`,
-and `status` equivalently for both adapters. Run C slice 10 adds equivalent
-`steer` surfaces. The remaining frozen skill, `aswitch`, is not exposed.
-Other Codex and Claude surfaces need their own installed-artifact coverage
-before they receive a stable-surface claim.
+and `status` equivalently for both adapters. Run C slices 10 and 11 add
+equivalent `steer` and `aswitch` surfaces. Other Codex and Claude surfaces need
+their own installed-artifact coverage before they receive a stable-surface
+claim.
 
 ### Guard boundary
 
@@ -160,7 +160,42 @@ repository code, manages no agent, writes no state, and creates no competing
 project-memory subsystem.
 
 Both host adapters and installed skill wrappers expose the same state model.
-`aswitch`, terminal launch, and full-history behavior remain unimplemented.
+This slice did not implement `aswitch`, terminal launch, or full-history
+behavior.
+
+### Run C slice 11 implementation status
+
+The accepted `aswitch` skill is a deterministic preview, write, and receive
+state machine, not a process manager. It asks for a missing target and offers
+exactly Last plan, Compacted structured handoff, and experimental Full-history
+archive. Last plan is the default and is recommended when a validated
+caller-supplied steer plan is available; compacted is recommended otherwise.
+Full-history remains `Unknown` and unavailable pending the separate slice 13
+source and acknowledgement gate.
+
+Preview binds one bounded payload, provenance, trust classification, source
+coverage, omissions, target, canonical repository identity, and canonical
+external destination to a SHA-256. Write requires a matching
+`kanon-aswitch-approval-v1` caller assertion of explicit user approval.
+Missing or mismatching approval writes nothing. A successful write creates
+only a content-derived `kanon-agent-handoff-v1` JSON file in the approved
+external directory, never inside the inspected repository. Each destination
+is capped at eight Kanon handoffs and 256 inspected entries.
+
+Receiving validation checks the exact schema, semantic checksum,
+content-derived filename, canonical repository root, recorded commit,
+complete normalized Git change-set fingerprint, and target host. A directly
+observed mismatch is `Stale`; an unavailable comparison remains `Unknown`;
+only complete matching observations are `Current`. The checksum is integrity
+evidence, not an authenticity signature. Payload claims remain untrusted and
+the proposed next step remains `Suggested`.
+
+No executable is resolved or launched in slice 11. The manual fallback is a
+structured `Suggested` command model whose executable resolution is
+`Unknown`; its argument contains only a fixed bootstrap plus the safe handoff
+path, never raw handoff content. The transfer deletes no source history, stops
+no source agent, claims no repository ownership, and grants no authorization
+or enforcement.
 
 ## Compatibility map
 
@@ -197,7 +232,7 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status through Run C slice 10
+## Evidence status through Run C slice 11
 
 ### Known
 
@@ -205,8 +240,8 @@ fail safely to the manual handoff.
   authoritative v1 contract on `release/v.1.0.0`.
 - The embedded development-artifact version remains `0.4.0-rc.1`; this branch
   is implementation evidence, not a v1 release.
-- The generated plugin exposes `kanon`, `orient`, `resume`, `status`, `verify`,
-  and `steer`. `aswitch` is absent.
+- The generated plugin exposes all six stable skills: `orient`, `resume`,
+  `status`, `verify`, `steer`, and `aswitch`, plus the root `kanon` skill.
 - The compatibility wrappers remain `ask`, `brief`, `refresh`, `resume`,
   `todo`, and `verify`; read aliases route to the stable slice 8 runtime,
   while `refresh` and `todo` retain their explicit bounded v0.4 writes.
@@ -223,6 +258,9 @@ fail safely to the manual handoff.
 - Slice 10 exposes one read-only, non-authorizing steer state through
   equivalent Codex and Claude adapters and reuses the shared continuity
   engine without adding persistence or orchestration.
+- Slice 11 exposes one bounded consent-driven handoff state machine through
+  equivalent Codex and Claude adapters. It implements no automatic launch,
+  ownership, supervision, or raw-history access.
 
 ### Likely
 
@@ -241,6 +279,8 @@ fail safely to the manual handoff.
 - The release-governance participants, beta-adapter opt-in policy, first
   adapter directions, and full-history shipment decision listed in the v1
   design.
+- Windows ACL privacy equivalence for a user-selected handoff destination is
+  unavailable to the portable runtime and remains `Unknown`.
 
 ### Stale / suspicious
 
@@ -253,12 +293,12 @@ fail safely to the manual handoff.
   remain current.
 - Slice 8 statements that the receipt is always in-memory are superseded only
   by slice 9's bounded, conditional plugin-data persistence.
-- Statements above or in the Run B record that both `steer` and `aswitch` are
-  absent are superseded for `steer` only; `aswitch` remains absent.
+- Statements above or in the Run B record that `steer` or `aswitch` are absent
+  are superseded by Run C slices 10 and 11.
 
 ### Suggested
 
 - Keep automatic lifecycle notice, hard Guard, and any enforcing or
   hook-driven receipt lifecycle outside public v1 until separately proven and
   authorized.
-- Continue Run C only through slices 11 to 13 and hard-stop before slice 14.
+- Continue Run C only through slices 12 and 13 and hard-stop before slice 14.

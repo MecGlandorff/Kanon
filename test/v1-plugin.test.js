@@ -57,7 +57,8 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
     "resume",
     "status",
     "verify",
-    "steer"
+    "steer",
+    "aswitch"
   ]);
   assert.equal(buildMetadata.package_name, packageManifest.name);
   assert.equal(buildMetadata.package_version, packageManifest.version);
@@ -109,21 +110,27 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
   );
   const read = readEmbeddedBuildMetadata();
   assert.equal(read.ok, true);
-  for (const skill of ["orient", "resume", "status", "verify", "steer"]) {
+  for (const skill of [
+    "orient",
+    "resume",
+    "status",
+    "verify",
+    "steer",
+    "aswitch"
+  ]) {
     assert.equal(
       fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
       true
     );
   }
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "aswitch")),
-    false
-  );
   assert.deepEqual(
     readJson("src/v1/build-metadata.json"),
     buildMetadata
   );
-  assert.doesNotMatch(JSON.stringify(buildMetadata), /aswitch/);
+  assert.doesNotMatch(
+    JSON.stringify(buildMetadata),
+    /terminal-launch|full-history/
+  );
 });
 
 test("host adapters expose only explicit stable-skill invocation", () => {
@@ -280,6 +287,16 @@ test("package builder uses an exact production allowlist", () => {
   assert.equal(actual.includes("runtime/build-metadata.json"), true);
   assert.equal(actual.includes("runtime/core/plugin-data.js"), true);
   assert.equal(actual.includes("runtime/core/receipt-store.js"), true);
+  assert.equal(actual.includes("runtime/core/handoff.js"), true);
+  assert.equal(actual.includes("runtime/core/handoff-store.js"), true);
+  assert.equal(actual.includes("runtime/skills/aswitch.js"), true);
+  const conformanceSource = fs.readFileSync(
+    path.join(repoRoot, "scripts", "conform-artifact.js"),
+    "utf8"
+  );
+  assert.match(conformanceSource, /kanon-aswitch-report-v1/);
+  assert.match(conformanceSource, /AwaitingTarget/);
+  assert.match(conformanceSource, /last-plan.*compacted.*full-history/s);
   assert.equal(
     actual.some((file) =>
       /^(?:docs|eval|src|test|spikes|node_modules)\//.test(file)

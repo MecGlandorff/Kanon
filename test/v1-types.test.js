@@ -70,6 +70,8 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/bin/kanon.js",
       "src/v1/cli.js",
       "src/v1/core/build-metadata.js",
+      "src/v1/core/handoff-store.js",
+      "src/v1/core/handoff.js",
       "src/v1/core/plugin-data.js",
       "src/v1/core/receipt-store.js",
       "src/v1/core/receipt.js",
@@ -82,6 +84,7 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/repository/git.js",
       "src/v1/repository/inspect.js",
       "src/v1/repository/read.js",
+      "src/v1/skills/aswitch.js",
       "src/v1/skills/invoke.js",
       "src/v1/skills/orient.js",
       "src/v1/skills/resume.js",
@@ -199,18 +202,22 @@ test("historical compatibility stays outside the expanded stable v1 type claim",
     "resume",
     "status",
     "verify",
-    "steer"
+    "steer",
+    "aswitch"
   ]);
-  for (const skill of ["orient", "resume", "status", "verify", "steer"]) {
+  for (const skill of [
+    "orient",
+    "resume",
+    "status",
+    "verify",
+    "steer",
+    "aswitch"
+  ]) {
     assert.equal(
       fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
       true
     );
   }
-  assert.equal(
-    fs.existsSync(path.join(repoRoot, "skills", "aswitch")),
-    false
-  );
 });
 
 test("release allowlist excludes type tooling and development metadata", () => {
