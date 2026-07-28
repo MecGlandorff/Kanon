@@ -57,7 +57,7 @@ export function initializeGit(root, options = {}) {
   return result;
 }
 
-export async function captureCli(runCli, argv) {
+export async function captureCli(runCli, argv, io = {}) {
   let output = "";
   const stdout = new Writable({
     write(chunk, _encoding, callback) {
@@ -65,7 +65,7 @@ export async function captureCli(runCli, argv) {
       callback();
     }
   });
-  await runCli(argv, { stdout });
+  await runCli(argv, { ...io, stdout });
   return output;
 }
 

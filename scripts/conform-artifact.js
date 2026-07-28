@@ -10,8 +10,8 @@ import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import { validateEmbeddedBuildMetadata } from "../src/v1/core/build-metadata.js";
 import {
-  PUBLIC_COMMANDS,
-  STABLE_SLICE_8_SKILLS
+  IMPLEMENTED_STABLE_SKILLS,
+  PUBLIC_COMMANDS
 } from "./lib/artifact-files.js";
 import { npmInvocation } from "./lib/npm-runner.js";
 
@@ -135,13 +135,7 @@ function inspectPackage(root, input) {
       metadataResult.ok &&
       metadataResult.value.package_version === input.candidateVersion &&
       JSON.stringify(metadataResult.value.public_capabilities.skills) ===
-        JSON.stringify([
-          "kanon",
-          "orient",
-          "resume",
-          "status",
-          "verify"
-        ]) &&
+        JSON.stringify(["kanon", ...IMPLEMENTED_STABLE_SKILLS]) &&
       metadataResult.value.public_capabilities.hosts["codex-cli"]
         .enforcement === false &&
       metadataResult.value.public_capabilities.hosts["claude-code"]
@@ -190,7 +184,7 @@ function inspectPackage(root, input) {
       JSON.stringify(shipped) === JSON.stringify(expected),
       "only supported compatibility wrappers are shipped"
     ));
-    for (const skill of STABLE_SLICE_8_SKILLS) {
+    for (const skill of IMPLEMENTED_STABLE_SKILLS) {
       const stableScripts = fs
         .readdirSync(path.join(root, "skills", skill, "scripts"))
         .sort();
@@ -227,8 +221,8 @@ function inspectPackage(root, input) {
       "experimental improve/refactor modules are absent"
     ));
     checks.push(result(
-      !all.some((file) => /(?:^|\/)(?:steer|aswitch)(?:\/|[.-])/.test(file)),
-      "removed steer and aswitch capabilities are absent"
+      !all.some((file) => /(?:^|\/)aswitch(?:\/|[.-])/.test(file)),
+      "unimplemented aswitch capability is absent"
     ));
   } catch (error) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
@@ -362,7 +356,7 @@ function exerciseWrappersInFixture(packageRoot, fixture) {
       )
     );
   }
-  for (const skill of STABLE_SLICE_8_SKILLS) {
+  for (const skill of IMPLEMENTED_STABLE_SKILLS) {
     checks.push(
       exerciseWrapper(
         path.join(
@@ -414,9 +408,10 @@ function exerciseWrappersInFixture(packageRoot, fixture) {
 
 function exerciseWrapper(wrapper, command, family, fixture, surface) {
   const args = wrapperArguments(command);
+  const input = wrapperInput(command);
   const execution = family === "powershell"
-    ? spawnPowerShell(wrapper, args, fixture, true)
-    : spawnSync(wrapper, args, runOptions(fixture, true));
+    ? spawnPowerShell(wrapper, args, fixture, true, input)
+    : spawnSync(wrapper, args, runOptions(fixture, true, input));
   return {
     name: `${family} ${surface} wrapper ${command}`,
     passed: execution.status === 0,
@@ -446,15 +441,45 @@ function wrapperArguments(command) {
   if (command === "orient") {
     return ["artifact conformance"];
   }
+  if (command === "steer") {
+    return ["--state-stdin", "--json"];
+  }
   return command === "brief" ? ["--json"] : [];
 }
 
-function spawnPowerShell(wrapper, args, cwd, poisonPath = false) {
+function wrapperInput(command) {
+  return command === "steer"
+    ? `${JSON.stringify({
+        schema: "kanon-steer-request-v1",
+        phase: "understand",
+        desired_outcome: "verify installed artifact behavior",
+        completion_criteria: ["installed wrapper exits successfully"],
+        constraints: ["do not execute repository code"],
+        user_decisions: [],
+        evidence_references: [],
+        unknowns: [],
+        next_slice: {
+          objective: "inspect one bounded installed wrapper",
+          boundaries: ["read-only invocation"]
+        },
+        required_verification: ["observe wrapper status"],
+        stop_or_redirect_reasons: []
+      })}\n`
+    : undefined;
+}
+
+function spawnPowerShell(
+  wrapper,
+  args,
+  cwd,
+  poisonPath = false,
+  input = undefined
+) {
   for (const binary of ["pwsh", "powershell.exe"]) {
     const found = spawnSync(
       binary,
       ["-NoProfile", "-File", wrapper, ...args],
-      runOptions(cwd, poisonPath)
+      runOptions(cwd, poisonPath, input)
     );
     if (!found.error || found.error.code !== "ENOENT") {
       return found;
@@ -463,7 +488,7 @@ function spawnPowerShell(wrapper, args, cwd, poisonPath = false) {
   return { status: null, stderr: "PowerShell unavailable" };
 }
 
-function runOptions(cwd, poisonPath = false) {
+function runOptions(cwd, poisonPath = false, input = undefined) {
   return {
     cwd,
     encoding: "utf8",
@@ -491,7 +516,8 @@ function runOptions(cwd, poisonPath = false) {
     },
     maxBuffer: 8 * 1024 * 1024,
     timeout: 30_000,
-    windowsHide: true
+    windowsHide: true,
+    ...(input === undefined ? {} : { input })
   };
 }
 

@@ -572,7 +572,7 @@ test("every stable invocation consults deprecation even when input is malformed"
   assert.equal(malformed.deprecation.status, "Current");
 });
 
-test("the checked CLI preserves narrow compatibility routes and rejects removed skills", async () => {
+test("the checked CLI preserves narrow compatibility routes and rejects unimplemented skills", async () => {
   const root = makeFixture({
     "README.md": "# Fixture purpose\n",
     "package.json": JSON.stringify({ name: "fixture" })
@@ -588,10 +588,6 @@ test("the checked CLI preserves narrow compatibility routes and rejects removed 
     assert.equal(parsed.schema, "kanon-stable-skill-result-v1");
     assert.equal(parsed.version, PACKAGE_VERSION);
   }
-  await assert.rejects(
-    () => captureCli(runStableCli, ["steer", "--root", root]),
-    /Unknown command/
-  );
   await assert.rejects(
     () => captureCli(runStableCli, ["aswitch", "--root", root]),
     /Unknown command/

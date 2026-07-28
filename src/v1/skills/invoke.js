@@ -21,12 +21,13 @@ import {
 import { runOrient } from "./orient.js";
 import { runResume } from "./resume.js";
 import { runStatus } from "./status.js";
+import { runSteer } from "./steer.js";
 import { runVerify } from "./verify.js";
 
 const MAX_DATE_MS = 8_640_000_000_000_000;
 
 /**
- * @typedef {"orient" | "resume" | "verify" | "status"} StableSkill
+ * @typedef {"orient" | "resume" | "verify" | "status" | "steer"} StableSkill
  * @typedef {"codex-cli" | "claude-code" | "Unknown"} InvocationHost
  * @typedef {{
  *   schema: "kanon-stable-invocation-v1",
@@ -34,7 +35,8 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *   root: string,
  *   task?: string,
  *   target?: string,
- *   receipt?: unknown
+ *   receipt?: unknown,
+ *   steer_state?: unknown
  * }} StableInvocation
  * @typedef {{
  *   host: InvocationHost,
@@ -61,7 +63,8 @@ const MAX_DATE_MS = 8_640_000_000_000_000;
  *   },
  *   deprecation: Awaited<ReturnType<typeof checkExactVersionDeprecation>>,
  *   report: ReturnType<typeof runOrient> | ReturnType<typeof runResume> |
- *     ReturnType<typeof runVerify> | ReturnType<typeof runStatus> | {
+ *     ReturnType<typeof runVerify> | ReturnType<typeof runStatus> |
+ *     ReturnType<typeof runSteer> | {
  *       schema: "kanon-invalid-invocation-v1",
  *       ok: false,
  *       status: "Unknown",
@@ -187,6 +190,15 @@ export async function executeStableInvocation(rawInput, context) {
         }
       );
       break;
+    case "steer":
+      report = runSteer(
+        {
+          root: stableInput.root,
+          state: stableInput.steer_state
+        },
+        sharedContext
+      );
+      break;
   }
   return envelope(
     stableInput.skill,
@@ -260,7 +272,8 @@ function validateInvocation(value) {
       value.skill !== "orient" &&
       value.skill !== "resume" &&
       value.skill !== "verify" &&
-      value.skill !== "status"
+      value.skill !== "status" &&
+      value.skill !== "steer"
     ) ||
     !isBoundedString(value.root, 8_192) ||
     (
@@ -277,7 +290,15 @@ function validateInvocation(value) {
   ) {
     return invalidInvocation();
   }
-  const allowed = ["receipt", "root", "schema", "skill", "target", "task"];
+  const allowed = [
+    "receipt",
+    "root",
+    "schema",
+    "skill",
+    "steer_state",
+    "target",
+    "task"
+  ];
   if (!Object.keys(value).every((key) => allowed.includes(key))) {
     return invalidInvocation();
   }
@@ -299,6 +320,23 @@ function validateInvocation(value) {
   ) {
     return invalidInvocation();
   }
+  if (
+    value.skill === "steer" &&
+    (
+      value.receipt !== undefined ||
+      value.steer_state === undefined ||
+      value.target !== undefined ||
+      value.task !== undefined
+    )
+  ) {
+    return invalidInvocation();
+  }
+  if (
+    value.skill !== "steer" &&
+    value.steer_state !== undefined
+  ) {
+    return invalidInvocation();
+  }
   return {
     ok: true,
     value: {
@@ -307,7 +345,10 @@ function validateInvocation(value) {
       root: value.root,
       ...(value.task === undefined ? {} : { task: value.task }),
       ...(value.target === undefined ? {} : { target: value.target }),
-      ...(value.receipt === undefined ? {} : { receipt: value.receipt })
+      ...(value.receipt === undefined ? {} : { receipt: value.receipt }),
+      ...(value.steer_state === undefined
+        ? {}
+        : { steer_state: value.steer_state })
     }
   };
 }
@@ -347,6 +388,8 @@ function defaultTask(skill, target) {
       return `verify ${target || "README.md"}`;
     case "status":
       return "status";
+    case "steer":
+      return "steer one bounded implementation slice";
   }
 }
 

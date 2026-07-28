@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import {
   collectRuntimeDependencies,
   embeddedBuildMetadata,
+  IMPLEMENTED_STABLE_SKILLS,
   PUBLIC_COMMANDS,
-  STABLE_SLICE_8_SKILLS,
   V1_RUNTIME_ARTIFACTS
 } from "./lib/artifact-files.js";
 
@@ -61,7 +61,7 @@ for (const command of commands) {
     mode: 0o644
   });
 }
-for (const skill of STABLE_SLICE_8_SKILLS) {
+for (const skill of IMPLEMENTED_STABLE_SKILLS) {
   const stableRoot = path.join(root, "skills", skill);
   artifacts.push({
     target: path.join(stableRoot, "scripts", `kanon-${skill}`),
@@ -143,7 +143,7 @@ function listJavaScriptFiles(relativeDirectory) {
 }
 
 function listWrapperFiles() {
-  return ["kanon", ...STABLE_SLICE_8_SKILLS].flatMap((skill) => {
+  return ["kanon", ...IMPLEMENTED_STABLE_SKILLS].flatMap((skill) => {
     const directory = path.join(root, "skills", skill, "scripts");
     if (!fs.existsSync(directory)) {
       return [];

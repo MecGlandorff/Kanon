@@ -5,7 +5,7 @@ classifications where applicable. Repository-derived strings are marked
 `trust: "repository-untrusted"` in structured evidence and rendered as inert
 data.
 
-## Stable reports through slice 9
+## Stable reports through slice 10
 
 - Orient: canonical repository, instruction-first bounded evidence, Git
   observation, limitations, and a minimal context receipt.
@@ -15,8 +15,12 @@ data.
 - Status: embedded version, exact-version deprecation, notice mode,
   `enforcement: false`, hook observability, receipt availability, and bounded
   diagnostics.
+- Steer: one exact-schema bounded state covering outcome, completion criteria,
+  constraints, user decisions, caller evidence references, Unknowns, one next
+  slice, required verification, and stop or redirect reasons beside the shared
+  continuity report. It performs no action and makes no completion claim.
 
-All four use `kanon-stable-skill-result-v1`, consult the shared exact-version
+All five use `kanon-stable-skill-result-v1`, consult the shared exact-version
 deprecation checker, and preserve unavailable evidence as Unknown.
 
 The `kanon-context-receipt-v2` object contains only its schema,

@@ -2,8 +2,8 @@
 
 **Status:** Frozen scope plus the authorized 2026-07-28 lifecycle-notice and
 receipt-only amendments, additive Run B recovery status through product
-slice 8, and accepted Run C implementation status through slice 9. This file
-is not a release claim. Run C may implement slices 10 through 13; this record
+slice 8, and accepted Run C implementation status through slice 10. This file
+is not a release claim. Run C may implement slices 11 through 13; this record
 does not claim that those slices are complete.
 
 **Authority:** [`V_1design.md`](../V_1design.md) is the authoritative contract,
@@ -36,10 +36,10 @@ or human review.
 
 Codex CLI and Claude Code CLI have the two validated stable host adapters.
 Run B slice 8 implements the four read skills `orient`, `resume`, `verify`,
-and `status` equivalently for both adapters. The remaining frozen skills,
-`steer` and `aswitch`, are not exposed. Other Codex and Claude surfaces need
-their own installed-artifact coverage before they receive a stable-surface
-claim.
+and `status` equivalently for both adapters. Run C slice 10 adds equivalent
+`steer` surfaces. The remaining frozen skill, `aswitch`, is not exposed.
+Other Codex and Claude surfaces need their own installed-artifact coverage
+before they receive a stable-surface claim.
 
 ### Guard boundary
 
@@ -139,8 +139,28 @@ be classified `Current`. This limitation is not evidence that either host
 cannot expose the inputs in another documented surface.
 
 The implementation and validation record is
-[`v1-run-c.md`](v1-run-c.md). It does not expose `steer` or `aswitch`, add a
-hook, or begin slice 10.
+[`v1-run-c.md`](v1-run-c.md). Slice 9 itself did not expose `steer` or
+`aswitch`, add a hook, or implement a later-slice capability.
+
+### Run C slice 10 implementation status
+
+The accepted `steer` skill uses one 32 KiB exact-schema request supplied on
+standard input. Its deterministic state covers the desired outcome,
+completion criteria, constraints, caller-asserted user decisions, caller
+evidence references, Unknowns, exactly one next slice, required verification,
+and stop or redirect reasons. The fixed loop is Understand, choose one slice,
+act, verify, and reassess.
+
+Every caller value remains explicitly untrusted. Caller evidence references
+remain `Unknown`, a next phase is only `Suggested`, any stop or redirect
+reason pauses the state, and the model always reports `authorization: false`
+and `completion: NotClaimed`. Steer reuses the shared live-authoritative
+continuity engine, performs no plan action or verification, executes no
+repository code, manages no agent, writes no state, and creates no competing
+project-memory subsystem.
+
+Both host adapters and installed skill wrappers expose the same state model.
+`aswitch`, terminal launch, and full-history behavior remain unimplemented.
 
 ## Compatibility map
 
@@ -177,7 +197,7 @@ handoff path, and sanitized arguments; require explicit approval; keep raw
 repository content out of arguments; validate and contain handoff paths; and
 fail safely to the manual handoff.
 
-## Evidence status through Run C slice 9
+## Evidence status through Run C slice 10
 
 ### Known
 
@@ -185,8 +205,8 @@ fail safely to the manual handoff.
   authoritative v1 contract on `release/v.1.0.0`.
 - The embedded development-artifact version remains `0.4.0-rc.1`; this branch
   is implementation evidence, not a v1 release.
-- The generated plugin exposes `kanon`, `orient`, `resume`, `status`, and
-  `verify`. `steer` and `aswitch` are absent.
+- The generated plugin exposes `kanon`, `orient`, `resume`, `status`, `verify`,
+  and `steer`. `aswitch` is absent.
 - The compatibility wrappers remain `ask`, `brief`, `refresh`, `resume`,
   `todo`, and `verify`; read aliases route to the stable slice 8 runtime,
   while `refresh` and `todo` retain their explicit bounded v0.4 writes.
@@ -200,6 +220,9 @@ fail safely to the manual handoff.
   receipt and conditional plugin-data storage. Persistence and evaluation
   occur only on explicit Kanon invocations, and the receipt has no
   authorization or enforcement effect.
+- Slice 10 exposes one read-only, non-authorizing steer state through
+  equivalent Codex and Claude adapters and reuses the shared continuity
+  engine without adding persistence or orchestration.
 
 ### Likely
 
@@ -230,10 +253,12 @@ fail safely to the manual handoff.
   remain current.
 - Slice 8 statements that the receipt is always in-memory are superseded only
   by slice 9's bounded, conditional plugin-data persistence.
+- Statements above or in the Run B record that both `steer` and `aswitch` are
+  absent are superseded for `steer` only; `aswitch` remains absent.
 
 ### Suggested
 
 - Keep automatic lifecycle notice, hard Guard, and any enforcing or
   hook-driven receipt lifecycle outside public v1 until separately proven and
   authorized.
-- Continue Run C only through slices 10 to 13 and hard-stop before slice 14.
+- Continue Run C only through slices 11 to 13 and hard-stop before slice 14.

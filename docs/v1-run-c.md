@@ -1,7 +1,7 @@
 # Kanon v1 Run C implementation record
 
-**Status:** Run C is in progress on `release/v.1.0.0`. Product slice 9 is
-accepted; slices 10 through 13 remain unimplemented in this record. This is
+**Status:** Run C is in progress on `release/v.1.0.0`. Product slices 9 and
+10 are accepted; slices 11 through 13 remain unimplemented in this record. This is
 not a release claim and does not authorize slice 14.
 
 The authoritative contract is [`V_1design.md`](../V_1design.md), including
@@ -117,3 +117,67 @@ Same-user concurrent replacement between directory validation and rename,
 Windows ACL privacy equivalence, and Windows replacement semantics remain
 platform residuals. They fail to `Unknown` where observable and do not create
 an authorization effect.
+
+## Slice 10 — thin steer
+
+### Accepted behavior
+
+- Both host adapters expose stable `steer` through the shared
+  `kanon-stable-skill-result-v1` envelope and exact-version deprecation check.
+- `kanon-steer-request-v1` is an exact-schema, 32 KiB input supplied on
+  standard input. The shipped wrappers never place raw steer state in process
+  arguments.
+- `kanon-steer-state-v1` covers the desired outcome, completion criteria,
+  constraints, caller-asserted user decisions, caller evidence references,
+  Unknowns, exactly one next slice, required verification, and stop or
+  redirect reasons.
+- The fixed phases are Understand, choose one slice, act, verify, and reassess.
+  A phase transition is only `Suggested`; a stop or redirect reason makes the
+  suggestion `Unknown` and pauses the state.
+- Caller values remain `caller-untrusted`, caller evidence references remain
+  `Unknown`, `authorization` is always false, and completion is always
+  `NotClaimed`.
+- Steer runs the existing bounded, live-authoritative continuity engine. It
+  does not execute a plan step, repository code, or verification; expand
+  scope; manage agents; write state; or create a second project-memory
+  subsystem.
+
+### Correction loop and validation evidence
+
+The principal review removed a hostile-object serialization path, moved the
+32 KiB check after exact runtime validation over a canonical primitive-only
+shape, bounded the derived repository-inspection task to 2 KiB, changed user
+decision provenance from direct to caller-asserted, and changed phase
+advancement into a `Suggested` or `Unknown` value. Regression tests prove that
+a hostile `toJSON` function is not invoked.
+
+- Focused steer, stable-skill, adversarial, plugin, type, wrapper, and scope
+  tests: 72 tests, 71 passed, 1 PowerShell availability check skipped,
+  0 failed.
+- Strict checked JavaScript passed with zero diagnostics; generated
+  synchronization produced 107 artifacts and the subsequent check passed.
+- Full `npm run validate`: 198 tests, 196 passed, 2 platform proofs skipped,
+  0 failed.
+- Both plugin validators, JavaScript syntax, JSON parsing, package allowlist,
+  and `git diff --check` passed. The pre-commit package contained 125
+  allowlisted entries; installed-artifact conformance passed 36 of 36 checks
+  with artifact SHA-256
+  `64fbd3cc9c6c4ee3fb354c8a1dc7555510b403e6231a8492f965d603735e076c`.
+
+### Residual classification
+
+- **Known:** the pure state model, live continuity integration, CLI stdin
+  boundary, both adapters, and both generated wrapper families implement the
+  bounded non-orchestrating contract.
+- **Likely:** an agent following the skill contract can use the suggested loop
+  without another memory system; this is a workflow expectation, not proof of
+  agent behavior.
+- **Unknown:** caller assertions, evidence references, actual execution,
+  verification success, semantic slice smallness, and completion remain
+  unproven by the state model.
+- **Stale / suspicious:** Run B and slice 9 statements that `steer` is absent
+  are superseded. Their statements that `aswitch` is absent remain current.
+- **Suggested:** use steer output only as bounded planning state and directly
+  verify work before any completion claim.
+
+No P0 or P1 remains for slice 10.

@@ -73,6 +73,7 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/core/plugin-data.js",
       "src/v1/core/receipt-store.js",
       "src/v1/core/receipt.js",
+      "src/v1/core/steer-state.js",
       "src/v1/core/trust.js",
       "src/v1/registry/cache.js",
       "src/v1/registry/deprecation.js",
@@ -85,6 +86,7 @@ test("every canonical v1 production module is in the strict project", () => {
       "src/v1/skills/orient.js",
       "src/v1/skills/resume.js",
       "src/v1/skills/status.js",
+      "src/v1/skills/steer.js",
       "src/v1/skills/verify.js"
     ]
   );
@@ -196,20 +198,19 @@ test("historical compatibility stays outside the expanded stable v1 type claim",
     "orient",
     "resume",
     "status",
-    "verify"
+    "verify",
+    "steer"
   ]);
-  for (const skill of ["orient", "resume", "status", "verify"]) {
+  for (const skill of ["orient", "resume", "status", "verify", "steer"]) {
     assert.equal(
       fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
       true
     );
   }
-  for (const removed of ["steer", "aswitch"]) {
-    assert.equal(
-      fs.existsSync(path.join(repoRoot, "skills", removed)),
-      false
-    );
-  }
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "skills", "aswitch")),
+    false
+  );
 });
 
 test("release allowlist excludes type tooling and development metadata", () => {

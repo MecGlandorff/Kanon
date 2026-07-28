@@ -56,7 +56,8 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
     "orient",
     "resume",
     "status",
-    "verify"
+    "verify",
+    "steer"
   ]);
   assert.equal(buildMetadata.package_name, packageManifest.name);
   assert.equal(buildMetadata.package_version, packageManifest.version);
@@ -108,23 +109,21 @@ test("embedded metadata exposes only accurate notice-mode capabilities", () => {
   );
   const read = readEmbeddedBuildMetadata();
   assert.equal(read.ok, true);
-  for (const skill of ["orient", "resume", "status", "verify"]) {
+  for (const skill of ["orient", "resume", "status", "verify", "steer"]) {
     assert.equal(
       fs.existsSync(path.join(repoRoot, "skills", skill, "SKILL.md")),
       true
     );
   }
-  for (const removed of ["steer", "aswitch"]) {
-    assert.equal(
-      fs.existsSync(path.join(repoRoot, "skills", removed)),
-      false
-    );
-  }
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "skills", "aswitch")),
+    false
+  );
   assert.deepEqual(
     readJson("src/v1/build-metadata.json"),
     buildMetadata
   );
-  assert.doesNotMatch(JSON.stringify(buildMetadata), /steer|aswitch/);
+  assert.doesNotMatch(JSON.stringify(buildMetadata), /aswitch/);
 });
 
 test("host adapters expose only explicit stable-skill invocation", () => {

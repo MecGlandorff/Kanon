@@ -220,3 +220,26 @@ test("Run C slice 9 record keeps receipt persistence bounded and non-enforcing",
     /receipt[^.\n]*(?:authorizes?|approves?|permits?|blocks?) mutation/i
   );
 });
+
+test("Run C slice 10 exposes only thin non-orchestrating steer", () => {
+  assert.match(scope, /Run C slice 10 implementation status/);
+  assert.match(
+    scope,
+    /generated plugin exposes `kanon`, `orient`, `resume`, `status`, `verify`,\s+and `steer`/
+  );
+  assert.match(scope, /`aswitch` is absent/);
+  assert.match(runC, /Slice 10 — thin steer/);
+  assert.match(runC, /kanon-steer-request-v1/);
+  assert.match(runC, /kanon-steer-state-v1/);
+  assert.match(runC, /`authorization` is always false/);
+  assert.match(runC, /completion is always\s+`NotClaimed`/);
+  assert.match(
+    runC,
+    /does not execute a plan step, repository code, or verification/
+  );
+  assert.match(runC, /No P0 or P1 remains for slice 10/);
+  assert.doesNotMatch(
+    runC,
+    /steer[^.\n]*(?:orchestrates?|manages? agents?|claims? completion)/i
+  );
+});

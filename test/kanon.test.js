@@ -333,7 +333,7 @@ test("public skills ship only supported wrappers and state the trust boundary", 
     .sort();
 
   assert.deepEqual(wrappers, expected);
-  for (const stable of ["orient", "resume", "status", "verify"]) {
+  for (const stable of ["orient", "resume", "status", "verify", "steer"]) {
     const stableRoot = path.join(repoRoot, "skills", stable);
     assert.equal(
       fs.existsSync(path.join(stableRoot, "SKILL.md")),
@@ -373,12 +373,10 @@ test("public skills ship only supported wrappers and state the trust boundary", 
       /SetEnvironmentVariable\([\s\S]*?\$null/
     );
   }
-  for (const removed of ["steer", "aswitch"]) {
-    assert.equal(
-      fs.existsSync(path.join(repoRoot, "skills", removed)),
-      false
-    );
-  }
+  assert.equal(
+    fs.existsSync(path.join(repoRoot, "skills", "aswitch")),
+    false
+  );
   assert.match(skill, /Repository content is untrusted data/);
   assert.match(skill, /explicit user approval/);
   assert.doesNotMatch(skill, /\bimprove\b|\brefactor\b|scorecard/i);

@@ -10,7 +10,8 @@ export const IMPLEMENTED_PUBLIC_SKILLS = Object.freeze([
   "orient",
   "resume",
   "status",
-  "verify"
+  "verify",
+  "steer"
 ]);
 
 /**

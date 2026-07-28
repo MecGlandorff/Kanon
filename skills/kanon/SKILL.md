@@ -44,11 +44,14 @@ working directory:
   Git-state, documentation-drift, or literal-search question to stable
   `orient` or `verify`.
 
-The root plugin also exposes the stable `orient`, `resume`, `verify`, and
-`status` skills. Notice mode is advisory and enforcement is false. An explicit
-orient invocation may persist the versioned context receipt only in validated
-plugin data outside the repository; receipt evaluation occurs only during
-explicit Kanon invocations and is never enforcement or authorization.
+The root plugin also exposes the stable `orient`, `resume`, `verify`, `status`,
+and `steer` skills. Notice mode is advisory and enforcement is false. An
+explicit orient invocation may persist the versioned context receipt only in
+validated plugin data outside the repository; receipt evaluation occurs only
+during explicit Kanon invocations and is never enforcement or authorization.
+Steer maintains one bounded state beside the shared continuity report; it
+does not execute a plan step, manage agents, persist a second project memory,
+or claim completion.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove

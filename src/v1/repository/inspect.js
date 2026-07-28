@@ -98,7 +98,7 @@ const BASELINE_PATHS = new Map([
 ]);
 
 /**
- * @typedef {"orient" | "resume" | "verify"} InspectionProfile
+ * @typedef {"orient" | "resume" | "steer" | "verify"} InspectionProfile
  * @typedef {{
  *   path: string,
  *   size: number,
@@ -222,7 +222,7 @@ const BASELINE_PATHS = new Map([
 export function inspectRepository(rootInput, taskInput, options = {}) {
   const profile = options.profile || "orient";
   if (
-    !["orient", "resume", "verify"].includes(profile) ||
+    !["orient", "resume", "steer", "verify"].includes(profile) ||
     !isBoundedString(taskInput, 2_048)
   ) {
     return invalidInspection(
@@ -1112,7 +1112,7 @@ function selectEvidencePaths(
         score += token.length >= 6 ? 36 : 18;
       }
     }
-    if (profile === "resume") {
+    if (profile === "resume" || profile === "steer") {
       if (isDocumentationPath(file.path)) score += 70;
       if (isArtifactPath(file.path)) score += 55;
     }

@@ -47,6 +47,11 @@ contains no repository prose, commands, prompts, secrets, or imperative
 instructions. If safe plugin data is unavailable, receipt persistence remains
 Unknown and there is no repository or undocumented host-state fallback.
 
+Steer input is a bounded exact-schema JSON object supplied on standard input,
+not shell arguments. Caller evidence references remain Unknown. The state
+model performs no repository execution, plan action, verification, agent
+management, persistence, or implicit scope expansion.
+
 ## Git observation
 
 Every Git invocation disables optional locks, terminal prompts, system/global

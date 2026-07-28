@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
+import { TextDecoder } from "node:util";
 import { invokeClaudeSkill } from "./adapters/claude.js";
 import { invokeCodexSkill } from "./adapters/codex.js";
 import { readEmbeddedBuildMetadata } from "./core/build-metadata.js";
@@ -12,6 +13,7 @@ import { executeStableInvocation } from "./skills/invoke.js";
 const MAX_ARGUMENTS = 64;
 const MAX_ARGUMENT_BYTES = 16 * 1024;
 const MAX_RECEIPT_INPUT_BYTES = 16 * 1024;
+const MAX_STEER_STATE_INPUT_BYTES = 32 * 1024;
 
 /**
  * @typedef {{
@@ -22,6 +24,7 @@ const MAX_RECEIPT_INPUT_BYTES = 16 * 1024;
  *     help: boolean,
  *     version: boolean,
  *     receipt_stdin: boolean,
+ *     state_stdin: boolean,
  *     root: string | null,
  *     task: string | null
  *   }
@@ -54,7 +57,18 @@ export async function runStableCli(argvInput, ioInput = {}) {
   }
   const routed = routeCommand(parsed);
   const receipt = parsed.flags.receipt_stdin
-    ? await readReceipt(ioInput.stdin || process.stdin)
+    ? await readBoundedJson(
+        ioInput.stdin || process.stdin,
+        MAX_RECEIPT_INPUT_BYTES,
+        "Receipt"
+      )
+    : undefined;
+  const steerState = parsed.flags.state_stdin
+    ? await readBoundedJson(
+        ioInput.stdin || process.stdin,
+        MAX_STEER_STATE_INPUT_BYTES,
+        "Steer state"
+      )
     : undefined;
   const invocation = {
     schema: /** @type {"kanon-stable-invocation-v1"} */ (
@@ -64,7 +78,8 @@ export async function runStableCli(argvInput, ioInput = {}) {
     root: path.resolve(parsed.flags.root || process.cwd()),
     ...(routed.task === undefined ? {} : { task: routed.task }),
     ...(routed.target === undefined ? {} : { target: routed.target }),
-    ...(receipt === undefined ? {} : { receipt })
+    ...(receipt === undefined ? {} : { receipt }),
+    ...(steerState === undefined ? {} : { steer_state: steerState })
   };
   const host = selectHost(environment);
   const result =
@@ -111,6 +126,7 @@ function parseArguments(argv) {
     help: false,
     version: false,
     receipt_stdin: false,
+    state_stdin: false,
     root: null,
     task: null
   };
@@ -131,6 +147,8 @@ function parseArguments(argv) {
       flags.version = true;
     } else if (argument === "--receipt-stdin") {
       flags.receipt_stdin = true;
+    } else if (argument === "--state-stdin") {
+      flags.state_stdin = true;
     } else if (argument === "--root" || argument === "--task") {
       const value = argv[index + 1];
       if (!isBoundedString(value, argument === "--root" ? 8_192 : 2_048)) {
@@ -156,13 +174,24 @@ function parseArguments(argv) {
 /**
  * @param {ParsedArguments} parsed
  * @returns {{
- *   skill: "orient" | "resume" | "verify" | "status",
+ *   skill: "orient" | "resume" | "verify" | "status" | "steer",
  *   task?: string,
  *   target?: string
  * }}
  */
 function routeCommand(parsed) {
   const command = parsed.command;
+  if (
+    parsed.flags.receipt_stdin &&
+    parsed.flags.state_stdin
+  ) {
+    throw new Error(
+      "Receipt and steer-state stdin modes cannot be combined."
+    );
+  }
+  if (parsed.flags.state_stdin && command !== "steer") {
+    throw new Error("--state-stdin is available only for steer.");
+  }
   if (command === "orient" || command === "brief") {
     return {
       skill: "orient",
@@ -205,6 +234,19 @@ function routeCommand(parsed) {
       throw new Error("status accepts no positional or task input.");
     }
     return { skill: "status" };
+  }
+  if (command === "steer") {
+    if (
+      parsed.positionals.length > 0 ||
+      parsed.flags.task !== null ||
+      parsed.flags.receipt_stdin ||
+      !parsed.flags.state_stdin
+    ) {
+      throw new Error(
+        "steer requires exactly --state-stdin and accepts no task, receipt, or positional input."
+      );
+    }
+    return { skill: "steer" };
   }
   if (command === "ask") {
     const question = sanitizeDisplayText(
@@ -262,9 +304,11 @@ function routeAsk(question) {
 
 /**
  * @param {NodeJS.ReadableStream} stream
+ * @param {number} maximumBytes
+ * @param {string} label
  * @returns {Promise<unknown>}
  */
-async function readReceipt(stream) {
+async function readBoundedJson(stream, maximumBytes, label) {
   /** @type {Buffer[]} */
   const chunks = [];
   let bytes = 0;
@@ -273,18 +317,23 @@ async function readReceipt(stream) {
       ? chunk
       : Buffer.from(String(chunk));
     bytes += selected.length;
-    if (bytes > MAX_RECEIPT_INPUT_BYTES) {
-      throw new Error("Receipt input exceeded the 16 KiB limit.");
+    if (bytes > maximumBytes) {
+      throw new Error(
+        `${label} input exceeded the ${maximumBytes / 1_024} KiB limit.`
+      );
     }
     chunks.push(selected);
   }
   if (bytes === 0) {
-    throw new Error("Receipt input was empty.");
+    throw new Error(`${label} input was empty.`);
   }
   try {
-    return JSON.parse(Buffer.concat(chunks, bytes).toString("utf8"));
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(
+      Buffer.concat(chunks, bytes)
+    );
+    return JSON.parse(decoded);
   } catch {
-    throw new Error("Receipt input was malformed.");
+    throw new Error(`${label} input was malformed.`);
   }
 }
 
@@ -362,6 +411,7 @@ Usage:
   kanon resume [--task TEXT] [--json] [--root PATH]
   kanon verify [README.md] [--task TEXT] [--receipt-stdin] [--json] [--root PATH]
   kanon status [--receipt-stdin] [--json] [--root PATH]
+  kanon steer --state-stdin [--json] [--root PATH]
 
 Compatibility read aliases:
   brief -> orient
@@ -371,5 +421,6 @@ Compatibility read aliases:
 
 Refresh and todo remain explicit v0.4 continuity writes. Notice mode is
 advisory, enforcement is false, and unavailable host state remains Unknown.
+Steer records one bounded state and performs no action or agent management.
 `;
 }

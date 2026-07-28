@@ -13,7 +13,8 @@
       "orient",
       "resume",
       "status",
-      "verify"
+      "verify",
+      "steer"
     ],
     "hosts": {
       "codex-cli": {
