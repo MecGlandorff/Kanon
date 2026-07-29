@@ -568,7 +568,13 @@ function assertSameStaticProof(left, right) {
   }
 }
 
-export function readStableRegularFile(file, maximumBytes) {
+export function readStableRegularFile(file, maximumBytes, options = {}) {
+  if (
+    options.afterOpen !== undefined &&
+    typeof options.afterOpen !== "function"
+  ) {
+    throw new Error("Stable-read test hook is invalid.");
+  }
   const before = fs.lstatSync(file, { bigint: true });
   if (
     !before.isFile() ||
@@ -586,6 +592,9 @@ export function readStableRegularFile(file, maximumBytes) {
     const opened = fs.fstatSync(fd, { bigint: true });
     if (!sameStableStat(before, opened)) {
       throw new Error("Input file changed before its stable read.");
+    }
+    if (options.afterOpen) {
+      options.afterOpen(file);
     }
     const bytes = fs.readFileSync(fd);
     const after = fs.fstatSync(fd, { bigint: true });
@@ -664,7 +673,7 @@ function validateDestinationName(value) {
   }
 }
 
-function refuseExistingPath(target) {
+export function refuseExistingPath(target) {
   try {
     fs.lstatSync(target);
   } catch (error) {
@@ -676,7 +685,7 @@ function refuseExistingPath(target) {
   throw new Error("D.2C destination already exists; replacement refused.");
 }
 
-function writeNewFile(target, bytes) {
+export function writeNewFile(target, bytes) {
   const fd = fs.openSync(
     target,
     fs.constants.O_WRONLY |
