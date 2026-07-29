@@ -568,7 +568,7 @@ function assertSameStaticProof(left, right) {
   }
 }
 
-function readStableRegularFile(file, maximumBytes) {
+export function readStableRegularFile(file, maximumBytes) {
   const before = fs.lstatSync(file, { bigint: true });
   if (
     !before.isFile() ||
@@ -601,7 +601,7 @@ function readStableRegularFile(file, maximumBytes) {
   }
 }
 
-function sameStableStat(left, right) {
+export function sameStableStat(left, right) {
   return (
     left.dev === right.dev &&
     left.ino === right.ino &&

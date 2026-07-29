@@ -1263,7 +1263,7 @@ function validatePathSet(values, label) {
   return paths;
 }
 
-function validateRelativePath(value) {
+export function validateRelativePath(value) {
   if (
     typeof value !== "string" ||
     value.length < 1 ||
@@ -1302,7 +1302,7 @@ function validateAllowedOutputFiles(value) {
   return [...names].sort(compareText);
 }
 
-function copySnapshot(sourceRoot, destinationRoot, state, caseKey) {
+export function copySnapshot(sourceRoot, destinationRoot, state, caseKey) {
   fs.mkdirSync(destinationRoot, { recursive: false, mode: 0o700 });
   state.directoryCount += 1;
   const stack = [{
@@ -1474,7 +1474,7 @@ function copyRegularFile(source, destination, lstat, state) {
   state.totalBytes += size;
 }
 
-function validateSnapshotPath(relativePath) {
+export function validateSnapshotPath(relativePath) {
   validateRelativePath(relativePath);
   const parts = relativePath.split("/");
   const lowered = parts.map((part) => part.toLowerCase());
@@ -1497,7 +1497,7 @@ function validateNoSensitiveSnapshotNames(entries) {
   }
 }
 
-function collectTreeEntries(root, prefix, options = {}) {
+export function collectTreeEntries(root, prefix, options = {}) {
   const entries = [];
   const stack = [{ absolute: root, relative: prefix }];
   while (stack.length) {
@@ -1541,13 +1541,16 @@ function collectTreeEntries(root, prefix, options = {}) {
   return entries.sort(compareEntries);
 }
 
-function makePacketReadOnly(root) {
-  for (const relativePath of [
+export function makePacketReadOnly(
+  root,
+  controlledFiles = [
     "README-FIRST.txt",
     "adjudication.schema.json",
     "review-items.json",
     "packet-manifest.json"
-  ]) {
+  ]
+) {
+  for (const relativePath of controlledFiles) {
     fs.chmodSync(path.join(root, relativePath), 0o400);
   }
   const directories = [];
@@ -1577,7 +1580,7 @@ function makePacketReadOnly(root) {
   }
 }
 
-function newCopyState(limits, startedAt) {
+export function newCopyState(limits, startedAt) {
   return {
     limits,
     startedAt,
@@ -1606,7 +1609,7 @@ function sameStableStat(left, right) {
   );
 }
 
-function prepareAbsentOutput(value) {
+export function prepareAbsentOutput(value) {
   const resolved = path.resolve(String(value));
   const parent = canonicalDirectory(
     path.dirname(resolved),
@@ -1628,7 +1631,7 @@ function prepareAbsentOutput(value) {
   return { parent, name, path: selected };
 }
 
-function cleanupOwnedStaging(parent, name) {
+export function cleanupOwnedStaging(parent, name) {
   if (
     !name.startsWith(".") ||
     !name.includes(".staging-") ||
@@ -1674,7 +1677,7 @@ function makeTreeWritable(root) {
   }
 }
 
-function canonicalDirectory(value, label) {
+export function canonicalDirectory(value, label) {
   const resolved = path.resolve(String(value));
   const canonical = fs.realpathSync(resolved);
   const stat = fs.lstatSync(canonical);
@@ -1684,7 +1687,7 @@ function canonicalDirectory(value, label) {
   return canonical;
 }
 
-function containedFile(root, relativePath) {
+export function containedFile(root, relativePath) {
   const result = resolveContainedPath(root, relativePath, {
     type: "file"
   });
@@ -1694,11 +1697,11 @@ function containedFile(root, relativePath) {
   return result.path;
 }
 
-function readJsonBounded(file, maximum) {
+export function readJsonBounded(file, maximum) {
   return parseJson(readBytesBounded(file, maximum), path.basename(file));
 }
 
-function readBytesBounded(file, maximum) {
+export function readBytesBounded(file, maximum) {
   const stat = fs.lstatSync(file);
   if (
     !stat.isFile() ||
@@ -1710,7 +1713,7 @@ function readBytesBounded(file, maximum) {
   return fs.readFileSync(file);
 }
 
-function parseJson(bytes, label) {
+export function parseJson(bytes, label) {
   try {
     return JSON.parse(bytes.toString("utf8"));
   } catch {
@@ -1733,7 +1736,7 @@ function assertHash(bytes, expected, label) {
   }
 }
 
-function writeNewFile(target, bytes) {
+export function writeNewFile(target, bytes) {
   fs.writeFileSync(target, bytes, {
     flag: "wx",
     mode: 0o400
@@ -1741,11 +1744,11 @@ function writeNewFile(target, bytes) {
   fs.chmodSync(target, 0o400);
 }
 
-function jsonBytes(value) {
+export function jsonBytes(value) {
   return Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 }
 
-function fileEntry(root, relativePath, requireReadOnly = false) {
+export function fileEntry(root, relativePath, requireReadOnly = false) {
   const result = resolveContainedPath(root, relativePath, {
     type: "file"
   });
@@ -1767,11 +1770,11 @@ function fileEntry(root, relativePath, requireReadOnly = false) {
   };
 }
 
-function treeCommitment(entries) {
+export function treeCommitment(entries) {
   return sha256(Buffer.from(canonicalJson(entries)));
 }
 
-function directoryFileBytes(root) {
+export function directoryFileBytes(root) {
   let total = 0;
   const stack = [root];
   while (stack.length) {
@@ -1792,11 +1795,11 @@ function directoryFileBytes(root) {
   return total;
 }
 
-function sha256(bytes) {
+export function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
-function keyedHex(seed, value, length) {
+export function keyedHex(seed, value, length) {
   return crypto
     .createHmac("sha256", Buffer.from(seed, "hex"))
     .update(value, "utf8")
@@ -1804,19 +1807,19 @@ function keyedHex(seed, value, length) {
     .slice(0, length);
 }
 
-function compareEntries(left, right) {
+export function compareEntries(left, right) {
   return compareText(left.path, right.path) ||
     compareText(left.type, right.type);
 }
 
-function compareText(left, right) {
+export function compareText(left, right) {
   return Buffer.compare(
     Buffer.from(left, "utf8"),
     Buffer.from(right, "utf8")
   );
 }
 
-function isPlainRecord(value) {
+export function isPlainRecord(value) {
   return Boolean(
     value &&
     typeof value === "object" &&
@@ -1825,7 +1828,7 @@ function isPlainRecord(value) {
   );
 }
 
-function hasExactKeys(value, keys) {
+export function hasExactKeys(value, keys) {
   return hasExactKeyList(value, keys);
 }
 
@@ -1847,7 +1850,7 @@ function sameStringSet(left, right) {
   );
 }
 
-function boundedText(value, maximumBytes) {
+export function boundedText(value, maximumBytes) {
   return (
     typeof value === "string" &&
     value.trim().length > 0 &&
@@ -1856,7 +1859,7 @@ function boundedText(value, maximumBytes) {
   );
 }
 
-function assertDeepEqual(left, right, message) {
+export function assertDeepEqual(left, right, message) {
   if (canonicalJson(left) !== canonicalJson(right)) {
     throw new Error(message);
   }
