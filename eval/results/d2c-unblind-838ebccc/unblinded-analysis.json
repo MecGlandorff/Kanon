@@ -1,0 +1,2954 @@
+{
+  "schema_version": "kanon-d2c-unblinded-analysis-v1",
+  "bindings": {
+    "preparation_commit": "372e66cddf4dd65fc4d87e6e982f1c90b9e11d73",
+    "packet_manifest_sha256": "008c3b271813820e934d73fbc777901b5139bc38e6b8d3e172f91d21ae939ef4",
+    "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+    "reviewer_prompt_sha256": "f633b9139b5f03be449de7480276508d7848851872ec97bb12bd95c986040ac6",
+    "adjudication_schema_sha256": "8af982b857eb9a32b9b8436b280c7449e4e363242d246ebef443f9b09cec2fcc",
+    "review_items_sha256": "8f703240961edfb5d68d249d62826d0f9e6b603cb15694061f054ea3fa376e89",
+    "case_snapshots_sha256": "4ad546ef3e7950697f80de7480a98cecc4f5e69de3b1bb7978fe302d228730b6",
+    "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66",
+    "raw_report_sha256": "747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3",
+    "corpus_manifest_sha256": "4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92",
+    "restored_artifact_sha256": "89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a"
+  },
+  "method": {
+    "source_set": "important-file symmetric difference only",
+    "reviewer_dispositions_modified": false,
+    "frozen_labels_modified": false,
+    "official_score_recalculated": false,
+    "consensus_items_presented_to_reviewer": false,
+    "exact_top_five_selection_requested": false,
+    "comparative_top_five_review_required": true
+  },
+  "item_count": 94,
+  "case_count": 28,
+  "items": [
+    {
+      "item_id": "item-a08041e4b5399728ed321a1a",
+      "case_id": "case-88928d03efee8d051237",
+      "repository_identity": "sharkdp/bat",
+      "path": "src/lib.rs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the crate's documented public surface, module structure, and principal PrettyPrinter API re-exports.",
+      "direct_sources": [
+        "src/lib.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-e2fbd35d699026b50421fb06",
+      "case_id": "case-88928d03efee8d051237",
+      "repository_identity": "sharkdp/bat",
+      "path": "src/controller.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the central input-processing and output-control pipeline used to run printing across inputs.",
+      "direct_sources": [
+        "src/controller.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-58d51331791650b66154c891",
+      "case_id": "case-1cb3c58132d3ce60508d",
+      "repository_identity": "vercel/turborepo",
+      "path": "crates/turborepo-lib/src/lib.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the library's module graph, public CLI-facing exports, version access, and main execution entry point.",
+      "direct_sources": [
+        "crates/turborepo-lib/src/lib.rs"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-360b8739f925ba719cfc169e",
+      "case_id": "case-1cb3c58132d3ce60508d",
+      "repository_identity": "vercel/turborepo",
+      "path": "crates/turbo-trace/src/main.rs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the complete executable entry point for the trace tool, including CLI parsing, tracing, output, and failure handling.",
+      "direct_sources": [
+        "crates/turbo-trace/src/main.rs"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-6abbf289d53fec9979d951f9",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/vue/index.js",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Acts as the CommonJS package entry point and selects the production or development build at runtime.",
+      "direct_sources": [
+        "packages/vue/index.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-428704b4da1d73f193bf5ec5",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/vue/jsx.d.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Registers the package's global JSX contract, including element, intrinsic-element, and reserved-prop types.",
+      "direct_sources": [
+        "packages/vue/jsx.d.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-d7c0449658e1c0594d760332",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/reactivity/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates and exposes the reactivity package's complete public runtime and type API.",
+      "direct_sources": [
+        "packages/reactivity/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7adc0afe7744a20b53170413",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/vue/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the full build's runtime compiler integration and re-exports the public runtime DOM API.",
+      "direct_sources": [
+        "packages/vue/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-824c6c7b0c15c21f18ac4a17",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/runtime-core/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the runtime-core package's broad public API, including rendering, lifecycle, reactivity, and component contracts.",
+      "direct_sources": [
+        "packages/runtime-core/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-97bb18f581c1b3e33c78b806",
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "repository_identity": "vuejs/core",
+      "path": "packages/vue/index.mjs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the ESM-facing package entry by forwarding the package's JavaScript exports.",
+      "direct_sources": [
+        "packages/vue/index.mjs"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-3979b58746ddf571f0e4fd50",
+      "case_id": "case-70d541ddb7f8ba95de95",
+      "repository_identity": "wagtail/bakerydemo",
+      "path": "bakerydemo/urls.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the application's root URL routing, including administration, documents, search, API, media, and Wagtail routes.",
+      "direct_sources": [
+        "bakerydemo/urls.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-fe0b3ad501d324fa58e2eeba",
+      "case_id": "case-70d541ddb7f8ba95de95",
+      "repository_identity": "wagtail/bakerydemo",
+      "path": "requirements.txt",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the root dependency installation path by including the production requirements set.",
+      "direct_sources": [
+        "requirements.txt"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-347eb300f5c6c0a33e1fa827",
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "repository_identity": "pretix/pretix",
+      "path": "src/pretix/_base_settings.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines shared application settings covering installed apps, localization, templates, static assets, and other foundational configuration.",
+      "direct_sources": [
+        "src/pretix/_base_settings.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-15f736e231747cc1472feece",
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "repository_identity": "pretix/pretix",
+      "path": "src/pretix/urls.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Composes the application's top-level health, control, API, media, and supporting URL patterns.",
+      "direct_sources": [
+        "src/pretix/urls.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-d636476330652777c65ba6d9",
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "repository_identity": "pretix/pretix",
+      "path": "src/pretix/base/signals.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the plugin-aware signal dispatch mechanism that gates receivers by active application and plugin scope.",
+      "direct_sources": [
+        "src/pretix/base/signals.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-f3f113a3ece576ad8e512e18",
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "repository_identity": "pretix/pretix",
+      "path": "src/pretix/settings.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Builds the runtime configuration from base settings and deployment inputs, including secrets, databases, URLs, and plugin settings.",
+      "direct_sources": [
+        "src/pretix/settings.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-d5d0ddfa350de05e58a841ce",
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "repository_identity": "authelia/authelia",
+      "path": "internal/utils/bools.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only one generic boolean-count helper and no evidence of an architectural, entry-point, or public-contract role.",
+      "direct_sources": [
+        "internal/utils/bools.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ee14e45d76220e17aeeb7181",
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "repository_identity": "authelia/authelia",
+      "path": "web/package.json",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the web application's dependency graph, supported toolchain, and primary build, start, lint, and test workflows.",
+      "direct_sources": [
+        "web/package.json"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-23e8861e675adca8c6dda1b3",
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "repository_identity": "authelia/authelia",
+      "path": "internal/commands/root.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs the root CLI command, registers major subcommands, and orchestrates startup validation and service execution.",
+      "direct_sources": [
+        "internal/commands/root.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-9a9a5d978a855e43a2a26ac9",
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "repository_identity": "authelia/authelia",
+      "path": "internal/configuration/schema/server.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the server configuration schema and operational defaults for listeners, TLS, endpoints, rate limits, buffers, and timeouts.",
+      "direct_sources": [
+        "internal/configuration/schema/server.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-945e9ac341d6426f8a23ff6b",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/adapter-static/index.js",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the adapter's exported behavior for validating prerenderability and writing static sites, assets, fallbacks, and compressed output.",
+      "direct_sources": [
+        "packages/adapter-static/index.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-98963bd9c415a1760f6640f4",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/kit/src/runtime/server/index.js",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the server runtime object that initializes hooks and environment state and dispatches application requests.",
+      "direct_sources": [
+        "packages/kit/src/runtime/server/index.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-fb673c6b9d7592ca6e3b1636",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/kit/src/exports/index.js",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements and documents central public package exports for errors, redirects, responses, validation, and URL normalization.",
+      "direct_sources": [
+        "packages/kit/src/exports/index.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-500e454447830bdb1f7fd9f4",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/package/svelte-package.js",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the executable CLI boundary through a shebang entry point that loads the package command implementation.",
+      "direct_sources": [
+        "packages/package/svelte-package.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-615b9425e599bbe6c5f64c34",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/kit/package.json",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's published exports, executable mapping, dependencies, files, engines, and lifecycle workflows.",
+      "direct_sources": [
+        "packages/kit/package.json"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ebb80bbaa7ab99b30f354df1",
+      "case_id": "case-b418e22c3077876db652",
+      "repository_identity": "sveltejs/kit",
+      "path": "packages/kit/svelte-kit.js",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the package's executable svelte-kit CLI boundary and forwards directly to its command implementation.",
+      "direct_sources": [
+        "packages/kit/svelte-kit.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-af6afdd26cdb26262d807375",
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "repository_identity": "tanstack/query",
+      "path": "packages/angular-query-experimental/src/index.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the Angular binding's public query, mutation, provider, restoration, and core re-export surface.",
+      "direct_sources": [
+        "packages/angular-query-experimental/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-8d904fa3e78cbba3a7c7bf35",
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "repository_identity": "tanstack/query",
+      "path": "packages/react-query/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the React binding's public hooks, providers, option builders, boundaries, and core API.",
+      "direct_sources": [
+        "packages/react-query/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-f51cd08d7bb7ae02652e36cd",
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "repository_identity": "tanstack/query",
+      "path": "packages/query-core/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the query-core package's public managers, caches, clients, observers, hydration, retry, utility, and type exports.",
+      "direct_sources": [
+        "packages/query-core/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7ccd2dfde27ff9b65aca382a",
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "repository_identity": "tanstack/query",
+      "path": "packages/preact-query/src/index.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the Preact binding's public hooks, providers, option builders, boundaries, and core API.",
+      "direct_sources": [
+        "packages/preact-query/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-751868fc6386d15e3d3b5d9f",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "segment_anything/segment_anything/common.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Defines only two small supporting neural-network blocks; the file itself does not establish a central package or workflow role.",
+      "direct_sources": [
+        "segment_anything/segment_anything/common.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ceef0c92195443f5afaa2565",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "lora/models.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the LoRA linear layer and the transformer model architecture used by the fine-tuning workflow.",
+      "direct_sources": [
+        "lora/models.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-9ca53074de99a44b2d674041",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "whisper/mlx_whisper/__init__.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package import surface by exposing transcription, model-loading, decoding, audio, and version interfaces.",
+      "direct_sources": [
+        "whisper/mlx_whisper/__init__.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-a68e3d670d9a553445e5ec47",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "mnist/README.md",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the example's primary setup, execution, device-selection, and help instructions.",
+      "direct_sources": [
+        "mnist/README.md"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-f04912014368ee5d86456779",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "lora/lora.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the LoRA workflow's CLI, dataset loading, training, evaluation, generation, checkpointing, and model adaptation.",
+      "direct_sources": [
+        "lora/lora.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-3f101080969183ccf98fb797",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "mnist/mnist.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the example's MNIST and Fashion-MNIST acquisition, preprocessing, caching, and data-return interface.",
+      "direct_sources": [
+        "mnist/mnist.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-9b0e9a9f053e18e43f490334",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "stable_diffusion/stable_diffusion/config.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the model configuration contracts and defaults for the autoencoder, text encoder, UNet, and diffusion process.",
+      "direct_sources": [
+        "stable_diffusion/stable_diffusion/config.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-8deaa7d0bb38dc150654ad2f",
+      "case_id": "case-f9d19760c12f72eaa933",
+      "repository_identity": "ml-explore/mlx-examples",
+      "path": "mnist/main.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the runnable MNIST example entry point and contains its model, training loop, evaluation, and device selection.",
+      "direct_sources": [
+        "mnist/main.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-0d605ad84312e2d6ade22604",
+      "case_id": "case-252c319d41b39118878a",
+      "repository_identity": "adguardteam/adguardhome",
+      "path": "internal/aghhttp/aghhttp.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains a small collection of HTTP response helpers, including an explicitly temporary registration type, without evidence of central orchestration.",
+      "direct_sources": [
+        "internal/aghhttp/aghhttp.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-81f6e449613813179b7feddf",
+      "case_id": "case-252c319d41b39118878a",
+      "repository_identity": "adguardteam/adguardhome",
+      "path": "internal/home/home.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Contains the application's main entry point and coordinates configuration, logging, signals, services, modules, and shutdown.",
+      "direct_sources": [
+        "internal/home/home.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-84b2eb9720b688cc08d8ce7b",
+      "case_id": "case-252c319d41b39118878a",
+      "repository_identity": "adguardteam/adguardhome",
+      "path": "go.mod",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the Go module identity, language version, direct and indirect dependencies, tools, and ignored module directories.",
+      "direct_sources": [
+        "go.mod"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-2d34c9e0e76b23cb06542155",
+      "case_id": "case-252c319d41b39118878a",
+      "repository_identity": "adguardteam/adguardhome",
+      "path": "client/package.json",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the client application's scripts, runtime dependencies, development toolchain, and browser support policy.",
+      "direct_sources": [
+        "client/package.json"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-02e14fb6d94f1310fad701ba",
+      "case_id": "case-e9b8b7435e14ce8dca97",
+      "repository_identity": "casey/just",
+      "path": "tests/test.rs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the shared integration-test DSL that constructs fixtures, runs the binary, and verifies status, output, and files.",
+      "direct_sources": [
+        "tests/test.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-fee99a866a9c92f415c11c9d",
+      "case_id": "case-e9b8b7435e14ce8dca97",
+      "repository_identity": "casey/just",
+      "path": "tests/lib.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Acts as the integration-test suite root, providing shared support and declaring the full set of test modules.",
+      "direct_sources": [
+        "tests/lib.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-e8075ec251910a31e93749bb",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "distributed/ddp-tutorial-series/datautils.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only a minimal synthetic Dataset helper and does not itself define the tutorial's distributed workflow.",
+      "direct_sources": [
+        "distributed/ddp-tutorial-series/datautils.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-01e3ef9b90e6af5a1f8c986b",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "mnist/main.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is a complete runnable MNIST example containing the model, training and test loops, CLI, data loading, and checkpoint option.",
+      "direct_sources": [
+        "mnist/main.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-3d5f583d177acb8711eee50b",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "run_python_examples.sh",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Orchestrates integration checks across the repository's Python examples, including selection, setup, execution, cleanup, and aggregate failure reporting.",
+      "direct_sources": [
+        "run_python_examples.sh"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-02251314c5039c3775f3b194",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "super_resolution/model.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the super-resolution example's complete neural network architecture and weight initialization.",
+      "direct_sources": [
+        "super_resolution/model.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-6f918e0a8ab0d4b624d88af7",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "word_language_model/data.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the language-model example's vocabulary and corpus tokenization pipeline for train, validation, and test data.",
+      "direct_sources": [
+        "word_language_model/data.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-c1502a2debb39f34d87e9044",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "distributed/tensor_parallelism/log_utils.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only logging and accelerator-count helpers, with no direct evidence of a central tensor-parallel implementation role.",
+      "direct_sources": [
+        "distributed/tensor_parallelism/log_utils.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-2023251065c911a3ae736017",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "dcgan/main.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the complete DCGAN example, including CLI, datasets, generator and discriminator models, optimization, training, and checkpoints.",
+      "direct_sources": [
+        "dcgan/main.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7f3fd1d4539e9cd899047737",
+      "case_id": "case-e20f183077ea5021408f",
+      "repository_identity": "pytorch/examples",
+      "path": "distributed/FSDP2/example.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the runnable FSDP2 example's distributed initialization, sharding, precision, prefetching, optimization, and checkpoint flow.",
+      "direct_sources": [
+        "distributed/FSDP2/example.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-289b698c48f36d715cf9a149",
+      "case_id": "case-afc3e17d24393ba3e978",
+      "repository_identity": "burntsushi/ripgrep",
+      "path": "crates/matcher/src/lib.rs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines and documents the matcher crate's core public abstractions, including match ranges, line terminators, byte sets, and matcher interfaces.",
+      "direct_sources": [
+        "crates/matcher/src/lib.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-01a0e33cd229fa14e260c7b6",
+      "case_id": "case-afc3e17d24393ba3e978",
+      "repository_identity": "burntsushi/ripgrep",
+      "path": "crates/core/search.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the high-level search worker that coordinates matchers, readers, preprocessing, decompression, binary handling, and printers.",
+      "direct_sources": [
+        "crates/core/search.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ceed7116fbe48c152708e7b1",
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "repository_identity": "pmndrs/react-spring",
+      "path": "packages/mock-raf/index.d.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the public TypeScript contract for the mock RAF package's scheduling, cancellation, stepping, flushing, and timing API.",
+      "direct_sources": [
+        "packages/mock-raf/index.d.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-72385f7af810366d64e24344",
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "repository_identity": "pmndrs/react-spring",
+      "path": "packages/shared/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the shared package's public export surface for animation loops, interpolation, colors, hooks, events, fluids, and RAF integration.",
+      "direct_sources": [
+        "packages/shared/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-4dd3a42d05082db92a1e662a",
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "repository_identity": "pmndrs/react-spring",
+      "path": "packages/mock-raf/index.js",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the mock RAF package's complete public runtime for scheduling, cancellation, time advancement, stepping, and flushing.",
+      "direct_sources": [
+        "packages/mock-raf/index.js"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-96bed261a5df5886b01b8de1",
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "repository_identity": "pmndrs/react-spring",
+      "path": "packages/core/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the core package's public hooks, components, interpolation, controller, spring, frame, async, helper, and type exports.",
+      "direct_sources": [
+        "packages/core/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-c9d5470917be37f9303263bd",
+      "case_id": "case-544d9ef412bce7994a73",
+      "repository_identity": "changesets/changesets",
+      "path": "packages/config/src/config.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the configuration schema, defaults, validation descriptions, and normalization logic for release behavior.",
+      "direct_sources": [
+        "packages/config/src/config.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-6a098820ce2e07af8b4ad8af",
+      "case_id": "case-544d9ef412bce7994a73",
+      "repository_identity": "changesets/changesets",
+      "path": "packages/color/src/index.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the color package's exported API as a lazy proxy over the runtime text-styling facility.",
+      "direct_sources": [
+        "packages/color/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-6d3ff12b7230952321fb483d",
+      "case_id": "case-544d9ef412bce7994a73",
+      "repository_identity": "changesets/changesets",
+      "path": "scripts/test-utils/src/index.ts",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Provides test-only fixture, mocking, logging, and Git helpers; the evidence does not support a product or public-contract role.",
+      "direct_sources": [
+        "scripts/test-utils/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-29a4d3d4a290f78c26b9dc98",
+      "case_id": "case-544d9ef412bce7994a73",
+      "repository_identity": "changesets/changesets",
+      "path": "packages/cli/src/index.ts",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the CLI execution boundary, handling command parsing, interactive presentation, matched-command execution, errors, and exit codes.",
+      "direct_sources": [
+        "packages/cli/src/index.ts"
+      ],
+      "category": "monorepo",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-a99dbf80190a58e4c10bd39f",
+      "case_id": "case-ffea795b67680efb8844",
+      "repository_identity": "caddyserver/caddy",
+      "path": "cmd/commands.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the command registry and configures major operational commands such as run, start, stop, reload, adapt, validate, and storage.",
+      "direct_sources": [
+        "cmd/commands.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7ec45f939a85cd6c5e45cfb1",
+      "case_id": "case-ffea795b67680efb8844",
+      "repository_identity": "caddyserver/caddy",
+      "path": "caddyconfig/caddyfile/adapter.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the Caddyfile-to-JSON adapter and its public adapter, unmarshaler, and server-type extension contracts.",
+      "direct_sources": [
+        "caddyconfig/caddyfile/adapter.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-c77419a10bd6b2c223820aa8",
+      "case_id": "case-6f0e9cbbee1ceda8299c",
+      "repository_identity": "charmbracelet/soft-serve",
+      "path": "cmd/soft/serve/server.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs and orchestrates the application's SSH, Git, HTTP, stats, TLS, cron, startup, and shutdown services.",
+      "direct_sources": [
+        "cmd/soft/serve/server.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-5a63f591d33ba10c26fc42f0",
+      "case_id": "case-6f0e9cbbee1ceda8299c",
+      "repository_identity": "charmbracelet/soft-serve",
+      "path": "pkg/db/db.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines database opening and the transaction commit-and-rollback abstraction used by the application.",
+      "direct_sources": [
+        "pkg/db/db.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-96ae053433c94f527ad32688",
+      "case_id": "case-e1382be027673c336b85",
+      "repository_identity": "django/djangoproject.com",
+      "path": "djangoproject/hosts.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the application's host-level routing for the primary site, documentation, and dashboard.",
+      "direct_sources": [
+        "djangoproject/hosts.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-174729f452dc48d702a2206c",
+      "case_id": "case-e1382be027673c336b85",
+      "repository_identity": "django/djangoproject.com",
+      "path": "setup.cfg",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only formatter and linter configuration; its contents do not establish an application, runtime, or public API role.",
+      "direct_sources": [
+        "setup.cfg"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-8c34ca0f231191628cc42cf7",
+      "case_id": "case-fffe44ecc6f1c62266c4",
+      "repository_identity": "pallets/flask-initial-no-readme",
+      "path": "examples/apishowcase/apishowcase.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Implements a small optional demonstration application with three routes and no evidence of a repository-wide runtime role.",
+      "direct_sources": [
+        "examples/apishowcase/apishowcase.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-57e0d4338a607cea7a1c1bbe",
+      "case_id": "case-fffe44ecc6f1c62266c4",
+      "repository_identity": "pallets/flask-initial-no-readme",
+      "path": "examples/minitwit/templates/layout.html",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Is a presentation template for one optional example and does not define framework behavior or a repository-level interface.",
+      "direct_sources": [
+        "examples/minitwit/templates/layout.html"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-1367cef5997711151e901e87",
+      "case_id": "case-4628a39c88a74335c07f",
+      "repository_identity": "karpathy/nanogpt",
+      "path": "config/train_shakespeare_char.py",
+      "origin": "label-only",
+      "reviewer_disposition": "unknown",
+      "rationale": "Defines a complete debugging-oriented training preset, but direct evidence does not establish whether this preset is privileged over other configuration variants.",
+      "direct_sources": [
+        "config/train_shakespeare_char.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7d5de0f10e9fc6b84a9ba115",
+      "case_id": "case-4628a39c88a74335c07f",
+      "repository_identity": "karpathy/nanogpt",
+      "path": "train.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the central training program, including configuration, distributed setup, data batching, model initialization, optimization, evaluation, and checkpointing.",
+      "direct_sources": [
+        "train.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-3203617048e5ef98bf6f6bf2",
+      "case_id": "case-4628a39c88a74335c07f",
+      "repository_identity": "karpathy/nanogpt",
+      "path": "data/openwebtext/prepare.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the OpenWebText ingestion, split, tokenization, and binary serialization pipeline consumed by training.",
+      "direct_sources": [
+        "data/openwebtext/prepare.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ba9395b9d4f511679474dff0",
+      "case_id": "case-631520ae9045bfe9ca44",
+      "repository_identity": "pocketbase/pocketbase",
+      "path": "pocketbase.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the primary public application launcher, configuration, CLI construction, bootstrap, startup, execution, and graceful termination.",
+      "direct_sources": [
+        "pocketbase.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-6d98fb4223fc55264c1c8f1e",
+      "case_id": "case-631520ae9045bfe9ca44",
+      "repository_identity": "pocketbase/pocketbase",
+      "path": "cmd/serve.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the principal serve command, listener defaults, TLS and CORS options, and web-server launch behavior.",
+      "direct_sources": [
+        "cmd/serve.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-0c3006d7fe6f9666a85238c7",
+      "case_id": "case-631520ae9045bfe9ca44",
+      "repository_identity": "pocketbase/pocketbase",
+      "path": "README.md",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the repository's primary description, usage modes, minimal application example, build guidance, testing, security, and contribution information.",
+      "direct_sources": [
+        "README.md"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-2e96daadeb019ed57d16ecf9",
+      "case_id": "case-631520ae9045bfe9ca44",
+      "repository_identity": "pocketbase/pocketbase",
+      "path": "Makefile",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only convenience targets for linting, testing, type generation, and coverage, without evidence that it is the canonical build or runtime definition.",
+      "direct_sources": [
+        "Makefile"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-33f714c5071de47e9d513dc2",
+      "case_id": "case-fec61674a92ab33c152b",
+      "repository_identity": "saleor/saleor",
+      "path": "saleor/graphql/api.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Composes the complete GraphQL query and mutation schema, directives, monitoring, validation, execution backend, and cache.",
+      "direct_sources": [
+        "saleor/graphql/api.py"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-a586ee7c1e236a764206c40b",
+      "case_id": "case-fec61674a92ab33c152b",
+      "repository_identity": "saleor/saleor",
+      "path": "README.md",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the repository's primary product description, architecture, features, installation, documentation, component, and contribution guidance.",
+      "direct_sources": [
+        "README.md"
+      ],
+      "category": "python-web",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-192a61f0aeddb220f55b1e22",
+      "case_id": "case-4760635b80ee4edceab3",
+      "repository_identity": "ajeetdsouza/zoxide",
+      "path": "src/db/mod.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the application's persistent ranked-directory database, including open, save, mutation, sorting, aging, deduplication, and serialization.",
+      "direct_sources": [
+        "src/db/mod.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-1b416c108ef0aa537747ef10",
+      "case_id": "case-4760635b80ee4edceab3",
+      "repository_identity": "ajeetdsouza/zoxide",
+      "path": "tests/completions.rs",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Tests only generated shell-completion scripts and does not establish a central runtime or public API role.",
+      "direct_sources": [
+        "tests/completions.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-5716523ac3c9da57105ece4a",
+      "case_id": "case-8684b7a189623f3b052b",
+      "repository_identity": "karpathy/mingpt",
+      "path": "mingpt/trainer.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's reusable training abstraction, optimizer and data-loader setup, device handling, callbacks, and update loop.",
+      "direct_sources": [
+        "mingpt/trainer.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-006eaf30c59990ca4f5277f0",
+      "case_id": "case-8684b7a189623f3b052b",
+      "repository_identity": "karpathy/mingpt",
+      "path": "mingpt/utils.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides foundational configuration, command-line override, reproducibility, and logging utilities used by the training layer.",
+      "direct_sources": [
+        "mingpt/utils.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-9d4a4fba2e3c3e2121a7e05d",
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "repository_identity": "tinygrad/tinygrad",
+      "path": "tinygrad/tensor.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the principal Tensor abstraction and its construction, graph, realization, device, dtype, mutation, and data interfaces.",
+      "direct_sources": [
+        "tinygrad/tensor.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-0342770dfb550a30fc89cd2f",
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "repository_identity": "tinygrad/tinygrad",
+      "path": "tinygrad/__init__.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's top-level public import surface for Tensor, JIT, functions, variables, dtypes, context, counters, fetching, and devices.",
+      "direct_sources": [
+        "tinygrad/__init__.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-7c31ac0a43e75e0d4771c235",
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "repository_identity": "tinygrad/tinygrad",
+      "path": "tinygrad/uop/ops.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements foundational UOp graph types, symbolic operations, shapes, traversal, rewriting, and low-level computation representation.",
+      "direct_sources": [
+        "tinygrad/uop/ops.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-333b5e9d1f27c14af7c57e6e",
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "repository_identity": "tinygrad/tinygrad",
+      "path": "tinygrad/helpers.py",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides foundational global context, configuration, profiling, caching, shape, arithmetic, platform, and utility infrastructure used across the package.",
+      "direct_sources": [
+        "tinygrad/helpers.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-f897a5289b5b6688a5a9db41",
+      "case_id": "case-ee88fe4c02007f836828",
+      "repository_identity": "usememos/memos",
+      "path": "proto/gen/store/attachment.pb.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Explicitly identifies itself as generated protobuf output; direct evidence points to the source schema rather than this artifact as the canonical definition.",
+      "direct_sources": [
+        "proto/gen/store/attachment.pb.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-e8d58a8e8436b0a734fa5bb4",
+      "case_id": "case-ee88fe4c02007f836828",
+      "repository_identity": "usememos/memos",
+      "path": "store/store.go",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the central Store object, database driver ownership, application caches, deployment configuration, construction, and shutdown.",
+      "direct_sources": [
+        "store/store.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-241fe605a03c10417722f784",
+      "case_id": "case-ee88fe4c02007f836828",
+      "repository_identity": "usememos/memos",
+      "path": "web/package.json",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the web application's toolchain, release and quality workflows, runtime dependencies, and development dependencies.",
+      "direct_sources": [
+        "web/package.json"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-1d24c2dcffb3e2bae2caf790",
+      "case_id": "case-ee88fe4c02007f836828",
+      "repository_identity": "usememos/memos",
+      "path": "server/server.go",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs and runs the HTTP server, registers frontend, API, file, RSS, and MCP routes, and coordinates background work and graceful shutdown.",
+      "direct_sources": [
+        "server/server.go"
+      ],
+      "category": "go-service",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-ed77bcc24147c8e35d12163d",
+      "case_id": "case-34b289c7e5030dfd1ea5",
+      "repository_identity": "sharkdp/fd",
+      "path": "Makefile",
+      "origin": "prediction-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the build target and installation layout for the executable, shell completions, and manual page.",
+      "direct_sources": [
+        "Makefile"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-d8bf44ee8de3063283335ff7",
+      "case_id": "case-34b289c7e5030dfd1ea5",
+      "repository_identity": "sharkdp/fd",
+      "path": "src/walk.rs",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the core parallel filesystem walk, filtering, batching, buffering, output, interruption, and result-limit behavior.",
+      "direct_sources": [
+        "src/walk.rs"
+      ],
+      "category": "rust-cli",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    },
+    {
+      "item_id": "item-477ac40a86dba1346516e444",
+      "case_id": "case-cb1a8dbcf2fb395aaec0",
+      "repository_identity": "karpathy/micrograd",
+      "path": "micrograd/nn.py",
+      "origin": "label-only",
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the library's neural-network layer on top of Value, including modules, neurons, layers, MLP composition, parameters, and gradient reset.",
+      "direct_sources": [
+        "micrograd/nn.py"
+      ],
+      "category": "python-ml",
+      "packet_commitment": "abe906e1291086dc3803eb8d4153e6a5aede85b8b4e7ae4e18d99b8f44bc3979",
+      "review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66"
+    }
+  ],
+  "matrices": {
+    "prediction_only_by_disposition": {
+      "clearly-defensible-important": 35,
+      "clearly-unsupported": 10,
+      "ambiguous-equivalent": 0,
+      "insufficient-label-provenance": 0,
+      "weak-ranking-signal": 0,
+      "unknown": 0,
+      "total": 45
+    },
+    "label_only_by_disposition": {
+      "clearly-defensible-important": 46,
+      "clearly-unsupported": 2,
+      "ambiguous-equivalent": 0,
+      "insufficient-label-provenance": 0,
+      "weak-ranking-signal": 0,
+      "unknown": 1,
+      "total": 49
+    },
+    "category_by_origin_and_disposition": {
+      "go-service": {
+        "prediction-only": {
+          "clearly-defensible-important": 6,
+          "clearly-unsupported": 4,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 10
+        },
+        "label-only": {
+          "clearly-defensible-important": 10,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 10
+        }
+      },
+      "monorepo": {
+        "prediction-only": {
+          "clearly-defensible-important": 12,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 13
+        },
+        "label-only": {
+          "clearly-defensible-important": 13,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 13
+        }
+      },
+      "python-ml": {
+        "prediction-only": {
+          "clearly-defensible-important": 9,
+          "clearly-unsupported": 3,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 12
+        },
+        "label-only": {
+          "clearly-defensible-important": 13,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 1,
+          "total": 14
+        }
+      },
+      "python-web": {
+        "prediction-only": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 5
+        },
+        "label-only": {
+          "clearly-defensible-important": 5,
+          "clearly-unsupported": 2,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 7
+        }
+      },
+      "rust-cli": {
+        "prediction-only": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 5
+        },
+        "label-only": {
+          "clearly-defensible-important": 5,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 5
+        }
+      }
+    },
+    "case_level": [
+      {
+        "case_id": "case-88928d03efee8d051237",
+        "repository_identity": "sharkdp/bat",
+        "category": "rust-cli",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-1cb3c58132d3ce60508d",
+        "repository_identity": "vercel/turborepo",
+        "category": "monorepo",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-aeaf6a6e928739b70f99",
+        "repository_identity": "vuejs/core",
+        "category": "monorepo",
+        "item_count": 6,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          },
+          "label-only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 6,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 6
+        }
+      },
+      {
+        "case_id": "case-70d541ddb7f8ba95de95",
+        "repository_identity": "wagtail/bakerydemo",
+        "category": "python-web",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-9eed4a5b41ba4af420bd",
+        "repository_identity": "pretix/pretix",
+        "category": "python-web",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-9a2aa408a5339ef7f9d5",
+        "repository_identity": "authelia/authelia",
+        "category": "go-service",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 3,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-b418e22c3077876db652",
+        "repository_identity": "sveltejs/kit",
+        "category": "monorepo",
+        "item_count": 6,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          },
+          "label-only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 6,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 6
+        }
+      },
+      {
+        "case_id": "case-2b0dc3de4806a1da54d6",
+        "repository_identity": "tanstack/query",
+        "category": "monorepo",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-f9d19760c12f72eaa933",
+        "repository_identity": "ml-explore/mlx-examples",
+        "category": "python-ml",
+        "item_count": 8,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          },
+          "label-only": {
+            "clearly-defensible-important": 4,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 7,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 8
+        }
+      },
+      {
+        "case_id": "case-252c319d41b39118878a",
+        "repository_identity": "adguardteam/adguardhome",
+        "category": "go-service",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 3,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-e9b8b7435e14ce8dca97",
+        "repository_identity": "casey/just",
+        "category": "rust-cli",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-e20f183077ea5021408f",
+        "repository_identity": "pytorch/examples",
+        "category": "python-ml",
+        "item_count": 8,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 2,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          },
+          "label-only": {
+            "clearly-defensible-important": 4,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 6,
+          "clearly-unsupported": 2,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 8
+        }
+      },
+      {
+        "case_id": "case-afc3e17d24393ba3e978",
+        "repository_identity": "burntsushi/ripgrep",
+        "category": "rust-cli",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-f2a3c500e2f9bd2dfc78",
+        "repository_identity": "pmndrs/react-spring",
+        "category": "monorepo",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-544d9ef412bce7994a73",
+        "repository_identity": "changesets/changesets",
+        "category": "monorepo",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 3,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-ffea795b67680efb8844",
+        "repository_identity": "caddyserver/caddy",
+        "category": "go-service",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-6f0e9cbbee1ceda8299c",
+        "repository_identity": "charmbracelet/soft-serve",
+        "category": "go-service",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-e1382be027673c336b85",
+        "repository_identity": "django/djangoproject.com",
+        "category": "python-web",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 1,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-fffe44ecc6f1c62266c4",
+        "repository_identity": "pallets/flask-initial-no-readme",
+        "category": "python-web",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 0
+          },
+          "label-only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 2,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 0,
+          "clearly-unsupported": 2,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-4628a39c88a74335c07f",
+        "repository_identity": "karpathy/nanogpt",
+        "category": "python-ml",
+        "item_count": 3,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 1,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 1,
+          "total": 3
+        }
+      },
+      {
+        "case_id": "case-631520ae9045bfe9ca44",
+        "repository_identity": "pocketbase/pocketbase",
+        "category": "go-service",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 3,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-fec61674a92ab33c152b",
+        "repository_identity": "saleor/saleor",
+        "category": "python-web",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-4760635b80ee4edceab3",
+        "repository_identity": "ajeetdsouza/zoxide",
+        "category": "rust-cli",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 1,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-8684b7a189623f3b052b",
+        "repository_identity": "karpathy/mingpt",
+        "category": "python-ml",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-31a3c7c563bf2f4eb54d",
+        "repository_identity": "tinygrad/tinygrad",
+        "category": "python-ml",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 4,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-ee88fe4c02007f836828",
+        "repository_identity": "usememos/memos",
+        "category": "go-service",
+        "item_count": 4,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label-only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 3,
+          "clearly-unsupported": 1,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 4
+        }
+      },
+      {
+        "case_id": "case-34b289c7e5030dfd1ea5",
+        "repository_identity": "sharkdp/fd",
+        "category": "rust-cli",
+        "item_count": 2,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 2,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 2
+        }
+      },
+      {
+        "case_id": "case-cb1a8dbcf2fb395aaec0",
+        "repository_identity": "karpathy/micrograd",
+        "category": "python-ml",
+        "item_count": 1,
+        "by_origin": {
+          "prediction-only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 0
+          },
+          "label-only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "all_dispositions": {
+          "clearly-defensible-important": 1,
+          "clearly-unsupported": 0,
+          "ambiguous-equivalent": 0,
+          "insufficient-label-provenance": 0,
+          "weak-ranking-signal": 0,
+          "unknown": 0,
+          "total": 1
+        }
+      }
+    ],
+    "case_pattern_groups": [
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "case_count": 10,
+        "case_ids": [
+          "case-88928d03efee8d051237",
+          "case-1cb3c58132d3ce60508d",
+          "case-70d541ddb7f8ba95de95",
+          "case-e9b8b7435e14ce8dca97",
+          "case-afc3e17d24393ba3e978",
+          "case-ffea795b67680efb8844",
+          "case-6f0e9cbbee1ceda8299c",
+          "case-fec61674a92ab33c152b",
+          "case-8684b7a189623f3b052b",
+          "case-34b289c7e5030dfd1ea5"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          },
+          "label_only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 3
+          }
+        },
+        "case_count": 2,
+        "case_ids": [
+          "case-aeaf6a6e928739b70f99",
+          "case-b418e22c3077876db652"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label_only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "case_count": 4,
+        "case_ids": [
+          "case-9eed4a5b41ba4af420bd",
+          "case-2b0dc3de4806a1da54d6",
+          "case-f2a3c500e2f9bd2dfc78",
+          "case-31a3c7c563bf2f4eb54d"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          },
+          "label_only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "case_count": 5,
+        "case_ids": [
+          "case-9a2aa408a5339ef7f9d5",
+          "case-252c319d41b39118878a",
+          "case-544d9ef412bce7994a73",
+          "case-631520ae9045bfe9ca44",
+          "case-ee88fe4c02007f836828"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 3,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          },
+          "label_only": {
+            "clearly-defensible-important": 4,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          }
+        },
+        "case_count": 1,
+        "case_ids": [
+          "case-f9d19760c12f72eaa933"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 2,
+            "clearly-unsupported": 2,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          },
+          "label_only": {
+            "clearly-defensible-important": 4,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 4
+          }
+        },
+        "case_count": 1,
+        "case_ids": [
+          "case-e20f183077ea5021408f"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 1,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "case_count": 2,
+        "case_ids": [
+          "case-e1382be027673c336b85",
+          "case-4760635b80ee4edceab3"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 0
+          },
+          "label_only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 2,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 2
+          }
+        },
+        "case_count": 1,
+        "case_ids": [
+          "case-fffe44ecc6f1c62266c4"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          },
+          "label_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 1,
+            "total": 2
+          }
+        },
+        "case_count": 1,
+        "case_ids": [
+          "case-4628a39c88a74335c07f"
+        ]
+      },
+      {
+        "signature": {
+          "prediction_only": {
+            "clearly-defensible-important": 0,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 0
+          },
+          "label_only": {
+            "clearly-defensible-important": 1,
+            "clearly-unsupported": 0,
+            "ambiguous-equivalent": 0,
+            "insufficient-label-provenance": 0,
+            "weak-ranking-signal": 0,
+            "unknown": 0,
+            "total": 1
+          }
+        },
+        "case_count": 1,
+        "case_ids": [
+          "case-cb1a8dbcf2fb395aaec0"
+        ]
+      }
+    ],
+    "findings": {
+      "clearly-defensible-important": {
+        "prediction-only": [
+          "item-a08041e4b5399728ed321a1a",
+          "item-360b8739f925ba719cfc169e",
+          "item-6abbf289d53fec9979d951f9",
+          "item-428704b4da1d73f193bf5ec5",
+          "item-97bb18f581c1b3e33c78b806",
+          "item-fe0b3ad501d324fa58e2eeba",
+          "item-347eb300f5c6c0a33e1fa827",
+          "item-d636476330652777c65ba6d9",
+          "item-9a9a5d978a855e43a2a26ac9",
+          "item-945e9ac341d6426f8a23ff6b",
+          "item-500e454447830bdb1f7fd9f4",
+          "item-ebb80bbaa7ab99b30f354df1",
+          "item-af6afdd26cdb26262d807375",
+          "item-7ccd2dfde27ff9b65aca382a",
+          "item-ceef0c92195443f5afaa2565",
+          "item-9ca53074de99a44b2d674041",
+          "item-9b0e9a9f053e18e43f490334",
+          "item-84b2eb9720b688cc08d8ce7b",
+          "item-02e14fb6d94f1310fad701ba",
+          "item-02251314c5039c3775f3b194",
+          "item-6f918e0a8ab0d4b624d88af7",
+          "item-289b698c48f36d715cf9a149",
+          "item-ceed7116fbe48c152708e7b1",
+          "item-4dd3a42d05082db92a1e662a",
+          "item-6a098820ce2e07af8b4ad8af",
+          "item-7ec45f939a85cd6c5e45cfb1",
+          "item-5a63f591d33ba10c26fc42f0",
+          "item-3203617048e5ef98bf6f6bf2",
+          "item-0c3006d7fe6f9666a85238c7",
+          "item-a586ee7c1e236a764206c40b",
+          "item-006eaf30c59990ca4f5277f0",
+          "item-0342770dfb550a30fc89cd2f",
+          "item-333b5e9d1f27c14af7c57e6e",
+          "item-e8d58a8e8436b0a734fa5bb4",
+          "item-ed77bcc24147c8e35d12163d"
+        ],
+        "label-only": [
+          "item-e2fbd35d699026b50421fb06",
+          "item-58d51331791650b66154c891",
+          "item-d7c0449658e1c0594d760332",
+          "item-7adc0afe7744a20b53170413",
+          "item-824c6c7b0c15c21f18ac4a17",
+          "item-3979b58746ddf571f0e4fd50",
+          "item-15f736e231747cc1472feece",
+          "item-f3f113a3ece576ad8e512e18",
+          "item-ee14e45d76220e17aeeb7181",
+          "item-23e8861e675adca8c6dda1b3",
+          "item-98963bd9c415a1760f6640f4",
+          "item-fb673c6b9d7592ca6e3b1636",
+          "item-615b9425e599bbe6c5f64c34",
+          "item-8d904fa3e78cbba3a7c7bf35",
+          "item-f51cd08d7bb7ae02652e36cd",
+          "item-a68e3d670d9a553445e5ec47",
+          "item-f04912014368ee5d86456779",
+          "item-3f101080969183ccf98fb797",
+          "item-8deaa7d0bb38dc150654ad2f",
+          "item-81f6e449613813179b7feddf",
+          "item-2d34c9e0e76b23cb06542155",
+          "item-fee99a866a9c92f415c11c9d",
+          "item-01e3ef9b90e6af5a1f8c986b",
+          "item-3d5f583d177acb8711eee50b",
+          "item-2023251065c911a3ae736017",
+          "item-7f3fd1d4539e9cd899047737",
+          "item-01a0e33cd229fa14e260c7b6",
+          "item-72385f7af810366d64e24344",
+          "item-96bed261a5df5886b01b8de1",
+          "item-c9d5470917be37f9303263bd",
+          "item-29a4d3d4a290f78c26b9dc98",
+          "item-a99dbf80190a58e4c10bd39f",
+          "item-c77419a10bd6b2c223820aa8",
+          "item-96ae053433c94f527ad32688",
+          "item-7d5de0f10e9fc6b84a9ba115",
+          "item-ba9395b9d4f511679474dff0",
+          "item-6d98fb4223fc55264c1c8f1e",
+          "item-33f714c5071de47e9d513dc2",
+          "item-192a61f0aeddb220f55b1e22",
+          "item-5716523ac3c9da57105ece4a",
+          "item-9d4a4fba2e3c3e2121a7e05d",
+          "item-7c31ac0a43e75e0d4771c235",
+          "item-241fe605a03c10417722f784",
+          "item-1d24c2dcffb3e2bae2caf790",
+          "item-d8bf44ee8de3063283335ff7",
+          "item-477ac40a86dba1346516e444"
+        ],
+        "total": 81
+      },
+      "clearly-unsupported": {
+        "prediction-only": [
+          "item-d5d0ddfa350de05e58a841ce",
+          "item-751868fc6386d15e3d3b5d9f",
+          "item-0d605ad84312e2d6ade22604",
+          "item-e8075ec251910a31e93749bb",
+          "item-c1502a2debb39f34d87e9044",
+          "item-6d3ff12b7230952321fb483d",
+          "item-174729f452dc48d702a2206c",
+          "item-2e96daadeb019ed57d16ecf9",
+          "item-1b416c108ef0aa537747ef10",
+          "item-f897a5289b5b6688a5a9db41"
+        ],
+        "label-only": [
+          "item-8c34ca0f231191628cc42cf7",
+          "item-57e0d4338a607cea7a1c1bbe"
+        ],
+        "total": 12
+      },
+      "ambiguous-equivalent": {
+        "prediction-only": [],
+        "label-only": [],
+        "total": 0
+      },
+      "insufficient-label-provenance": {
+        "prediction-only": [],
+        "label-only": [],
+        "total": 0
+      },
+      "weak-ranking-signal": {
+        "prediction-only": [],
+        "label-only": [],
+        "total": 0
+      },
+      "unknown": {
+        "prediction-only": [],
+        "label-only": [
+          "item-1367cef5997711151e901e87"
+        ],
+        "total": 1
+      }
+    }
+  }
+}

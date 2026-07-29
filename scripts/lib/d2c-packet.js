@@ -388,8 +388,9 @@ export function buildPacket(options) {
  * masking without reading repository file content as instructions.
  *
  * @param {string} packetRoot
+ * @param {{allowedOutputFiles?: string[]}} [options]
  */
-export function validatePacket(packetRoot) {
+export function validatePacket(packetRoot, options = {}) {
   const root = canonicalDirectory(packetRoot, "packet root");
   const rootEntries = fs.readdirSync(root, { withFileTypes: true });
   const rootNames = rootEntries.map((entry) => entry.name).sort();
@@ -409,8 +410,34 @@ export function validatePacket(packetRoot) {
   const output = resolveContainedPath(root, "output", {
     type: "directory"
   });
-  if (!output.ok || fs.readdirSync(output.path).length !== 0) {
-    throw new Error("Packet output directory is unsafe or nonempty.");
+  if (!output.ok) {
+    throw new Error("Packet output directory is unsafe.");
+  }
+  const allowedOutputFiles = validateAllowedOutputFiles(
+    options.allowedOutputFiles
+  );
+  const outputEntries = fs.readdirSync(output.path, {
+    withFileTypes: true
+  });
+  assertDeepEqual(
+    outputEntries.map((entry) => entry.name).sort(compareText),
+    allowedOutputFiles,
+    "Packet output directory differs from the allowed output set."
+  );
+  for (const entry of outputEntries) {
+    const outputFile = resolveContainedPath(output.path, entry.name, {
+      type: "file"
+    });
+    if (
+      entry.isSymbolicLink() ||
+      !entry.isFile() ||
+      !outputFile.ok ||
+      outputFile.stat.nlink !== 1
+    ) {
+      throw new Error(
+        "Packet output contains a link, hard link, or special file."
+      );
+    }
   }
   if ((fs.statSync(output.path).mode & 0o200) === 0) {
     throw new Error("Packet output directory is not writable.");
@@ -586,7 +613,8 @@ export function validatePacket(packetRoot) {
     case_count: manifest.case_count,
     item_count: manifest.item_count,
     packet_bytes: directoryFileBytes(root),
-    resource_counts: manifest.resource_counts
+    resource_counts: manifest.resource_counts,
+    output_files: allowedOutputFiles
   };
 }
 
@@ -598,12 +626,15 @@ export function validatePacket(packetRoot) {
  * @param {{
  *   repoRoot: string,
  *   packetRoot: string,
- *   preparationPath?: string
+ *   preparationPath?: string,
+ *   allowedOutputFiles?: string[]
  * }} options
  */
 export function auditPacketAgainstInputs(options) {
   const repoRoot = canonicalDirectory(options.repoRoot, "repository root");
-  const packet = validatePacket(options.packetRoot);
+  const packet = validatePacket(options.packetRoot, {
+    allowedOutputFiles: options.allowedOutputFiles
+  });
   const preparation = readJsonBounded(
     containedFile(
       repoRoot,
@@ -871,24 +902,46 @@ export function assignOpaqueIdentities(records, seed, canonicalInput) {
  *
  * @param {unknown} result
  * @param {unknown} template
+ * @param {{
+ *   expectedItemCount?: number,
+ *   packetRoot?: string
+ * }} [options]
  */
-export function validateReviewResult(result, template) {
+export function validateReviewResult(result, template, options = {}) {
   if (
     !isPlainRecord(result) ||
     !hasExactKeys(result, ["items", "schema_version"]) ||
     result.schema_version !== ADJUDICATION_SCHEMA ||
     !Array.isArray(result.items) ||
     !isPlainRecord(template) ||
+    !hasExactKeys(template, ["items", "schema_version"]) ||
+    template.schema_version !== ADJUDICATION_SCHEMA ||
     !Array.isArray(template.items) ||
-    result.items.length !== template.items.length
+    result.items.length !== template.items.length ||
+    (
+      options.expectedItemCount !== undefined &&
+      (
+        !Number.isSafeInteger(options.expectedItemCount) ||
+        options.expectedItemCount < 1 ||
+        result.items.length !== options.expectedItemCount
+      )
+    )
   ) {
     throw new Error("Review result has invalid top-level structure.");
   }
   validateReviewTemplate(template.items, RESOURCE_LIMITS);
+  const packetRoot = options.packetRoot === undefined
+    ? null
+    : canonicalDirectory(options.packetRoot, "packet root");
+  const itemIds = new Set();
   for (let index = 0; index < result.items.length; index += 1) {
     const item = result.items[index];
     const source = template.items[index];
     validateItemShape(item);
+    if (itemIds.has(item.item_id)) {
+      throw new Error("Review result contains a duplicate item ID.");
+    }
+    itemIds.add(item.item_id);
     for (const field of [
       "case_id",
       "item_id",
@@ -921,6 +974,18 @@ export function validateReviewResult(result, template) {
     }
     for (const sourcePath of item.source_paths) {
       validateRelativePath(sourcePath);
+      if (packetRoot) {
+        const directSource = resolveContainedPath(
+          packetRoot,
+          `${item.snapshot_root}/${sourcePath}`,
+          { type: "file" }
+        );
+        if (!directSource.ok) {
+          throw new Error(
+            "Review result source path is not a regular contained snapshot file."
+          );
+        }
+      }
     }
   }
   return true;
@@ -964,15 +1029,72 @@ export function canonicalJson(value) {
 
 /**
  * @param {string} packetRoot
+ * @param {{
+ *   model?: string,
+ *   reasoningEffort?: string,
+ *   sandbox?: "workspace-write"
+ * }} [options]
  */
-export function reviewerCommand(packetRoot) {
+export function reviewerCommand(packetRoot, options = {}) {
   const quoted = shellQuote(path.resolve(packetRoot));
+  const model = reviewerOption(
+    options.model || "gpt-5.6-sol",
+    "reviewer model"
+  );
+  const reasoningEffort = reviewerOption(
+    options.reasoningEffort || "high",
+    "reviewer reasoning effort"
+  );
+  const sandbox = options.sandbox || "workspace-write";
+  if (sandbox !== "workspace-write") {
+    throw new Error("Reviewer sandbox must remain workspace-write.");
+  }
   return (
     `cd ${quoted} && ` +
-    "codex exec --ephemeral --model gpt-5.6-sol " +
-    "--sandbox workspace-write --ask-for-approval never " +
-    "-c model_reasoning_effort=high - < README-FIRST.txt"
+    "codex exec --skip-git-repo-check --ephemeral " +
+    `--model ${shellQuote(model)} ` +
+    `--sandbox ${shellQuote(sandbox)} ` +
+    `-c ${shellQuote('approval_policy="never"')} ` +
+    `-c ${shellQuote(`model_reasoning_effort="${reasoningEffort}"`)} ` +
+    "- < README-FIRST.txt"
   );
+}
+
+/**
+ * Prove that locally observed `codex exec --help` text exposes every option
+ * used by the generated reviewer command and does not expose the obsolete
+ * nested approval flag.
+ *
+ * @param {unknown} helpText
+ */
+export function validateReviewerCommandHelp(helpText) {
+  if (typeof helpText !== "string" || !helpText.includes("Usage: codex exec")) {
+    throw new Error("Codex exec help text is unavailable or invalid.");
+  }
+  const required = [
+    "--config",
+    "--ephemeral",
+    "--model",
+    "--sandbox",
+    "--skip-git-repo-check"
+  ];
+  const missing = required.filter((option) => !helpText.includes(option));
+  if (missing.length) {
+    throw new Error(
+      `Codex exec help is missing required option(s): ${missing.join(", ")}.`
+    );
+  }
+  if (helpText.includes("--ask-for-approval")) {
+    throw new Error(
+      "Codex exec help unexpectedly exposes the obsolete approval flag."
+    );
+  }
+  return {
+    compatible: true,
+    required_options: required,
+    approval_transport: "--config approval_policy",
+    gitless_transport: "--skip-git-repo-check"
+  };
 }
 
 function validatePreparation(value) {
@@ -1156,6 +1278,28 @@ function validateRelativePath(value) {
   ) {
     throw new Error("Unsafe repository-relative path.");
   }
+}
+
+function validateAllowedOutputFiles(value) {
+  const names = value === undefined ? [] : value;
+  if (
+    !Array.isArray(names) ||
+    names.length > 1 ||
+    names.some((name) =>
+      typeof name !== "string" ||
+      name.includes("/") ||
+      name.includes("\\")
+    )
+  ) {
+    throw new Error("Allowed packet output set is invalid.");
+  }
+  for (const name of names) {
+    validateRelativePath(name);
+  }
+  if (new Set(names).size !== names.length) {
+    throw new Error("Allowed packet output set contains duplicates.");
+  }
+  return [...names].sort(compareText);
 }
 
 function copySnapshot(sourceRoot, destinationRoot, state, caseKey) {
@@ -1377,6 +1521,9 @@ function collectTreeEntries(root, prefix, options = {}) {
         entries.push({ path: relative, type: "directory" });
         stack.push({ absolute, relative });
       } else if (child.isFile() && stat.isFile()) {
+        if (stat.nlink !== 1) {
+          throw new Error("Committed packet tree contains a hard-linked file.");
+        }
         if (options.requireReadOnly && (stat.mode & 0o222) !== 0) {
           throw new Error("Packet snapshot file is writable.");
         }
@@ -1605,6 +1752,9 @@ function fileEntry(root, relativePath, requireReadOnly = false) {
   if (!result.ok) {
     throw new Error("Controlled packet file is unsafe.");
   }
+  if (result.stat.nlink !== 1) {
+    throw new Error("Controlled packet file is hard-linked.");
+  }
   if (requireReadOnly && (result.stat.mode & 0o222) !== 0) {
     throw new Error("Controlled packet input is writable.");
   }
@@ -1714,4 +1864,16 @@ function assertDeepEqual(left, right, message) {
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
+function reviewerOption(value, label) {
+  if (
+    typeof value !== "string" ||
+    value.length < 1 ||
+    value.length > 100 ||
+    UNSAFE_DISPLAY.test(value)
+  ) {
+    throw new Error(`${label} is invalid.`);
+  }
+  return value;
 }

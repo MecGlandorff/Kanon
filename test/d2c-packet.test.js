@@ -14,8 +14,10 @@ import {
   buildPacket,
   canonicalInputIdentity,
   deriveMaskedRecords,
+  reviewerCommand,
   validatePacket,
-  validateReviewResult
+  validateReviewResult,
+  validateReviewerCommandHelp
 } from "../scripts/lib/d2c-packet.js";
 import {
   repositoryCacheName
@@ -341,7 +343,7 @@ test("unsafe paths, excluded material, and resource overflow are rejected", () =
   );
 });
 
-test("completed review results require every immutable item and direct sources", () => {
+test("completed review results require every immutable item and direct sources", (t) => {
   const fixture = makeBuildFixture();
   const packetRoot = path.join(fixture.root, "packet-result");
   buildFixturePacket(fixture, packetRoot);
@@ -352,7 +354,25 @@ test("completed review results require every immutable item and direct sources",
     item.rationale = "The supplied snapshot evidence is incomplete.";
     item.source_paths = [item.path];
   }
-  assert.equal(validateReviewResult(result, template), true);
+  assert.equal(validateReviewResult(result, template, {
+    expectedItemCount: 2,
+    packetRoot
+  }), true);
+
+  fs.writeFileSync(
+    path.join(packetRoot, "output", "review-result.json"),
+    jsonBytes(result)
+  );
+  assert.deepEqual(
+    validatePacket(packetRoot, {
+      allowedOutputFiles: ["review-result.json"]
+    }).output_files,
+    ["review-result.json"]
+  );
+  assert.throws(
+    () => validatePacket(packetRoot),
+    /allowed output set/
+  );
 
   const missing = structuredClone(result);
   missing.items.pop();
@@ -372,6 +392,80 @@ test("completed review results require every immutable item and direct sources",
     () => validateReviewResult(extra, template),
     /shape/
   );
+  const indirectSource = structuredClone(result);
+  indirectSource.items[0].source_paths = ["missing.txt"];
+  assert.throws(
+    () => validateReviewResult(indirectSource, template, { packetRoot }),
+    /regular contained snapshot file/
+  );
+  const unsafeRationale = structuredClone(result);
+  unsafeRationale.items[0].rationale = "unsafe\u001b]0;title\u0007";
+  assert.throws(
+    () => validateReviewResult(unsafeRationale, template),
+    /empty or oversized/
+  );
+
+  const outputFile = path.join(
+    packetRoot,
+    "output",
+    "review-result.json"
+  );
+  const outsideResult = path.join(fixture.root, "outside-result.json");
+  fs.unlinkSync(outputFile);
+  fs.writeFileSync(outsideResult, jsonBytes(result));
+  try {
+    fs.linkSync(outsideResult, outputFile);
+  } catch {
+    t.skip("Hard links are unavailable.");
+    return;
+  }
+  assert.throws(
+    () => validatePacket(packetRoot, {
+      allowedOutputFiles: ["review-result.json"]
+    }),
+    /hard link/
+  );
+});
+
+test("reviewer command matches the observed gitless codex exec contract", () => {
+  const command = reviewerCommand("/tmp/packet with ' quote", {
+    model: "gpt-5.6-sol",
+    reasoningEffort: "high",
+    sandbox: "workspace-write"
+  });
+  assert.match(command, /codex exec --skip-git-repo-check --ephemeral/);
+  assert.match(command, /approval_policy="never"/);
+  assert.match(command, /model_reasoning_effort="high"/);
+  assert.equal(command.includes("--ask-for-approval"), false);
+  assert.match(command, /README-FIRST\.txt$/);
+  assert.deepEqual(
+    validateReviewerCommandHelp([
+      "Usage: codex exec [OPTIONS] [PROMPT]",
+      "--config <key=value>",
+      "--model <MODEL>",
+      "--sandbox <SANDBOX_MODE>",
+      "--skip-git-repo-check",
+      "--ephemeral"
+    ].join("\n")),
+    {
+      compatible: true,
+      required_options: [
+        "--config",
+        "--ephemeral",
+        "--model",
+        "--sandbox",
+        "--skip-git-repo-check"
+      ],
+      approval_transport: "--config approval_policy",
+      gitless_transport: "--skip-git-repo-check"
+    }
+  );
+  assert.throws(
+    () => validateReviewerCommandHelp(
+      "Usage: codex exec\n--ask-for-approval\n"
+    ),
+    /missing required|obsolete/
+  );
 });
 
 test("packet tooling and evidence stay outside the production artifact", () => {
@@ -380,8 +474,13 @@ test("packet tooling and evidence stay outside the production artifact", () => {
     "eval/d2c/adjudication.schema.json",
     "eval/d2c/preparation.json",
     "eval/d2c/reviewer-prompt.txt",
+    "eval/results/d2c-unblind-838ebccc/review-result.json",
+    "eval/results/d2c-unblind-838ebccc/unblinded-analysis.json",
     "scripts/build-d2c-packet.js",
+    "scripts/d2c-unblind.js",
     "scripts/lib/d2c-packet.js",
+    "scripts/lib/d2c-unblind.js",
+    "test/d2c-unblind.test.js",
     "test/d2c-packet.test.js"
   ]) {
     assert.equal(shipped.has(candidate), false, candidate);
