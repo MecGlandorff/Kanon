@@ -10,7 +10,10 @@ import {
 } from "../src/persistence/safe-fs.js";
 import { runGit } from "../src/git-runner.js";
 import { resolveContainedPath } from "../src/path-security.js";
-import { safeJsonStringify } from "../src/trust.js";
+import {
+  safeJsonStringify,
+  safeTerminalText
+} from "../src/trust.js";
 import {
   assertFrozenReleaseCandidate,
   assertNoCorpusOverlap,
