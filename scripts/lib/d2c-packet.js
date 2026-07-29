@@ -1553,8 +1553,17 @@ export function makePacketReadOnly(
   for (const relativePath of controlledFiles) {
     fs.chmodSync(path.join(root, relativePath), 0o400);
   }
+  makeTreeReadOnly(path.join(root, "cases"));
+}
+
+/**
+ * Make one direct regular-file tree read-only and non-executable.
+ *
+ * @param {string} root
+ */
+export function makeTreeReadOnly(root) {
   const directories = [];
-  const stack = [path.join(root, "cases")];
+  const stack = [root];
   while (stack.length) {
     const directory = stack.pop();
     directories.push(directory);

@@ -1,0 +1,29 @@
+{
+  "schema_version": "kanon-d2d-label-phase2-materializer-contract-v1",
+  "status": "future-only",
+  "required_inputs": [
+    "validated canonical input commitment",
+    "validated isolated Phase-1 instance",
+    "exactly one schema-valid Phase-1 result",
+    "sealed Phase-1 result commitment",
+    "completed implementation-author attestation",
+    "completed independent-labeler attestation",
+    "named distinct independent-label-reviewer pre-attestation"
+  ],
+  "controlled_base_commitment": "must equal the Phase-1 canonical input commitment",
+  "additional_phase2_inputs": [
+    "frozen original label and rationale",
+    "sealed new label and rationale",
+    "Phase-1 result commitment",
+    "governance commitment"
+  ],
+  "decisions": [
+    "accept-original",
+    "accept-new",
+    "reconciled",
+    "unknown"
+  ],
+  "publication": "atomic rename to an absent isolated destination",
+  "replacement": "refuse",
+  "automatic_label_change": false
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanon.invalid/eval/d2d/governance.schema.json",
+  "title": "Kanon D.2D independent label governance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "implementation_author",
+    "independent_labeler",
+    "independent_label_reviewer"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kanon-d2d-label-governance-v1"
+    },
+    "status": {
+      "enum": [
+        "governance-blocked",
+        "phase1-ready",
+        "phase1-sealed",
+        "phase2-ready",
+        "complete"
+      ]
+    },
+    "implementation_author": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/person"
+        }
+      ]
+    },
+    "independent_labeler": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/person"
+        }
+      ]
+    },
+    "independent_label_reviewer": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/person"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legal_or_professional_name",
+        "role",
+        "conflict_declaration",
+        "independence_declaration",
+        "date",
+        "frozen_input_commitment",
+        "result_commitment",
+        "attestation"
+      ],
+      "properties": {
+        "legal_or_professional_name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "role": {
+          "enum": [
+            "implementation-author",
+            "independent-labeler",
+            "independent-label-reviewer"
+          ]
+        },
+        "conflict_declaration": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "independence_declaration": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "frozen_input_commitment": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "result_commitment": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "attestation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    }
+  }
+}
