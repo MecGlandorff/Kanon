@@ -548,6 +548,47 @@ test("review output roots are isolated and exact single-output enforcement fails
     ),
     /exact single-output set/
   );
+  fs.unlinkSync(path.join(root, "output", "extra.json"));
+  fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
+  fs.symlinkSync(
+    path.join(root, "outside-result.json"),
+    path.join(root, "output", "ranking-result.json")
+  );
+  assert.throws(
+    () => validateDocketOutput(
+      root,
+      ["ranking-result.json"],
+      "ranking-result.json"
+    ),
+    /indirect or special/
+  );
+  fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
+  fs.writeFileSync(path.join(root, "hard-source.json"), "{}\n");
+  fs.linkSync(
+    path.join(root, "hard-source.json"),
+    path.join(root, "output", "ranking-result.json")
+  );
+  assert.throws(
+    () => validateDocketOutput(
+      root,
+      ["ranking-result.json"],
+      "ranking-result.json"
+    ),
+    /hard-linked/
+  );
+  fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
+  fs.writeFileSync(
+    path.join(root, "output", "ranking-result.json"),
+    Buffer.alloc(D2D_LIMITS.max_result_bytes + 1)
+  );
+  assert.throws(
+    () => validateDocketOutput(
+      root,
+      ["ranking-result.json"],
+      "ranking-result.json"
+    ),
+    /oversized/
+  );
 });
 
 test("reused D.2C copier excludes links and rejects hard links, special files, hostile names, and interrupted copies", (t) => {
@@ -667,6 +708,8 @@ test("absent-destination publication refuses existing paths and D.2D stays evalu
   for (const relativePath of [
     "scripts/d2d-dual-docket.js",
     "scripts/lib/d2d-dual-docket.js",
+    "scripts/d2d-ranking-result.js",
+    "scripts/lib/d2d-ranking-result.js",
     "eval/d2d/preparation.json",
     "eval/d2d/ranking-reviewer-prompt.txt",
     "eval/d2d/label-reviewer-prompt.txt",
@@ -676,7 +719,8 @@ test("absent-destination publication refuses existing paths and D.2D stays evalu
     "eval/d2d/governance.schema.json",
     "eval/d2d/governance-template.json",
     "eval/d2d/phase2-materializer-contract.json",
-    "test/d2d-dual-docket.test.js"
+    "test/d2d-dual-docket.test.js",
+    "test/d2d-ranking-result.test.js"
   ]) {
     assert.equal(shipped.has(relativePath), false);
   }
