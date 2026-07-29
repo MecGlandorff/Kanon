@@ -60,8 +60,9 @@ export async function runCorpus(corpus, options = {}) {
     35_000
   );
   const results = [];
+  const rankingTraceReceipts = [];
   let analyzerVersion = options.analyzerVersion || VERSION;
-  for (const item of selected) {
+  for (const [caseIndex, item] of selected.entries()) {
     try {
       options.onProgress?.({ phase: "checkout", id: item.id });
       const checkout = ensureCheckout(item, {
@@ -76,10 +77,46 @@ export async function runCorpus(corpus, options = {}) {
         analyzerModule,
         checkout,
         item,
-        analysisTimeoutMs
+        analysisTimeoutMs,
+        options.rankingTrace
+          ? {
+              output_directory:
+                options.rankingTrace.outputDirectory,
+              file_name:
+                `case-${String(caseIndex + 1).padStart(3, "0")}.json`,
+              binding: {
+                protocolSha256:
+                  options.rankingTrace.protocolSha256,
+                traceSourceCommit:
+                  options.rankingTrace.traceSourceCommit,
+                artifactSha256:
+                  options.rankingTrace.artifactSha256,
+                corpusSha256:
+                  options.rankingTrace.corpusSha256,
+                caseId: item.id,
+                revision: item.revision,
+                ordinal: caseIndex + 1
+              }
+            }
+          : null
       );
       const analysisDurationMs = Date.now() - analysisStarted;
       analyzerVersion = analysis.state.version || analyzerVersion;
+      if (options.rankingTrace) {
+        rankingTraceReceipts.push({
+          id: item.id,
+          revision: item.revision,
+          ordinal: caseIndex + 1,
+          ...(analysis.ranking_trace || {
+            status: "missing",
+            file_name: null,
+            sha256: null,
+            bytes: 0,
+            complete: false,
+            validation_failures: ["worker trace receipt missing"]
+          })
+        });
+      }
       results.push({
         ...scoreCase(item, analysis, corpus.policy),
         analysis_duration_ms: analysisDurationMs
@@ -90,6 +127,22 @@ export async function runCorpus(corpus, options = {}) {
         id: item.id,
         message: error.message
       });
+      if (options.rankingTrace) {
+        rankingTraceReceipts.push({
+          id: item.id,
+          revision: item.revision,
+          ordinal: caseIndex + 1,
+          status: "analysis-error",
+          file_name:
+            `case-${String(caseIndex + 1).padStart(3, "0")}.json`,
+          sha256: null,
+          bytes: 0,
+          complete: false,
+          validation_failures: [
+            String(error?.message || error).slice(0, 1_000)
+          ]
+        });
+      }
       results.push(scoreErrorCase(item, error, corpus.policy));
     }
   }
@@ -171,7 +224,15 @@ export async function runCorpus(corpus, options = {}) {
       reasons: summary.passed
         ? ["All predeclared gates passed."]
         : summary.failures
-    }
+    },
+    ...(options.rankingTrace
+      ? {
+          ranking_trace: {
+            schema: "kanon-d2e-ranking-trace-receipts-v1",
+            receipts: rankingTraceReceipts
+          }
+        }
+      : {})
   };
 }
 
@@ -205,7 +266,8 @@ export function analyzeCase(
   analyzerModule,
   repositoryRoot,
   item,
-  timeoutMs
+  timeoutMs,
+  rankingTrace = null
 ) {
   const worker = fileURLToPath(
     new URL("./analyze-case.js", import.meta.url)
@@ -240,7 +302,10 @@ export function analyzeCase(
           maxTotalTextBytes: 32 * 1024 * 1024,
           maxElapsedMs: 30_000,
           useGitIgnore: false
-        }
+        },
+        ...(rankingTrace
+          ? { ranking_trace: rankingTrace }
+          : {})
       }),
       maxBuffer: 4 * 1024 * 1024,
       timeout: timeoutMs,

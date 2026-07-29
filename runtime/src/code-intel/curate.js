@@ -8,8 +8,28 @@ import {
   rootReadme
 } from "./curate-common.js";
 import { registeredHeuristic } from "./heuristics.js";
+import { observeRanking } from "./shared.js";
 
 /** @typedef {import("./shared.js").RankedFile} RankedFile */
+/**
+ * @typedef {{
+ *   enter: (
+ *     name: string,
+ *     ordering: string[],
+ *     quota: number | null
+ *   ) => void,
+ *   decision: (
+ *     item: RankedFile,
+ *     decision: "selected" | "duplicate" | "policy-excluded" | "quota-excluded" | "not-selected",
+ *     reason: string,
+ *     heuristic: string | null,
+ *     selectedCount?: number,
+ *     displacedBy?: string | null
+ *   ) => void,
+ *   exit: (selectedOverride?: RankedFile[]) => void,
+ *   current: () => {name: string, ordinal: number}
+ * }} CurationTrace
+ */
 
 /** @type {[string, string, string][]} */
 const ROOT_CONTRACTS = [
@@ -38,12 +58,16 @@ const WORKSPACE_MARKERS = new Set([
 
 /**
  * @param {RankedFile[]} ranked
- * @param {{goModule?: string | null}} [context]
+ * @param {{
+ *   goModule?: string | null,
+ *   observer?: import("./shared.js").RankingObserver
+ * }} [context]
  * @returns {RankedFile[]}
  */
 export function curateRankedFiles(ranked, context = {}) {
   /** @type {RankedFile[]} */
   const selected = [];
+  const trace = createCurationTrace(context.observer, selected);
   const workspace = [...ROOT_CONTRACTS, ...WORKSPACE_TASKS].some(
     ([contract]) =>
       WORKSPACE_MARKERS.has(contract) && byPath(ranked, contract)
@@ -91,37 +115,71 @@ export function curateRankedFiles(ranked, context = {}) {
     : null;
   const primaryGoEntrypoint = primaryGoSelection?.item || null;
 
+  trace?.enter("root-readme", ["root-readme-policy"], 1);
   if (!workspace) {
     addRegistered(
       selected,
       rootReadme(ranked),
       "root-readme",
-      "root usage contract"
+      "root usage contract",
+      trace
     );
   }
+
+  trace?.enter("root-contracts", ["declared-contract-order"], null);
   for (const [contract, heuristic, reason] of rootContracts) {
     addRegistered(
       selected,
       byPath(ranked, contract),
       heuristic,
-      reason
+      reason,
+      trace
     );
   }
-
-  if (workspace && !byPath(ranked, "Cargo.toml")) {
-    addWorkspaceTasks(selected, ranked);
+  if (trace) {
+    const included = new Set(
+      rootContracts.map(([contract]) => contract)
+    );
+    for (const [contract, heuristic] of ROOT_CONTRACTS) {
+      const item = byPath(ranked, contract);
+      if (item && !included.has(contract)) {
+        trace.decision(
+          item,
+          "policy-excluded",
+          "superseded root contract",
+          heuristic
+        );
+      }
+    }
   }
+
+  trace?.enter(
+    "workspace-tasks-pre",
+    ["declared-contract-order"],
+    null
+  );
+  if (workspace && !byPath(ranked, "Cargo.toml")) {
+    addWorkspaceTasks(selected, ranked, trace);
+  }
+
+  trace?.enter("root-tasks", ["declared-task-order"], null);
   if (!workspace) {
     for (const task of ROOT_TASKS) {
       addRegistered(
         selected,
         byPath(ranked, task),
         "root-task-contract",
-        "root task/build contract"
+        "root task/build contract",
+        trace
       );
     }
   }
 
+  trace?.enter(
+    "framework-declarations",
+    ["score:desc", "fan_in:desc", "path-depth:asc", "path:asc"],
+    null
+  );
   for (const declaration of declarations.filter((item) =>
     item.signals.some((signal) => signal.source === "framework")
   )) {
@@ -129,20 +187,50 @@ export function curateRankedFiles(ranked, context = {}) {
       selected,
       declaration,
       "framework-declaration",
-      "framework-declared repository file"
+      "framework-declared repository file",
+      trace
     );
   }
-  for (const entrypoint of manifestEntrypoints.slice(
-    0,
-    workspace ? 2 : 1
-  )) {
+
+  const manifestQuota = workspace ? 2 : 1;
+  trace?.enter(
+    "manifest-entrypoints",
+    [
+      "declared:desc",
+      "confidence:desc",
+      "score:desc",
+      "path-depth:asc",
+      "path:asc"
+    ],
+    manifestQuota
+  );
+  for (const entrypoint of manifestEntrypoints.slice(0, manifestQuota)) {
     addRegistered(
       selected,
       entrypoint,
       "manifest-entrypoint",
-      "manifest-declared executable"
+      "manifest-declared executable",
+      trace
     );
   }
+  if (trace) {
+    for (const entrypoint of manifestEntrypoints.slice(manifestQuota)) {
+      trace.decision(
+        entrypoint,
+        "quota-excluded",
+        "outside manifest-entrypoint quota",
+        "manifest-entrypoint",
+        selected.length,
+        manifestEntrypoints[manifestQuota - 1]?.path || null
+      );
+    }
+  }
+
+  trace?.enter(
+    "go-entrypoint",
+    ["module-name", "root-main", "entrypoint-order"],
+    1
+  );
   if (primaryGoSelection) {
     addRegistered(
       selected,
@@ -152,19 +240,32 @@ export function curateRankedFiles(ranked, context = {}) {
         : "executable-syntax",
       primaryGoSelection.moduleNamed
         ? "Go module-named executable"
-        : "primary Go executable syntax"
+        : "primary Go executable syntax",
+      trace
     );
   }
 
+  trace?.enter(
+    "ecosystem-test-anchor",
+    ["score:desc", "fan_in:desc", "path-depth:asc", "path:asc"],
+    1
+  );
   const testAnchor = conventionalTestAnchor(ranked);
   if (testAnchor) {
     addRegistered(
       selected,
       testAnchor,
       "ecosystem-test-anchor",
-      "ecosystem-conventional test entry"
+      "ecosystem-conventional test entry",
+      trace
     );
   }
+
+  trace?.enter(
+    "package-declarations",
+    ["score:desc", "fan_in:desc", "path-depth:asc", "path:asc"],
+    null
+  );
   for (const declaration of declarations.filter((item) =>
     !item.signals.some((signal) => signal.source === "framework")
   )) {
@@ -177,20 +278,31 @@ export function curateRankedFiles(ranked, context = {}) {
       framework ? "framework-declaration" : "manifest-entrypoint",
       framework
         ? "framework-declared repository file"
-        : "manifest-declared package target"
+        : "manifest-declared package target",
+      trace
     );
   }
+
+  trace?.enter(
+    "workspace-tasks-post",
+    ["declared-contract-order"],
+    null
+  );
   if (workspace && byPath(ranked, "Cargo.toml")) {
-    addWorkspaceTasks(selected, ranked);
+    addWorkspaceTasks(selected, ranked, trace);
   }
+
+  trace?.enter("workspace-readme", ["root-readme-policy"], 1);
   if (workspace) {
     addRegistered(
       selected,
       rootReadme(ranked),
       "root-readme",
-      "root usage contract"
+      "root usage contract",
+      trace
     );
   }
+
   const fanInCandidates = ranked
     .filter((candidate) => candidate.fan_in > 0)
     .filter(
@@ -200,6 +312,11 @@ export function curateRankedFiles(ranked, context = {}) {
   if (hasGoRoot) {
     registeredHeuristic("polyglot-root-precedence");
   }
+  trace?.enter(
+    "fan-in",
+    ["fan_in:desc", "score:desc", "path:asc"],
+    null
+  );
   for (const item of fanInCandidates
     .sort((a, b) =>
       b.fan_in - a.fan_in ||
@@ -210,9 +327,16 @@ export function curateRankedFiles(ranked, context = {}) {
       selected,
       item,
       "local-import-fan-in",
-      `imported by ${item.fan_in} local file(s)`
+      `imported by ${item.fan_in} local file(s)`,
+      trace
     );
   }
+
+  trace?.enter(
+    "literal-reference",
+    ["referenced_by:desc", "score:desc", "path:asc"],
+    null
+  );
   for (const item of ranked
     .filter((candidate) => candidate.referenced_by > 0)
     .sort((a, b) =>
@@ -224,9 +348,22 @@ export function curateRankedFiles(ranked, context = {}) {
       selected,
       item,
       "literal-local-reference",
-      `referenced by ${item.referenced_by} local file(s)`
+      `referenced by ${item.referenced_by} local file(s)`,
+      trace
     );
   }
+
+  trace?.enter(
+    "executable-syntax",
+    [
+      "declared:desc",
+      "confidence:desc",
+      "score:desc",
+      "path-depth:asc",
+      "path:asc"
+    ],
+    1
+  );
   const executable = primaryEntrypoints(ranked).find(
     (item) =>
       item.path !== primaryGoEntrypoint?.path &&
@@ -239,10 +376,23 @@ export function curateRankedFiles(ranked, context = {}) {
       selected,
       executable,
       "executable-syntax",
-      "language-level executable syntax"
+      "language-level executable syntax",
+      trace
     );
   }
-  return finish(selected, ranked);
+
+  trace?.enter("final-cap", ["curation-order"], 5);
+  const output = finish(
+    selected,
+    ranked,
+    5,
+    context.observer,
+    trace?.current()
+  );
+  trace?.exit(
+    output.filter((item) => item.recommended === true)
+  );
+  return output;
 }
 
 /**
@@ -250,11 +400,35 @@ export function curateRankedFiles(ranked, context = {}) {
  * @param {RankedFile | null | undefined} item
  * @param {string} heuristicId
  * @param {string} reason
+ * @param {CurationTrace | null} trace
  * @returns {void}
  */
-function addRegistered(selected, item, heuristicId, reason) {
+function addRegistered(
+  selected,
+  item,
+  heuristicId,
+  reason,
+  trace
+) {
   registeredHeuristic(heuristicId);
-  add(selected, item, reason, heuristicId);
+  if (!trace) {
+    add(selected, item, reason, heuristicId);
+    return;
+  }
+  if (!item) {
+    return;
+  }
+  const selectedCount = selected.length;
+  const decision = add(selected, item, reason, heuristicId);
+  if (decision !== "absent") {
+    trace.decision(
+      item,
+      decision,
+      reason,
+      heuristicId,
+      selectedCount
+    );
+  }
 }
 
 /**
@@ -284,17 +458,91 @@ function conventionalTestAnchor(ranked) {
 /**
  * @param {RankedFile[]} selected
  * @param {RankedFile[]} ranked
+ * @param {CurationTrace | null} trace
  * @returns {void}
  */
-function addWorkspaceTasks(selected, ranked) {
+function addWorkspaceTasks(selected, ranked, trace) {
   for (const [contract, heuristic, reason] of WORKSPACE_TASKS) {
     addRegistered(
       selected,
       byPath(ranked, contract),
       heuristic,
-      reason
+      reason,
+      trace
     );
   }
+}
+
+/**
+ * @param {import("./shared.js").RankingObserver | undefined} observer
+ * @param {RankedFile[]} selected
+ * @returns {CurationTrace | null}
+ */
+function createCurationTrace(observer, selected) {
+  if (typeof observer !== "function") {
+    return null;
+  }
+  let ordinal = 0;
+  let position = 0;
+  /** @type {number | null} */
+  let currentQuota = null;
+  let current = { name: "", ordinal: 0 };
+  const exit = (selectedOverride = selected) => {
+    if (current.ordinal === 0) {
+      return;
+    }
+    observeRanking(observer, {
+      type: "curation-stage-exited",
+      stage: current.name,
+      stage_ordinal: current.ordinal,
+      selected: selectedOverride.map((item) => item.path)
+    });
+  };
+  return {
+    enter(name, ordering, quota) {
+      exit();
+      current = { name, ordinal: ++ordinal };
+      currentQuota = quota;
+      position = 0;
+      observeRanking(observer, {
+        type: "curation-stage-entered",
+        stage: name,
+        stage_ordinal: current.ordinal,
+        ordering: [...ordering],
+        quota,
+        selected: selected.map((item) => item.path)
+      });
+    },
+    decision(
+      item,
+      decision,
+      reason,
+      heuristic,
+      selectedCount = selected.length,
+      displacedBy = null
+    ) {
+      position += 1;
+      observeRanking(observer, {
+        type: "curation-decision",
+        path: item.path,
+        stage: current.name,
+        stage_ordinal: current.ordinal,
+        entry_position: position,
+        selected_count_on_entry: selectedCount,
+        decision,
+        reason,
+        heuristic,
+        deduplicated: decision === "duplicate",
+        displaced_by: displacedBy,
+        quota: currentQuota,
+        cap: null
+      });
+    },
+    exit,
+    current() {
+      return { ...current };
+    }
+  };
 }
 
 /**

@@ -20,6 +20,7 @@ import { readText } from "../scanner.js";
  *   selection_reason?: string,
  *   selection_heuristic?: string | null
  * }} RankedFile
+ * @typedef {(event: Record<string, unknown>) => void} RankingObserver
  * @typedef {Map<string, string> & {
  *   readOptions: NonNullable<Parameters<typeof readText>[2]>,
  *   maxEntries: number,
@@ -28,6 +29,26 @@ import { readText } from "../scanner.js";
  * }} TextCache
  * @typedef {{path: string}} FilePath
  */
+
+/**
+ * Deliver a private, observational ranking event without exposing a return
+ * channel or allowing observer failure to affect product behavior. Callers
+ * construct event values from detached primitives and arrays.
+ *
+ * @param {RankingObserver | null | undefined} observer
+ * @param {Record<string, unknown>} event
+ * @returns {void}
+ */
+export function observeRanking(observer, event) {
+  if (typeof observer !== "function") {
+    return;
+  }
+  try {
+    observer(event);
+  } catch {
+    // Evaluation observation is deliberately fail-open and non-behavioral.
+  }
+}
 
 /**
  * @param {NonNullable<Parameters<typeof readText>[2]>} [readOptions]

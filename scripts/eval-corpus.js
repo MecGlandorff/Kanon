@@ -2,6 +2,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -18,6 +19,9 @@ import {
   renderCorpusReport,
   runCorpus
 } from "./lib/eval-corpus.js";
+import {
+  repositoryCacheName
+} from "./lib/eval-corpus/checkout.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -58,6 +62,9 @@ try {
       observeDevelopmentIdentity(repoRoot)
     );
   }
+  const traceAttempt = options.rankingTraceDirectory
+    ? prepareTraceAttempt(options, corpus, artifactOptions)
+    : null;
 
   const run = await runCorpus(corpus, {
     cacheRoot: options.cache,
@@ -74,7 +81,18 @@ try {
             );
           }
         },
-    ...artifactOptions
+    ...artifactOptions,
+    ...(traceAttempt
+      ? {
+          rankingTrace: {
+            outputDirectory: traceAttempt.caseDirectory,
+            protocolSha256: options.traceProtocolSha256,
+            traceSourceCommit: options.traceSourceCommit,
+            artifactSha256: artifactOptions.artifactSha256,
+            corpusSha256: corpus._manifest.sha256
+          }
+        }
+      : {})
   });
   if (
     corpus.evaluation_role === "release" &&
@@ -98,7 +116,14 @@ try {
   if (options.jsonOutput) {
     writeJsonOutput(options.jsonOutput, run);
   }
-  process.exitCode = run.summary.passed ? 0 : 1;
+  const traceResult = traceAttempt
+    ? finalizeTraceAttempt(traceAttempt, run, options.jsonOutput)
+    : null;
+  process.exitCode = traceResult && !traceResult.complete
+    ? 2
+    : run.summary.passed
+      ? 0
+      : 1;
 } catch (error) {
   process.stderr.write(`Kanon corpus error: ${error.message}\n`);
   process.exitCode = 2;
@@ -268,7 +293,11 @@ function parseArgs(argv) {
     expectedCorpusSha256: null,
     artifactTarball: null,
     artifactRoot: null,
-    conformanceReport: null
+    conformanceReport: null,
+    rankingTraceDirectory: null,
+    traceProtocolSha256: null,
+    traceSourceCommit: null,
+    expectedD2aSha256: null
   };
   const valueFlags = new Map([
     ["--corpus", "corpus"],
@@ -278,7 +307,11 @@ function parseArgs(argv) {
     ["--expected-corpus-sha256", "expectedCorpusSha256"],
     ["--artifact-tarball", "artifactTarball"],
     ["--artifact-root", "artifactRoot"],
-    ["--conformance-report", "conformanceReport"]
+    ["--conformance-report", "conformanceReport"],
+    ["--ranking-trace-directory", "rankingTraceDirectory"],
+    ["--trace-protocol-sha256", "traceProtocolSha256"],
+    ["--trace-source-commit", "traceSourceCommit"],
+    ["--expected-d2a-sha256", "expectedD2aSha256"]
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -313,6 +346,38 @@ function parseArgs(argv) {
       "--expected-corpus-sha256 must be lowercase SHA-256."
     );
   }
+  const traceFields = [
+    options.rankingTraceDirectory,
+    options.traceProtocolSha256,
+    options.traceSourceCommit,
+    options.expectedD2aSha256
+  ];
+  if (
+    traceFields.some(Boolean) &&
+    !traceFields.every(Boolean)
+  ) {
+    throw new Error(
+      "D.2E tracing requires its directory, protocol hash, source commit, and D.2A hash together."
+    );
+  }
+  if (
+    options.traceProtocolSha256 &&
+    !/^[0-9a-f]{64}$/.test(options.traceProtocolSha256)
+  ) {
+    throw new Error("--trace-protocol-sha256 must be lowercase SHA-256.");
+  }
+  if (
+    options.traceSourceCommit &&
+    !/^[0-9a-f]{40}$/.test(options.traceSourceCommit)
+  ) {
+    throw new Error("--trace-source-commit must be a full Git commit.");
+  }
+  if (
+    options.expectedD2aSha256 &&
+    !/^[0-9a-f]{64}$/.test(options.expectedD2aSha256)
+  ) {
+    throw new Error("--expected-d2a-sha256 must be lowercase SHA-256.");
+  }
   return options;
 }
 
@@ -333,6 +398,380 @@ function writeJsonOutput(outputPath, run) {
     relative,
     `${safeJsonStringify(run)}\n`
   );
+}
+
+function prepareTraceAttempt(options, corpus, artifactOptions) {
+  if (
+    corpus.evaluation_role !== "development" ||
+    options.requireRole !== "development" ||
+    options.fetch !== false ||
+    options.repos.length !== 0
+  ) {
+    throw new Error(
+      "D.2E tracing requires the complete development corpus with --no-fetch and no subset."
+    );
+  }
+  if (
+    !artifactOptions.artifactSha256 ||
+    artifactOptions.analyzerSource !== "installed-artifact"
+  ) {
+    throw new Error(
+      "D.2E tracing requires the exact installed artifact."
+    );
+  }
+  const identity = observeDevelopmentIdentity(repoRoot);
+  const gitState = observeTraceGitState(repoRoot);
+  if (identity.commit !== options.traceSourceCommit) {
+    throw new Error(
+      "D.2E trace source commit does not match the current HEAD."
+    );
+  }
+  const protocolPath = path.join(repoRoot, "eval", "d2e", "PROTOCOL.md");
+  const protocolSha256 = sha256BoundedFile(protocolPath, 1024 * 1024);
+  if (protocolSha256 !== options.traceProtocolSha256) {
+    throw new Error("D.2E protocol SHA-256 does not match.");
+  }
+  const d2aPath = path.join(
+    repoRoot,
+    "eval",
+    "results",
+    "development-0.4.0-rc.1-d2a-74208b9a.json"
+  );
+  const d2aSha256 = sha256BoundedFile(d2aPath, 8 * 1024 * 1024);
+  if (d2aSha256 !== options.expectedD2aSha256) {
+    throw new Error("Frozen D.2A report SHA-256 does not match.");
+  }
+  const d2a = readBoundedJson(d2aPath, 8 * 1024 * 1024);
+  const cache = verifyFrozenDevelopmentCache(
+    options.cache,
+    d2a.cache_root,
+    corpus
+  );
+  const requestedTraceRoot = path.resolve(
+    options.rankingTraceDirectory
+  );
+  const expectedReport = path.join(
+    requestedTraceRoot,
+    "raw-report.json"
+  );
+  if (path.resolve(options.jsonOutput || "") !== expectedReport) {
+    throw new Error(
+      "D.2E --json-output must be raw-report.json in the attempt root."
+    );
+  }
+  const traceRoot = prepareAbsentTraceRoot(requestedTraceRoot);
+  const caseDirectory = path.join(traceRoot, "cases");
+  fs.mkdirSync(caseDirectory, { mode: 0o700 });
+  const traceSchemaPath = path.join(
+    repoRoot,
+    "eval",
+    "d2e",
+    "trace.schema.json"
+  );
+  const analysisSchemaPath = path.join(
+    repoRoot,
+    "eval",
+    "d2e",
+    "analysis.schema.json"
+  );
+  const binding = {
+    schema: "kanon-d2e-trace-attempt-binding-v1",
+    attempt: 1,
+    retries: 0,
+    source_commit: identity.commit,
+    branch: gitState.branch,
+    upstream: gitState.upstream,
+    ahead: gitState.ahead,
+    behind: gitState.behind,
+    worktree_clean: gitState.worktreeClean,
+    package_version: identity.version,
+    protocol_sha256: protocolSha256,
+    trace_schema_sha256:
+      sha256BoundedFile(traceSchemaPath, 1024 * 1024),
+    analysis_schema_sha256:
+      sha256BoundedFile(analysisSchemaPath, 1024 * 1024),
+    corpus_sha256: corpus._manifest.sha256,
+    corpus_case_count: corpus.cases.length,
+    d2a_report_sha256: d2aSha256,
+    cache_identity_sha256: cache.identitySha256,
+    artifact_sha256: artifactOptions.artifactSha256,
+    conformance_report_sha256: sha256BoundedFile(
+      options.conformanceReport,
+      2 * 1024 * 1024
+    ),
+    conformance: {
+      applicable:
+        artifactOptions.artifactConformance?.applicable === true,
+      passed:
+        artifactOptions.artifactConformance?.passed === true,
+      check_count:
+        artifactOptions.artifactConformance?.report?.checks?.length || 0
+    },
+    configuration: {
+      evaluation_role: "development",
+      fetch: false,
+      subset: false,
+      cache_mode: "exact-d2a-revision-bound-offline",
+      cache_case_count: cache.caseCount,
+      analysis_timeout_ms: 35_000,
+      child_max_old_space_mb: 512,
+      child_timezone: "UTC",
+      child_locale: "C",
+      prediction_channel_max_bytes: 4 * 1024 * 1024,
+      scan: {
+        maxFiles: 25_000,
+        maxEntries: 100_000,
+        maxFileBytes: 1_000_000,
+        maxTotalHashBytes: 128 * 1024 * 1024,
+        maxTotalTextBytes: 32 * 1024 * 1024,
+        maxElapsedMs: 30_000,
+        useGitIgnore: false
+      }
+    }
+  };
+  atomicWriteContained(
+    traceRoot,
+    "attempt-binding.json",
+    `${safeJsonStringify(binding)}\n`
+  );
+  return {
+    root: traceRoot,
+    caseDirectory,
+    binding
+  };
+}
+
+function verifyFrozenDevelopmentCache(selectedPath, d2aPath, corpus) {
+  if (
+    typeof selectedPath !== "string" ||
+    typeof d2aPath !== "string"
+  ) {
+    throw new Error("D.2E tracing requires the explicit D.2A cache.");
+  }
+  const selected = canonicalDirectory(path.resolve(selectedPath));
+  const frozen = canonicalDirectory(path.resolve(d2aPath));
+  if (selected !== frozen) {
+    throw new Error(
+      "D.2E cache does not match the frozen D.2A cache root."
+    );
+  }
+  const bindings = [];
+  for (const [index, item] of corpus.cases.entries()) {
+    const cacheName = repositoryCacheName(
+      item.repository,
+      item.revision
+    );
+    const checkout = resolveContainedPath(selected, cacheName, {
+      type: "directory"
+    });
+    const gitMetadata = resolveContainedPath(
+      selected,
+      `${cacheName}/.git`,
+      { type: "any" }
+    );
+    if (!checkout.ok || gitMetadata.status !== "missing") {
+      throw new Error(
+        `D.2E frozen cache entry ${index + 1} is unavailable or retains Git metadata.`
+      );
+    }
+    bindings.push({
+      ordinal: index + 1,
+      id: item.id,
+      revision: item.revision,
+      cache_name: cacheName
+    });
+  }
+  if (fs.readdirSync(selected).length !== bindings.length) {
+    throw new Error("D.2E frozen cache contains unexpected entries.");
+  }
+  return {
+    caseCount: bindings.length,
+    identitySha256: sha256Bytes(
+      Buffer.from(JSON.stringify(bindings))
+    )
+  };
+}
+
+function finalizeTraceAttempt(attempt, run, reportPath) {
+  const receipts = run.ranking_trace?.receipts;
+  const failures = [];
+  const caseFiles = [];
+  let totalBytes = 0;
+  let totalCandidates = 0;
+  if (!Array.isArray(receipts) || receipts.length !== 30) {
+    failures.push("trace-receipt-count");
+  }
+  for (const receipt of Array.isArray(receipts) ? receipts : []) {
+    const expectedName =
+      `case-${String(receipt.ordinal).padStart(3, "0")}.json`;
+    const resolved = resolveContainedPath(
+      attempt.caseDirectory,
+      expectedName,
+      { type: "file" }
+    );
+    if (
+      receipt.status !== "written" ||
+      receipt.file_name !== expectedName ||
+      !resolved.ok ||
+      resolved.stat.size > 128 * 1024 * 1024
+    ) {
+      failures.push(`trace-case-${String(receipt.ordinal)}`);
+      continue;
+    }
+    const bytes = fs.readFileSync(resolved.path);
+    const hash = crypto
+      .createHash("sha256")
+      .update(bytes)
+      .digest("hex");
+    let trace;
+    try {
+      trace = JSON.parse(bytes.toString("utf8"));
+    } catch {
+      failures.push(`trace-json-${String(receipt.ordinal)}`);
+      continue;
+    }
+    const candidateCount = Number(trace?.limits?.candidate_count);
+    totalBytes += bytes.length;
+    totalCandidates += Number.isInteger(candidateCount)
+      ? candidateCount
+      : 0;
+    if (
+      hash !== receipt.sha256 ||
+      bytes.length !== receipt.bytes ||
+      receipt.complete !== true ||
+      trace?.completeness?.complete !== true
+    ) {
+      failures.push(`trace-binding-${String(receipt.ordinal)}`);
+    }
+    caseFiles.push({
+      ordinal: receipt.ordinal,
+      id: safeTerminalText(receipt.id),
+      revision: receipt.revision,
+      file: `cases/${expectedName}`,
+      sha256: hash,
+      bytes: bytes.length,
+      candidate_count:
+        Number.isInteger(candidateCount) ? candidateCount : null,
+      complete:
+        receipt.complete === true &&
+        trace?.completeness?.complete === true
+    });
+  }
+  if (totalBytes > 1024 * 1024 * 1024) {
+    failures.push("trace-total-byte-limit");
+  }
+  const report = containedSelectedFile(reportPath);
+  const attemptBinding = containedSelectedFile(
+    path.join(attempt.root, "attempt-binding.json")
+  );
+  const manifest = {
+    schema: "kanon-d2e-trace-manifest-v1",
+    attempt: 1,
+    retries: 0,
+    source_commit: attempt.binding.source_commit,
+    protocol_sha256: attempt.binding.protocol_sha256,
+    trace_schema_sha256: attempt.binding.trace_schema_sha256,
+    analysis_schema_sha256: attempt.binding.analysis_schema_sha256,
+    corpus_sha256: attempt.binding.corpus_sha256,
+    d2a_report_sha256: attempt.binding.d2a_report_sha256,
+    cache_identity_sha256: attempt.binding.cache_identity_sha256,
+    artifact_sha256: attempt.binding.artifact_sha256,
+    attempt_binding_sha256: sha256Bytes(
+      fs.readFileSync(attemptBinding.path)
+    ),
+    raw_report_sha256: sha256Bytes(fs.readFileSync(report.path)),
+    trace_set_sha256: sha256Bytes(
+      Buffer.from(
+        JSON.stringify(
+          caseFiles.map((item) => ({
+            ordinal: item.ordinal,
+            sha256: item.sha256
+          }))
+        )
+      )
+    ),
+    case_count: caseFiles.length,
+    candidate_count: totalCandidates,
+    trace_bytes: totalBytes,
+    complete:
+      failures.length === 0 &&
+      caseFiles.length === 30 &&
+      caseFiles.every((item) => item.complete),
+    failures: Array.from(new Set(failures)).slice(0, 64),
+    case_files: caseFiles
+  };
+  atomicWriteContained(
+    attempt.root,
+    "trace-manifest.json",
+    `${safeJsonStringify(manifest)}\n`
+  );
+  return manifest;
+}
+
+function observeTraceGitState(root) {
+  const branch = readGitScalar(root, [
+    "symbolic-ref",
+    "--short",
+    "HEAD"
+  ]);
+  const upstream = readGitScalar(root, [
+    "rev-parse",
+    "--abbrev-ref",
+    "--symbolic-full-name",
+    "@{upstream}"
+  ]);
+  const relation = readGitScalar(root, [
+    "rev-list",
+    "--left-right",
+    "--count",
+    "HEAD...@{upstream}"
+  ]).split(/\s+/).map(Number);
+  const status = readGitScalar(root, [
+    "status",
+    "--porcelain",
+    "--untracked-files=all"
+  ]);
+  if (
+    branch !== "release/v.1.0.0" ||
+    upstream !== "origin/release/v.1.0.0" ||
+    relation.length !== 2 ||
+    !relation.every(Number.isInteger) ||
+    relation[1] !== 0 ||
+    status !== ""
+  ) {
+    throw new Error(
+      "D.2E tracing requires the clean release/v.1.0.0 branch zero behind its exact upstream."
+    );
+  }
+  return {
+    branch,
+    upstream,
+    ahead: relation[0],
+    behind: relation[1],
+    worktreeClean: true
+  };
+}
+
+function prepareAbsentTraceRoot(directory) {
+  const resolved = path.resolve(directory);
+  const lexicalTemporaryRoot = path.resolve(os.tmpdir());
+  if (path.dirname(resolved) !== lexicalTemporaryRoot) {
+    throw new Error(
+      "D.2E trace directory must be a direct child of the OS temporary root."
+    );
+  }
+  if (fs.existsSync(resolved)) {
+    throw new Error("D.2E trace directory must be absent.");
+  }
+  const temporaryRoot = canonicalDirectory(lexicalTemporaryRoot);
+  fs.mkdirSync(path.join(temporaryRoot, path.basename(resolved)), {
+    mode: 0o700
+  });
+  return canonicalDirectory(resolved);
+}
+
+function sha256Bytes(bytes) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
 function sha256BoundedFile(filePath, limit) {
@@ -392,6 +831,12 @@ Development options:
   --json                          Emit the raw report
   --json-output <path>            Write the raw report atomically
   --require-role <role>           Require development or release
+
+D.2E trace options (all required together; development/full/no-fetch only):
+  --ranking-trace-directory <dir> One absent direct child of the OS temp root
+  --trace-protocol-sha256 <sha>   Frozen D.2E protocol identity
+  --trace-source-commit <commit>  Exact clean instrumentation commit
+  --expected-d2a-sha256 <sha>     Frozen D.2A raw-report identity
 
 Required together for an artifact-bound development run or release:
   --artifact-tarball <path>       Exact packed artifact

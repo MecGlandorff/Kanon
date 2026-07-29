@@ -28,7 +28,8 @@ import {
  * @param {ScannedFile[]} files
  * @param {{
  *   readOptions?: NonNullable<Parameters<typeof getText>[2]>["readOptions"],
- *   packageJson?: unknown
+ *   packageJson?: unknown,
+ *   rankingObserver?: import("./shared.js").RankingObserver
  * }} [options]
  */
 export function inspectRepoCode(root, files, options = {}) {
@@ -83,7 +84,10 @@ export function inspectRepoCode(root, files, options = {}) {
     ...(options.packageJson === undefined
       ? {}
       : { packageJson: options.packageJson }),
-    goModule: modulePath
+    goModule: modulePath,
+    ...(options.rankingObserver === undefined
+      ? {}
+      : { observer: options.rankingObserver })
   });
   return {
     importers,

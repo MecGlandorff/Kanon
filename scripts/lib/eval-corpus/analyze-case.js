@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 
+import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
+import { atomicWriteContained } from "../../../src/persistence/safe-fs.js";
+import {
+  createRankingTraceCollector,
+  validateRankingTrace
+} from "../d2e-trace.js";
 
 try {
   const input = JSON.parse(await readStdin(64 * 1024));
@@ -8,15 +14,22 @@ try {
   if (typeof module.analyzeRepo !== "function") {
     throw new Error("Analyzer module does not export analyzeRepo.");
   }
+  const collector = input.ranking_trace
+    ? createRankingTraceCollector(input.ranking_trace.binding)
+    : null;
   const analysis = await module.analyzeRepo(input.repository_root, {
     runId: input.run_id,
     inspectGit: false,
-    scan: input.scan
+    scan: input.scan,
+    ...(collector ? { _rankingObserver: collector.observer } : {})
   });
   const state = analysis?.state;
   if (!state || typeof state !== "object") {
     throw new Error("Analyzer returned no state object.");
   }
+  const rankingTraceReceipt = collector
+    ? preserveRankingTrace(input.ranking_trace, collector, analysis)
+    : null;
   process.stdout.write(`${JSON.stringify({
     state: {
       version: state.version,
@@ -26,13 +39,66 @@ try {
         test: state.commands?.test || []
       },
       scan: boundedScanDiagnostics(state.scan)
-    }
+    },
+    ...(rankingTraceReceipt
+      ? { ranking_trace: rankingTraceReceipt }
+      : {})
   })}\n`);
 } catch (error) {
   process.stderr.write(
     `${String(error?.stack || error?.message || error).slice(0, 8_000)}\n`
   );
   process.exitCode = 1;
+}
+
+function preserveRankingTrace(request, collector, analysis) {
+  try {
+    if (
+      !request ||
+      typeof request.output_directory !== "string" ||
+      !/^case-\d{3}\.json$/.test(String(request.file_name || ""))
+    ) {
+      throw new Error("Invalid ranking trace output request.");
+    }
+    const trace = collector.finalize(analysis);
+    const validation = validateRankingTrace(
+      trace,
+      request.binding
+    );
+    const bytes = `${JSON.stringify(trace)}\n`;
+    atomicWriteContained(
+      request.output_directory,
+      request.file_name,
+      bytes
+    );
+    return {
+      status: "written",
+      file_name: request.file_name,
+      sha256: crypto
+        .createHash("sha256")
+        .update(bytes)
+        .digest("hex"),
+      bytes: Buffer.byteLength(bytes),
+      complete:
+        trace.completeness.complete === true &&
+        validation.valid,
+      validation_failures: validation.failures
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      file_name:
+        typeof request?.file_name === "string"
+          ? request.file_name.slice(0, 64)
+          : null,
+      sha256: null,
+      bytes: 0,
+      complete: false,
+      validation_failures: [
+        String(error?.message || error || "trace failure").slice(0, 1_000)
+      ]
+    };
+  }
 }
 
 function boundedScanDiagnostics(value) {

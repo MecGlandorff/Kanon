@@ -45,7 +45,8 @@ import {
  *   runId?: string,
  *   scan?: import("./scanner/scan.js").ScanOptions,
  *   readmePath?: unknown,
- *   inspectGit?: boolean
+ *   inspectGit?: boolean,
+ *   _rankingObserver?: import("./code-intel/shared.js").RankingObserver
  * }} AnalyzeOptions
  * @typedef {{
  *   readmeTarget: string | null,
@@ -160,7 +161,10 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
   );
   const codeIntel = inspectRepoCode(resolvedRoot, files, {
     packageJson: packageInfo?.json,
-    readOptions
+    readOptions,
+    ...(options._rankingObserver === undefined
+      ? {}
+      : { rankingObserver: options._rankingObserver })
   });
   const git = inspectGit(resolvedRoot, evidence, {
     enabled: options.inspectGit !== false,
