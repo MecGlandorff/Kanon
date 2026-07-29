@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanon.invalid/eval/d2c/adjudication.schema.json",
+  "title": "Kanon D.2C status-masked review result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "items"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kanon-d2c-adjudication-v1"
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/review_item"
+      }
+    }
+  },
+  "$defs": {
+    "review_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "item_id",
+        "path",
+        "snapshot_root",
+        "file_metadata",
+        "reviewer_disposition",
+        "rationale",
+        "source_paths",
+        "unknown_option"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^case-[0-9a-f]{20}$"
+        },
+        "item_id": {
+          "type": "string",
+          "pattern": "^item-[0-9a-f]{24}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]+$"
+        },
+        "snapshot_root": {
+          "type": "string",
+          "pattern": "^cases/case-[0-9a-f]{20}$"
+        },
+        "file_metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "byte_count",
+            "sha256"
+          ],
+          "properties": {
+            "byte_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 134217728
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "reviewer_disposition": {
+          "enum": [
+            "clearly-defensible-important",
+            "clearly-unsupported",
+            "ambiguous-equivalent",
+            "insufficient-label-provenance",
+            "weak-ranking-signal",
+            "unknown"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]+$"
+        },
+        "source_paths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]+$"
+          }
+        },
+        "unknown_option": {
+          "const": "unknown"
+        }
+      }
+    }
+  }
+}

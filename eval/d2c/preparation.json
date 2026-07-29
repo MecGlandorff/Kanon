@@ -1,0 +1,10 @@
+{
+  "schema_version": "kanon-d2c-preparation-v1",
+  "recovery_head": "9008c0fec3a6b8a48ece04853df01ddf92604026",
+  "restored_artifact_sha256": "89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a",
+  "raw_report": "eval/results/development-0.4.0-rc.1-d2a-74208b9a.json",
+  "raw_report_sha256": "747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3",
+  "corpus_manifest": "eval/corpus.json",
+  "corpus_manifest_sha256": "4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92",
+  "preparation_seed": "fcf3f746dee8b8f4a1ea23654489e39d08ae2f21d4ca00c1ea64d38177dbf2aa"
+}
