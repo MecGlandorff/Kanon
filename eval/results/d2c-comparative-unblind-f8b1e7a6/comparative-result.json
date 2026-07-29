@@ -1,0 +1,1153 @@
+{
+  "schema_version": "kanon-d2c-comparative-result-v1",
+  "cases": [
+    {
+      "case_id": "case-43880021444cb215d26a",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-8bf09a33fc1b93a5e3d905b5",
+          "rationale": "Defines the project's installed applications, middleware, URL configuration, database setup, templates, and other central Django runtime settings.",
+          "source_paths": [
+            "bakerydemo/settings/base.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a34c13d6d929d4ff2ef91b22",
+          "rationale": "Composes the application's top-level routes for administration, documents, search, API, media, and Wagtail page handling.",
+          "source_paths": [
+            "bakerydemo/urls.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-0c27b28ac513a58c654f7802",
+          "rationale": "Is the executable Django management entrypoint and explicitly selects the development settings module.",
+          "source_paths": [
+            "manage.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-62675601aa2022d5c3de215d",
+          "rationale": "Directly describes the demo's multi-application architecture, demonstrated features, and supported setup paths.",
+          "source_paths": [
+            "readme.md"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-2365223f8d54658bdf3e",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-3e40956185dd26b9dbc9c643",
+          "rationale": "Constructs the root command, performs configuration and logging preparation, and registers the application's command surface.",
+          "source_paths": [
+            "internal/commands/root.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-75a01e9fc0bb985ec043edaf",
+          "rationale": "Is the executable entrypoint that runs the root command and maps command outcomes to process exit status.",
+          "source_paths": [
+            "cmd/authelia/main.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-23eee5c40ad50ad1227cf958",
+          "rationale": "Defines the HTTP server's configuration schema, endpoint authorization structure, rate limits, TLS, headers, buffers, timeouts, and defaults.",
+          "source_paths": [
+            "internal/configuration/schema/server.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8cd8414a5e50a74a200f72a8",
+          "rationale": "Declares the primary Go module, toolchain, and the backend dependency graph used to build the application.",
+          "source_paths": [
+            "go.mod"
+          ]
+        },
+        {
+          "candidate_id": "candidate-e58ef7398135ce805640269e",
+          "rationale": "Defines the web application's runtime dependencies and its build, lint, coverage, and test commands.",
+          "source_paths": [
+            "web/package.json"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-fd5c68537700f6f79582",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-11f05f37b523006a2fb2c9e0",
+          "rationale": "Implements the central single-GPU and distributed training workflow, including data batches, evaluation, optimization, checkpointing, and scheduling.",
+          "source_paths": [
+            "train.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a1750cf95c08058429d28501",
+          "rationale": "Contains the complete GPT model definition, including attention, transformer blocks, configuration, initialization, and model behavior.",
+          "source_paths": [
+            "model.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-39c04b91304cf91491a2f25b",
+          "rationale": "Explicitly identifies the repository's two-file core architecture and documents its training and data preparation workflows.",
+          "source_paths": [
+            "README.md"
+          ]
+        },
+        {
+          "candidate_id": "candidate-d33a0fb5eda4943106be3594",
+          "rationale": "Provides the configuration override mechanism consumed by the training workflow for files and command-line values.",
+          "source_paths": [
+            "configurator.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-cc78d5d18f275593233e4f17",
+          "rationale": "Implements the OpenWebText acquisition, split, tokenization, and binary preparation pipeline used by the primary training configuration.",
+          "source_paths": [
+            "data/openwebtext/prepare.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-06742cdfef00f4f0ecd1",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-a14b855c2410ad7b54f94285",
+          "rationale": "Defines the shared Django runtime architecture, including databases, applications, middleware, URL routing, templates, and data locations.",
+          "source_paths": [
+            "djangoproject/settings/common.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a887bace6ae84c263e5105f7",
+          "rationale": "Orchestrates installation, asset compilation, migrations checks, local execution, CI, and the project-wide test suite.",
+          "source_paths": [
+            "Makefile"
+          ]
+        },
+        {
+          "candidate_id": "candidate-dd3786949a4e6f7ef8058475",
+          "rationale": "Is the administrative command entrypoint and selects the development settings used for local management tasks.",
+          "source_paths": [
+            "manage.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-7b352ef7cb5e2d5bc3f691c3",
+          "rationale": "Directly maps the repository's principal hostnames to its public, documentation, and dashboard URL configurations.",
+          "source_paths": [
+            "djangoproject/hosts.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-08219d1cc8c9bc0d820f7c60",
+          "rationale": "Documents the required local configuration, supported execution paths, data setup, and operational development workflow.",
+          "source_paths": [
+            "README.rst"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-1cf15831b5e575d3e3dc",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-0fab7bdfad1639d6311614fe",
+          "rationale": "Provides repository-wide integration orchestration for running and dry-running the distinct Python examples across accelerator modes.",
+          "source_paths": [
+            "run_python_examples.sh"
+          ]
+        },
+        {
+          "candidate_id": "candidate-cfaf855f8ccbd13565b9bff1",
+          "rationale": "Defines the repository as a curated collection of independent examples and maps the major model and distributed-example areas.",
+          "source_paths": [
+            "README.md"
+          ]
+        },
+        {
+          "candidate_id": "candidate-61e5897bb2ae3a0af85ed4b3",
+          "rationale": "Is a substantial self-contained example implementing data setup, generator and discriminator models, and the full DCGAN training flow.",
+          "source_paths": [
+            "dcgan/main.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-7a3b9b5a0e1a81116c4f1d0e",
+          "rationale": "Implements an end-to-end MNIST example with model definition, training, evaluation, data loading, and command-line execution.",
+          "source_paths": [
+            "mnist/main.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-20b5b7ca6b843e252af07de4",
+          "rationale": "Implements the FSDP2 distributed example's sharding, precision, prefetch, checkpoint, and execution orchestration.",
+          "source_paths": [
+            "distributed/FSDP2/example.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-69039449d05feaf7583c",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-d5612080964025ce65b49be7",
+          "rationale": "Is the primary executable implementation, assembling configuration, matching, filtering, command execution, and filesystem traversal.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-0383d1b66ae6fd964ab16baf",
+          "rationale": "Implements the central parallel filesystem scanning pipeline, buffering, worker coordination, matching, and output dispatch.",
+          "source_paths": [
+            "src/walk.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-9569691be454ffa1989caa79",
+          "rationale": "Declares the executable target, feature set, platform-specific dependencies, and build profiles for the application.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-f5a177fc5805a99e25a64ea2",
+          "rationale": "Contains the broad integration test suite covering core search behavior, filters, patterns, paths, and platform-sensitive cases.",
+          "source_paths": [
+            "tests/tests.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a91264f96d4ebe22e5805511",
+          "rationale": "Directly documents the command's behavior, feature set, invocation model, options, and installation paths.",
+          "source_paths": [
+            "README.md"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-62716300443e0a01f53b",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-2189e492c2818850fe8c1f43",
+          "rationale": "Defines the package, workspace membership, library and binary targets, integration test target, dependencies, and lint policy.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-efb7994b1cbbfb561669d1ad",
+          "rationale": "Orchestrates the repository's build, run, test, CI, lint, documentation, packaging, and release tasks.",
+          "source_paths": [
+            "justfile"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a2539026d11bfa46bc0c1fc1",
+          "rationale": "Is the executable entrypoint, handling shell completion setup and delegating command execution to the core library.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-4e4bdfa3f2092b6bc4453cbb",
+          "rationale": "Defines the integration test harness and composes the extensive behavior-oriented test module tree.",
+          "source_paths": [
+            "tests/lib.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-fcf5f10aedb17fd7b86cd1b7",
+          "rationale": "Provides the primary functional specification and user-facing command semantics for the command runner.",
+          "source_paths": [
+            "README.md"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-aae7a9ea0cdc1933024d",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-d2851d241eac451384bd85fc",
+          "rationale": "Is the application entrypoint and root command implementation, assembling profile, store, server, configuration, logging, and shutdown behavior.",
+          "source_paths": [
+            "cmd/memos/main.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-6d0574ae901482ed56a9d88d",
+          "rationale": "Constructs and controls the HTTP server, API and frontend routes, background runners, long-lived connections, and graceful shutdown.",
+          "source_paths": [
+            "server/server.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a961fdf060bdd2354035c968",
+          "rationale": "Defines the central persistence facade, its driver, shared caches, deployment configuration, and lifecycle methods.",
+          "source_paths": [
+            "store/store.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-dc45765ee6ec293d4d0e41f4",
+          "rationale": "Declares the backend module and the dependencies supporting databases, APIs, object storage, authentication, and server operation.",
+          "source_paths": [
+            "go.mod"
+          ]
+        },
+        {
+          "candidate_id": "candidate-ee831a1872139629958cad7c",
+          "rationale": "Defines the frontend build and release pipeline, test commands, and its application dependency graph.",
+          "source_paths": [
+            "web/package.json"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-57eadf218b58651beb98",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-9679eb2afa5e43ac5b6a3a70",
+          "rationale": "Defines the monorepo's top-level build, development, packaging, linting, type-checking, and multi-layer test orchestration.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-245b9fbf70f01f47189c580b",
+          "rationale": "Defines the core package's public API across hooks, components, controllers, spring values, interpolation, and shared primitives.",
+          "source_paths": [
+            "packages/core/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-fe114073888ff0c241b27a07",
+          "rationale": "Composes the shared package's cross-cutting frame loop, interpolation, color, event, hook, fluid, and scheduling APIs.",
+          "source_paths": [
+            "packages/shared/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8f74c40903ad10c211890482",
+          "rationale": "Defines cross-package task dependencies, caching behavior, inputs, and outputs for development and builds.",
+          "source_paths": [
+            "turbo.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-58a5fb288e117f6b72598e69",
+          "rationale": "Directly identifies the package, target, demo, and documentation boundaries of the workspace.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-9ea80d34a89d02b57980",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-311807a000e9e1e6bf8f4e54",
+          "rationale": "Orchestrates monorepo-wide builds, checks, formatting, linting, releases, and the principal integration test groups.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-589cd0a2cd3b8c436910f256",
+          "rationale": "Defines the framework package's dependencies, executable command, scripts, and extensive public export map.",
+          "source_paths": [
+            "packages/kit/package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5b3953ec9a69ad60297129eb",
+          "rationale": "Implements the runtime server object, initialization, manifest setup, hooks, environment setup, and request response path.",
+          "source_paths": [
+            "packages/kit/src/runtime/server/index.js"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8a1bc17b9cb1e8f240d5f4cf",
+          "rationale": "Implements and exposes central framework request-handling primitives, errors, redirects, actions, validation, and public utilities.",
+          "source_paths": [
+            "packages/kit/src/exports/index.js"
+          ]
+        },
+        {
+          "candidate_id": "candidate-3849949796278613add6ea7e",
+          "rationale": "Defines the broad workspace topology, including packages, adapters, test applications, build-error fixtures, and playgrounds.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-d194bdec9803b7c6bd0f",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-6576528ee37673bdbc993fea",
+          "rationale": "Defines the command abstraction, registers the application's extensive command surface, and supplies central command dispatch infrastructure.",
+          "source_paths": [
+            "cmd/commands.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-1e53855a5e3eaf543d0e1d5f",
+          "rationale": "Is the executable entrypoint and directly composes the standard module set before handing control to the command runtime.",
+          "source_paths": [
+            "cmd/caddy/main.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-14cd899a78799c6ef4b61f29",
+          "rationale": "Defines foundational HTTP matcher, handler, middleware, response handling, path, and module interfaces used by the server platform.",
+          "source_paths": [
+            "modules/caddyhttp/caddyhttp.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-d6bc994fffe5ce5f1676c86c",
+          "rationale": "Implements the central adaptation boundary from Caddyfile input to the application's JSON configuration.",
+          "source_paths": [
+            "caddyconfig/caddyfile/adapter.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-eb2822fcd1b5019d4c7aaf08",
+          "rationale": "Declares the primary module and the dependency graph supporting TLS, HTTP, configuration, metrics, and command operation.",
+          "source_paths": [
+            "go.mod"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-06a0c19ef181ab42d867",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-14970b74926a7d795bb09010",
+          "rationale": "Defines the application's backbone interface and base implementation contract for lifecycle, persistence, hooks, services, and runtime facilities.",
+          "source_paths": [
+            "core/app.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5c56267c682d65b982f5faf8",
+          "rationale": "Implements the primary application launcher, root command integration, bootstrap selection, configuration, signal handling, and execution lifecycle.",
+          "source_paths": [
+            "pocketbase.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-fec72119a2c7b3046daa122b",
+          "rationale": "Constructs the default serve command and translates command arguments and listener settings into the web server configuration.",
+          "source_paths": [
+            "cmd/serve.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-f7292084dea6cde5e7e05917",
+          "rationale": "Declares the module and dependencies for the embedded database, HTTP, scripting, authentication, files, and command stack.",
+          "source_paths": [
+            "go.mod"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8db472b0a76fdfb5ccfd48e9",
+          "rationale": "Provides the repository's explicit lint, full test, coverage-report, and generated-type task entrypoints.",
+          "source_paths": [
+            "Makefile"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-8bea5dba7f22b9aa4224",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-8c76c1d12fb890554c7b3095",
+          "rationale": "Composes the central GraphQL schema across the application's functional domains and implements backend execution and validation behavior.",
+          "source_paths": [
+            "saleor/graphql/api.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-e4a7d56d806e38d8f962b232",
+          "rationale": "Defines the application's comprehensive Django, database, task, security, GraphQL, caching, observability, and environment configuration.",
+          "source_paths": [
+            "saleor/settings.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-b4885b982196e9f8533e4bc1",
+          "rationale": "Maps the top-level GraphQL, plugin webhook, thumbnail, media, and related service endpoints.",
+          "source_paths": [
+            "saleor/urls.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-916a016fb5b9f06cfbeb7456",
+          "rationale": "Is the administrative executable entrypoint and selects the production application settings module.",
+          "source_paths": [
+            "manage.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-f2c8e3e4dc7b2c07496e43e4",
+          "rationale": "Defines the build backend, application package, runtime dependencies, and the repository's test and development tool configuration.",
+          "source_paths": [
+            "pyproject.toml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-9c5fd2c076d9bb5d072c",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-71e65ad61eae661884b44f13",
+          "rationale": "Defines the packet as a collection of standalone examples and maps its text, image, video, audio, and other principal areas.",
+          "source_paths": [
+            "README.md"
+          ]
+        },
+        {
+          "candidate_id": "candidate-da09b785308690787d7d09e1",
+          "rationale": "Implements an end-to-end LoRA and QLoRA command workflow covering parsing, loading, datasets, evaluation, training, and generation.",
+          "source_paths": [
+            "lora/lora.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-53a33628c9efa5fdc6758096",
+          "rationale": "Provides the corresponding transformer, attention, feed-forward, LoRA layer, model configuration, and model-loading implementation.",
+          "source_paths": [
+            "lora/models.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5d23fc50c0c096816c30265a",
+          "rationale": "Implements a complete introductory example with model construction, data iteration, optimization, evaluation, and command-line execution.",
+          "source_paths": [
+            "mnist/main.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-02d986b019abb91045ae",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-8076114097bb4d8ab94cb836",
+          "rationale": "Defines repository-wide build, watch, documentation, release, formatting, and comprehensive CI test orchestration.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-b2bd9494b1f056d613293b0d",
+          "rationale": "Defines cached compilation, build, and test targets and their cross-project dependency and input rules.",
+          "source_paths": [
+            "nx.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-45e6068285f6197a7921812d",
+          "rationale": "Composes the framework-independent core public API for clients, queries, mutations, observers, hydration, retry, and scheduling.",
+          "source_paths": [
+            "packages/query-core/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-e71ffee951cf40cb1038e361",
+          "rationale": "Defines the package, integration, and multi-framework example topology of the workspace along with shared dependency controls.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-e062ddcdfd6326be4147",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-b81e9f80c476b130662c8149",
+          "rationale": "Implements the central Tensor abstraction and connects user-facing operations to scheduling, devices, realization, and the internal operation graph.",
+          "source_paths": [
+            "tinygrad/tensor.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-c4b586e71c1e4902c63f5672",
+          "rationale": "Implements the core operation graph, symbolic shape logic, pattern matching, graph rewriting, execution metadata, and low-level ALU semantics.",
+          "source_paths": [
+            "tinygrad/uop/ops.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-bd9baf2608a8cf7beba70b9d",
+          "rationale": "Provides pervasive runtime, shape, environment, profiling, serialization, and diagnostic primitives used across the implementation.",
+          "source_paths": [
+            "tinygrad/helpers.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-953bf4594b3cd010a95b0b42",
+          "rationale": "Defines the package's public entry surface for Tensor, JIT, operations, dtypes, context, counters, and devices.",
+          "source_paths": [
+            "tinygrad/__init__.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-0c76e2bb1432871cac979cf2",
+          "rationale": "Defines package construction, the full package tree, optional dependencies, and repository-wide test, type, lint, and formatting configuration.",
+          "source_paths": [
+            "pyproject.toml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-343b276347571d360cdc",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-1d3bb5c6beb601f4f97036a9",
+          "rationale": "Defines workspace scope and the repository-wide build, test, type-check, lint, format, schema, and release workflows.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-b2af8b3aa450e360ceb78cad",
+          "rationale": "Is the substantive CLI entry implementation, performing command parsing, interactive setup, execution, and error handling.",
+          "source_paths": [
+            "packages/cli/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-22ae26880780eae28da00e3e",
+          "rationale": "Defines and validates the central configuration schema, including package groups, changelog, commit, access, and root settings.",
+          "source_paths": [
+            "packages/config/src/config.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-36bc7019e4928eb18923d966",
+          "rationale": "Is the installed executable boundary that enables the compile cache and loads the CLI package.",
+          "source_paths": [
+            "packages/cli/bin.js"
+          ]
+        },
+        {
+          "candidate_id": "candidate-10d95bf481bcca4383276fd6",
+          "rationale": "Defines the monorepo's package and script workspace boundaries and shared dependency security controls.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-c56c12cd4716b1a273ab",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-7fc326c139c79a6c8ee9461f",
+          "rationale": "Is the application entrypoint, declares the principal modules, parses commands, runs them, and normalizes failures into process status.",
+          "source_paths": [
+            "src/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-f62fc2e38a705ed2ebf7f921",
+          "rationale": "Implements the central database abstraction, persistence format, directory and stream access, mutation tracking, and save lifecycle.",
+          "source_paths": [
+            "src/db/mod.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8024d62ba941fa51040467ea",
+          "rationale": "Declares the executable package, dependencies, build dependencies, platform behavior, features, and packaging metadata.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-7df52ccb84f1559bdf1dc762",
+          "rationale": "Orchestrates formatting, linting, tests, and other development tasks across Unix and Windows environments.",
+          "source_paths": [
+            "justfile"
+          ]
+        },
+        {
+          "candidate_id": "candidate-962ec7d28d1c7ead9c49d15e",
+          "rationale": "Provides the primary behavioral and operational description of the command, its shell integration, and its installation paths.",
+          "source_paths": [
+            "README.md"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-4960899f3bbfb39ff95e",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-ff8ca70693b92d35ae3536be",
+          "rationale": "Implements the application's central startup and runtime orchestration across configuration, HTTP, DNS, filtering, TLS, updates, users, and shutdown.",
+          "source_paths": [
+            "internal/home/home.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-bfd07a89c4351dff14aa54b4",
+          "rationale": "Is the executable entrypoint, embeds the built client, and hands it to the central application runtime.",
+          "source_paths": [
+            "main.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-9277d0877b86e69486713aaf",
+          "rationale": "Provides top-level backend and frontend build, dependency, lint, test, release, and platform-check orchestration.",
+          "source_paths": [
+            "Makefile"
+          ]
+        },
+        {
+          "candidate_id": "candidate-ced0bcf23af3c58f4f1865ce",
+          "rationale": "Declares the backend module and dependencies for DNS, filtering, DHCP, storage, HTTP, networking, security, and tests.",
+          "source_paths": [
+            "go.mod"
+          ]
+        },
+        {
+          "candidate_id": "candidate-ec6d0633a337545c815bef16",
+          "rationale": "Defines the client application's build modes, linting, type checking, unit and end-to-end tests, and runtime dependencies.",
+          "source_paths": [
+            "client/package.json"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-4698c59bea20c3a21914",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-3984b7b547bcd92130fb7247",
+          "rationale": "Implements the repository's central scalar value, dynamic computation graph, arithmetic operations, activation, and reverse-mode differentiation.",
+          "source_paths": [
+            "micrograd/engine.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a959493fbf179fe816e9191e",
+          "rationale": "Builds the neural-network layer directly on the autograd engine with modules, neurons, layers, parameter traversal, and MLP composition.",
+          "source_paths": [
+            "micrograd/nn.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-cc0b80a8e53651cc360b8d47",
+          "rationale": "Directly verifies the core forward and backward semantics against an independent tensor implementation across multiple operation graphs.",
+          "source_paths": [
+            "test/test_engine.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-3c94071fab5a0ee115efbab8",
+          "rationale": "Explicitly describes the two-layer architecture, supported operations, usage, and full neural-network training role.",
+          "source_paths": [
+            "README.md"
+          ]
+        },
+        {
+          "candidate_id": "candidate-568fde5c58162f2092c04228",
+          "rationale": "Defines the distributable package, discovers its modules, and supplies its runtime and interpreter requirements.",
+          "source_paths": [
+            "setup.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-e79bb27c4675f6688cb3",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-e38e65e50e705d0bcf1ab271",
+          "rationale": "Contains the microframework's central implementation, including application, request context, routing, rendering, sessions, responses, and public helpers.",
+          "source_paths": [
+            "flask.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-90b0eec67b4700b744f3a260",
+          "rationale": "Is a complete application example covering database access, request lifecycle, authentication, timelines, social actions, and routing.",
+          "source_paths": [
+            "examples/minitwit/minitwit.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-fc362197dbcfe6fc77dc8415",
+          "rationale": "Defines the persistent data model used by the substantial MiniTwit example for users, followers, and messages.",
+          "source_paths": [
+            "examples/minitwit/schema.sql"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5c4cc9a572328a18b4534c0b",
+          "rationale": "Provides a compact executable demonstration of application creation, routing, methods, redirects, parameters, and template rendering.",
+          "source_paths": [
+            "examples/apishowcase/apishowcase.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-bfb137dc1f9e7b5ed967",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-3934b3ecc6afe1a9d59b7ac1",
+          "rationale": "Composes and controls the SSH, Git, HTTP, statistics, scheduling, backend, database, and certificate services.",
+          "source_paths": [
+            "cmd/soft/serve/server.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-3eb471d121d4da07d8fd8bf4",
+          "rationale": "Is the executable root command, registering the serve, administration, browsing, and hook command areas and build metadata.",
+          "source_paths": [
+            "cmd/soft/main.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-ea454048985dfc16d4beba79",
+          "rationale": "Defines the central backend facade for users, repositories, settings, storage, task management, and caching.",
+          "source_paths": [
+            "pkg/backend/backend.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-2ce6f0f859109a340b5eb3f2",
+          "rationale": "Implements the shared database connection and transaction boundary for the application.",
+          "source_paths": [
+            "pkg/db/db.go"
+          ]
+        },
+        {
+          "candidate_id": "candidate-79b9af4f50ffec86d88752f0",
+          "rationale": "Declares the module and its substantial SSH, Git, HTTP, UI, persistence, scheduling, and observability dependency graph.",
+          "source_paths": [
+            "go.mod"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-ee69a5ba18aca3dcf976",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-6bf4a09c122f3507eb3a574c",
+          "rationale": "Is the primary executable implementation, assembling CLI configuration, inputs, assets, themes, paging, output, and controller execution.",
+          "source_paths": [
+            "src/bin/bat/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-6289e59ac5f932d3c2be3a03",
+          "rationale": "Implements the central processing controller that coordinates input reading, preprocessing, highlighting, line selection, printing, and output handling.",
+          "source_paths": [
+            "src/controller.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-2107a0803f1352183d6966f1",
+          "rationale": "Defines the library architecture, exposes the major subsystems, and presents PrettyPrinter as the primary public API.",
+          "source_paths": [
+            "src/lib.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-69848f571c4fc7b5688a5014",
+          "rationale": "Declares application and library feature composition, the build entry, dependencies, and development test dependencies.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-406e669aa8660c88e86f01d3",
+          "rationale": "Contains the broad executable integration suite covering output modes, line selection, terminal behavior, themes, and command options.",
+          "source_paths": [
+            "tests/integration_tests.rs"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-fa695cb669e14809f48f",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-9c31011a630254a0c6d9f2ff",
+          "rationale": "Contains the complete GPT implementation, including attention, transformer blocks, configuration, pretrained loading, optimization setup, and generation.",
+          "source_paths": [
+            "mingpt/model.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-8ca8e3fed4094ff2528cf56c",
+          "rationale": "Implements the general training lifecycle with configuration, device selection, data loading, optimization, callbacks, and iteration control.",
+          "source_paths": [
+            "mingpt/trainer.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-01f2da14638bb3b96b73c071",
+          "rationale": "Explicitly identifies the small library architecture and explains the roles of the model, tokenizer, trainer, demos, and projects.",
+          "source_paths": [
+            "README.md"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5a7166153e20f7f74edfdc5e",
+          "rationale": "Provides the shared configuration, reproducibility, and experiment logging facilities consumed by the model and trainer.",
+          "source_paths": [
+            "mingpt/utils.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-938cacfafe105111a9c1e758",
+          "rationale": "Directly tests pretrained-model import and numerical compatibility against the external reference implementation.",
+          "source_paths": [
+            "tests/test_huggingface_import.py"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-847c7cb083bf8f4e3d0f",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-1d05425b9be3224b3b069e84",
+          "rationale": "Defines the deployed application's environment-driven settings, middleware, installed applications, URLs, queues, and runtime integration.",
+          "source_paths": [
+            "src/pretix/settings.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-0a4af20b8e9a85b1cf9ee854",
+          "rationale": "Provides the base settings layer and directly establishes the core application set and shared internationalization behavior.",
+          "source_paths": [
+            "src/pretix/_base_settings.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a896842808b8219040f8da5f",
+          "rationale": "Implements the extensive plugin-aware signal and registry architecture connecting events, organizers, orders, payments, and extension points.",
+          "source_paths": [
+            "src/pretix/base/signals.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-b8c96b007e46c58bc156be92",
+          "rationale": "Composes the top-level control, presale, base, static, and service routes for the web application.",
+          "source_paths": [
+            "src/pretix/urls.py"
+          ]
+        },
+        {
+          "candidate_id": "candidate-5020ba539d0c1a0c7854644a",
+          "rationale": "Defines package construction, entry points, runtime and optional dependencies, and distribution discovery for the application and plugins.",
+          "source_paths": [
+            "pyproject.toml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-bb77e3b512b3c7d14941",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-35aa95a0a70ddc967dd9e5ec",
+          "rationale": "Defines the core library architecture and exposes its command, configuration, execution, task graph, hashing, daemon, and query integration.",
+          "source_paths": [
+            "crates/turborepo-lib/src/lib.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-fa2ad38b7a685f5208b72a1d",
+          "rationale": "Is the primary Rust executable entrypoint, joining the core library with query services, internal commands, process behavior, and allocators.",
+          "source_paths": [
+            "crates/turborepo/src/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-01e1e0a61e62ca225955fe89",
+          "rationale": "Defines the Rust workspace membership, shared dependencies, build profiles, lint rules, and crate group boundaries.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-c8a3d9bea7d9a486aef22688",
+          "rationale": "Orchestrates repository-wide builds, Rust builds, TypeScript builds, linting, formatting, tests, documentation, and local binary execution.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-b615643cf721d47398bf271f",
+          "rationale": "Defines the JavaScript workspace topology across applications, documentation, packages, examples, and lockfile tests.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-90f9c512c9c1f7eb3794",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-2b86d55520e58c59a6eebe98",
+          "rationale": "Defines the monorepo's development, build, type generation, lint, unit, end-to-end, benchmark, release, and playground workflows.",
+          "source_paths": [
+            "package.json"
+          ]
+        },
+        {
+          "candidate_id": "candidate-2bbed0f78d763a74f151271c",
+          "rationale": "Composes the runtime core's broad public API for components, rendering, hydration, reactivity, scheduling, watchers, directives, and SSR.",
+          "source_paths": [
+            "packages/runtime-core/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a530adf897763b651caa28f1",
+          "rationale": "Implements the full-build entry that joins the runtime and compiler and provides cached on-the-fly template compilation.",
+          "source_paths": [
+            "packages/vue/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-f8d001b3c88f2e73ada62fad",
+          "rationale": "Defines the reactivity package's public surface for refs, proxies, effects, computed values, scopes, watching, and instrumentation.",
+          "source_paths": [
+            "packages/reactivity/src/index.ts"
+          ]
+        },
+        {
+          "candidate_id": "candidate-2c0e1394f62527092a82dc8a",
+          "rationale": "Defines the package and private-package workspace boundaries and the shared dependency and build controls.",
+          "source_paths": [
+            "pnpm-workspace.yaml"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    },
+    {
+      "case_id": "case-da954daaeffe75c3de17",
+      "outcome": "selection",
+      "selections": [
+        {
+          "candidate_id": "candidate-c686264bb33749b6f3248e20",
+          "rationale": "Is the main executable implementation, declaring the core modules and orchestrating argument parsing, search modes, parallel traversal, generation, and status.",
+          "source_paths": [
+            "crates/core/main.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-1141ce113a0ca4e56dfe226a",
+          "rationale": "Implements the high-level search worker that connects matching, searching, printing, preprocessors, decompression, and binary handling.",
+          "source_paths": [
+            "crates/core/search.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-c2dc2e2fdaaffcfff3eff4c4",
+          "rationale": "Defines the binary target, integration test target, workspace membership, build script, and dependency graph.",
+          "source_paths": [
+            "Cargo.toml"
+          ]
+        },
+        {
+          "candidate_id": "candidate-a9ffb824d440c0b2d5ed0590",
+          "rationale": "Defines the foundational matcher abstraction and associated match, line termination, capture, and iteration semantics used by searchers.",
+          "source_paths": [
+            "crates/matcher/src/lib.rs"
+          ]
+        },
+        {
+          "candidate_id": "candidate-6c72b4da42125f2e7fa02faf",
+          "rationale": "Composes the integration suite across binary handling, features, indexing, JSON, multiline search, miscellaneous behavior, and regressions.",
+          "source_paths": [
+            "tests/tests.rs"
+          ]
+        }
+      ],
+      "unknown_reason": ""
+    }
+  ]
+}
