@@ -269,6 +269,15 @@ export function curateRankedFiles(ranked, context = {}) {
   for (const declaration of declarations.filter((item) =>
     !item.signals.some((signal) => signal.source === "framework")
   )) {
+    if (!hasIndependentPackageSalience(declaration)) {
+      trace?.decision(
+        declaration,
+        "policy-excluded",
+        "package declaration lacks independent salience",
+        null
+      );
+      continue;
+    }
     const framework = declaration.signals.some(
       (signal) => signal.source === "framework"
     );
@@ -393,6 +402,18 @@ export function curateRankedFiles(ranked, context = {}) {
     output.filter((item) => item.recommended === true)
   );
   return output;
+}
+
+/**
+ * @param {RankedFile} item
+ * @returns {boolean}
+ */
+function hasIndependentPackageSalience(item) {
+  return (
+    item.fan_in > 0 ||
+    item.referenced_by > 0 ||
+    item.signals.some((signal) => signal.type === "entrypoint")
+  );
 }
 
 /**
