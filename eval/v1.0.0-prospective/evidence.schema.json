@@ -1,0 +1,398 @@
+{
+  "$id": "https://kanon.invalid/schema/v1.0.0-prospective-release-evidence-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "attestation": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_human_id": {
+          "minLength": 3,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "role-identity-and-conflicts",
+            "blindness",
+            "corpus-custody",
+            "raw-label-freeze",
+            "adjudication-complete",
+            "label-set-freeze",
+            "candidate-freeze",
+            "attempt-authorization",
+            "attempt-consumption",
+            "prediction-unblinding",
+            "final-release-decision"
+          ]
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "statement": {
+          "maxLength": 4000,
+          "minLength": 20,
+          "type": "string"
+        },
+        "subject_sha256": {
+          "$ref": "#/$defs/hash"
+        }
+      },
+      "required": [
+        "actor_human_id",
+        "kind",
+        "occurred_at",
+        "statement",
+        "subject_sha256"
+      ],
+      "type": "object"
+    },
+    "gate": {
+      "enum": [
+        "pass",
+        "fail",
+        "unknown"
+      ]
+    },
+    "hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "nonnegativeInteger": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attestations": {
+      "items": {
+        "$ref": "#/$defs/attestation"
+      },
+      "type": "array"
+    },
+    "conclusion": {
+      "enum": [
+        "release-supported",
+        "release-not-supported",
+        "inconclusive"
+      ]
+    },
+    "gates": {
+      "additionalProperties": false,
+      "properties": {
+        "agreement": {
+          "$ref": "#/$defs/gate"
+        },
+        "artifact_identity": {
+          "$ref": "#/$defs/gate"
+        },
+        "binding": {
+          "$ref": "#/$defs/gate"
+        },
+        "blindness": {
+          "$ref": "#/$defs/gate"
+        },
+        "candidate_freeze": {
+          "$ref": "#/$defs/gate"
+        },
+        "category_coverage": {
+          "$ref": "#/$defs/gate"
+        },
+        "compatibility": {
+          "$ref": "#/$defs/gate"
+        },
+        "complete_case_results": {
+          "$ref": "#/$defs/gate"
+        },
+        "confidence_precision": {
+          "$ref": "#/$defs/gate"
+        },
+        "containment": {
+          "$ref": "#/$defs/gate"
+        },
+        "contamination": {
+          "$ref": "#/$defs/gate"
+        },
+        "coverage": {
+          "$ref": "#/$defs/gate"
+        },
+        "deterministic_artifact": {
+          "$ref": "#/$defs/gate"
+        },
+        "governance": {
+          "$ref": "#/$defs/gate"
+        },
+        "incomplete_scans": {
+          "$ref": "#/$defs/gate"
+        },
+        "installed_conformance": {
+          "$ref": "#/$defs/gate"
+        },
+        "integrity": {
+          "$ref": "#/$defs/gate"
+        },
+        "inventory": {
+          "$ref": "#/$defs/gate"
+        },
+        "label_validity": {
+          "$ref": "#/$defs/gate"
+        },
+        "no_post_freeze_mutation": {
+          "$ref": "#/$defs/gate"
+        },
+        "no_post_result_rule_change": {
+          "$ref": "#/$defs/gate"
+        },
+        "observer_failures": {
+          "$ref": "#/$defs/gate"
+        },
+        "one_use_attempt": {
+          "$ref": "#/$defs/gate"
+        },
+        "performance_thresholds": {
+          "$ref": "#/$defs/gate"
+        },
+        "safety": {
+          "$ref": "#/$defs/gate"
+        },
+        "sample_size": {
+          "$ref": "#/$defs/gate"
+        },
+        "schema": {
+          "$ref": "#/$defs/gate"
+        },
+        "trace_equivalence": {
+          "$ref": "#/$defs/gate"
+        },
+        "weighted_error": {
+          "$ref": "#/$defs/gate"
+        }
+      },
+      "required": [
+        "agreement",
+        "artifact_identity",
+        "binding",
+        "blindness",
+        "candidate_freeze",
+        "category_coverage",
+        "compatibility",
+        "complete_case_results",
+        "confidence_precision",
+        "containment",
+        "contamination",
+        "coverage",
+        "deterministic_artifact",
+        "governance",
+        "incomplete_scans",
+        "installed_conformance",
+        "integrity",
+        "inventory",
+        "label_validity",
+        "no_post_freeze_mutation",
+        "no_post_result_rule_change",
+        "observer_failures",
+        "one_use_attempt",
+        "performance_thresholds",
+        "safety",
+        "sample_size",
+        "schema",
+        "trace_equivalence",
+        "weighted_error"
+      ],
+      "type": "object"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/hash"
+    },
+    "schema": {
+      "const": "kanon-v1.0.0-prospective-release-evidence-v1"
+    },
+    "statistics": {
+      "additionalProperties": false,
+      "properties": {
+        "case_count": {
+          "$ref": "#/$defs/nonnegativeInteger"
+        },
+        "category_case_counts": {
+          "additionalProperties": false,
+          "properties": {
+            "go-service": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "monorepo": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "python-ml": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "python-web": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            },
+            "rust-cli": {
+              "$ref": "#/$defs/nonnegativeInteger"
+            }
+          },
+          "required": [
+            "go-service",
+            "monorepo",
+            "python-ml",
+            "python-web",
+            "rust-cli"
+          ],
+          "type": "object"
+        },
+        "complete_case_results": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "coverage_complete": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "denominators": {
+          "additionalProperties": false,
+          "properties": {
+            "labeled_positive_category": {
+              "additionalProperties": false,
+              "properties": {
+                "go-service": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "monorepo": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "python-ml": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "python-web": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "rust-cli": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                }
+              },
+              "required": [
+                "go-service",
+                "monorepo",
+                "python-ml",
+                "python-web",
+                "rust-cli"
+              ],
+              "type": "object"
+            },
+            "labeled_positive_overall_or_dimension": {
+              "additionalProperties": false,
+              "properties": {
+                "important_files": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "overall": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "run_command": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "test_command": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                }
+              },
+              "required": [
+                "important_files",
+                "overall",
+                "run_command",
+                "test_command"
+              ],
+              "type": "object"
+            },
+            "predicted_positive": {
+              "additionalProperties": false,
+              "properties": {
+                "go-service": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "important_files": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "monorepo": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "overall": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "python-ml": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "python-web": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "run_command": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "rust-cli": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                },
+                "test_command": {
+                  "$ref": "#/$defs/nonnegativeInteger"
+                }
+              },
+              "required": [
+                "go-service",
+                "important_files",
+                "monorepo",
+                "overall",
+                "python-ml",
+                "python-web",
+                "run_command",
+                "rust-cli",
+                "test_command"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "labeled_positive_category",
+            "labeled_positive_overall_or_dimension",
+            "predicted_positive"
+          ],
+          "type": "object"
+        },
+        "incomplete_scan_count": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "observer_failure_count": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "case_count",
+        "category_case_counts",
+        "complete_case_results",
+        "coverage_complete",
+        "denominators",
+        "incomplete_scan_count",
+        "observer_failure_count"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "attestations",
+    "conclusion",
+    "gates",
+    "protocol_sha256",
+    "schema",
+    "statistics"
+  ],
+  "title": "Kanon v1.0.0 prospective release evidence",
+  "type": "object"
+}

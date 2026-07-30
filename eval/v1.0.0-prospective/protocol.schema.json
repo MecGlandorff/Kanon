@@ -1,0 +1,385 @@
+{
+  "$id": "https://kanon.invalid/schema/v1.0.0-prospective-release-protocol-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "candidate_development": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_evidence": {},
+        "candidate_freeze": {},
+        "correction_requirements": {},
+        "failed_holdout_reuse_allowed": {},
+        "holdout_evidence_allowed": {}
+      },
+      "required": [
+        "allowed_evidence",
+        "candidate_freeze",
+        "correction_requirements",
+        "failed_holdout_reuse_allowed",
+        "holdout_evidence_allowed"
+      ],
+      "type": "object"
+    },
+    "conclusions": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "const": [
+            "release-supported",
+            "release-not-supported",
+            "inconclusive"
+          ]
+        },
+        "automatic_release_allowed": {
+          "const": false
+        },
+        "derivation": {
+          "type": "object"
+        },
+        "final_human_release_decision_required": {
+          "const": true
+        },
+        "human_override_of_failed_or_unknown_gate_allowed": {
+          "const": false
+        },
+        "required_gates": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "allowed",
+        "automatic_release_allowed",
+        "derivation",
+        "final_human_release_decision_required",
+        "human_override_of_failed_or_unknown_gate_allowed",
+        "required_gates"
+      ],
+      "type": "object"
+    },
+    "corpus_selection": {
+      "additionalProperties": false,
+      "properties": {
+        "activity": {},
+        "category_eligibility": {},
+        "category_quotas": {},
+        "content_access": {},
+        "duplicate_and_contamination": {},
+        "eligible_source_population": {},
+        "identity": {},
+        "language_and_ecosystem_balance": {},
+        "metadata_only_fields": {},
+        "random_selection": {},
+        "replacement": {},
+        "selection_abort_conditions": {},
+        "size_balance_per_category": {}
+      },
+      "required": [
+        "activity",
+        "category_eligibility",
+        "category_quotas",
+        "content_access",
+        "duplicate_and_contamination",
+        "eligible_source_population",
+        "identity",
+        "language_and_ecosystem_balance",
+        "metadata_only_fields",
+        "random_selection",
+        "replacement",
+        "selection_abort_conditions",
+        "size_balance_per_category"
+      ],
+      "type": "object"
+    },
+    "evidence_partitions": {
+      "additionalProperties": false,
+      "properties": {
+        "historical-visible-development": {
+          "type": "object"
+        },
+        "one-use-unseen-holdout": {
+          "type": "object"
+        },
+        "prospective-development": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "historical-visible-development",
+        "one-use-unseen-holdout",
+        "prospective-development"
+      ],
+      "type": "object"
+    },
+    "forbidden": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "governance": {
+      "additionalProperties": false,
+      "properties": {
+        "attestation_kinds": {},
+        "attestation_serialization": {},
+        "blindness": {},
+        "coding_agents_may_simulate_independence": {},
+        "minimum_distinct_humans": {},
+        "missing_assignments_leave_protocol_inactive": {},
+        "permitted_role_combination": {},
+        "required_role_counts": {},
+        "role_combination_other_than_permitted": {}
+      },
+      "required": [
+        "attestation_kinds",
+        "attestation_serialization",
+        "blindness",
+        "coding_agents_may_simulate_independence",
+        "minimum_distinct_humans",
+        "missing_assignments_leave_protocol_inactive",
+        "permitted_role_combination",
+        "required_role_counts",
+        "role_combination_other_than_permitted"
+      ],
+      "type": "object"
+    },
+    "holdout_execution": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_limit": {},
+        "attempt_wall_timeout_ms": {},
+        "canonical_components": {},
+        "case_count": {},
+        "case_order": {},
+        "consumption_boundary": {},
+        "consumption_receipt": {},
+        "containment": {},
+        "failure_preservation": {},
+        "incomplete_scan_limit": {},
+        "invalid_case_limit": {},
+        "inventory": {},
+        "live_model_allowed": {},
+        "network_allowed": {},
+        "observer_failure_limit": {},
+        "resources": {},
+        "retry_policy": {},
+        "serialization": {},
+        "trace_control": {}
+      },
+      "required": [
+        "attempt_limit",
+        "attempt_wall_timeout_ms",
+        "canonical_components",
+        "case_count",
+        "case_order",
+        "consumption_boundary",
+        "consumption_receipt",
+        "containment",
+        "failure_preservation",
+        "incomplete_scan_limit",
+        "invalid_case_limit",
+        "inventory",
+        "live_model_allowed",
+        "network_allowed",
+        "observer_failure_limit",
+        "resources",
+        "retry_policy",
+        "serialization",
+        "trace_control"
+      ],
+      "type": "object"
+    },
+    "labeling": {
+      "additionalProperties": false,
+      "properties": {
+        "adjudication_without_product_output": {},
+        "agreement": {},
+        "ambiguous": {},
+        "command_abstention": {},
+        "generated": {},
+        "immutable_raw_judgments_and_adjudication_history": {},
+        "important_files": {},
+        "incomplete_scan": {},
+        "label_set_commitment_before_candidate_execution": {},
+        "minimum_independent_judgments_per_case": {},
+        "p0_labeling_defect_after_unblinding": {},
+        "platform_specific": {},
+        "post_unblinding_label_repair_allowed": {},
+        "rubric_frozen_before_labeling": {},
+        "unavailable": {},
+        "unknown": {},
+        "vendored": {}
+      },
+      "required": [
+        "adjudication_without_product_output",
+        "agreement",
+        "ambiguous",
+        "command_abstention",
+        "generated",
+        "immutable_raw_judgments_and_adjudication_history",
+        "important_files",
+        "incomplete_scan",
+        "label_set_commitment_before_candidate_execution",
+        "minimum_independent_judgments_per_case",
+        "p0_labeling_defect_after_unblinding",
+        "platform_specific",
+        "post_unblinding_label_repair_allowed",
+        "rubric_frozen_before_labeling",
+        "unavailable",
+        "unknown",
+        "vendored"
+      ],
+      "type": "object"
+    },
+    "sample_size": {
+      "additionalProperties": false,
+      "properties": {
+        "calculation": {
+          "additionalProperties": false,
+          "properties": {
+            "cases_per_category": {
+              "const": 40
+            },
+            "category_count": {
+              "const": 5
+            },
+            "confidence": {
+              "const": 0.95
+            },
+            "development_target_cases": {
+              "const": 200
+            },
+            "holdout_minimum_cases": {
+              "const": 200
+            },
+            "holdout_target_cases": {
+              "const": 200
+            },
+            "historical_run_prediction_coverage_lower": {
+              "type": "number"
+            },
+            "maximum_wilson_half_width": {
+              "const": 0.1
+            },
+            "minimum_labeled_positive_denominator_category": {
+              "const": 93
+            },
+            "minimum_labeled_positive_denominator_overall_or_dimension": {
+              "const": 89
+            },
+            "minimum_predicted_positive_denominator": {
+              "const": 60
+            },
+            "raw_case_requirement": {
+              "const": 199
+            },
+            "z": {
+              "const": 1.959964
+            }
+          },
+          "required": [
+            "cases_per_category",
+            "category_count",
+            "confidence",
+            "development_target_cases",
+            "holdout_minimum_cases",
+            "holdout_target_cases",
+            "historical_run_prediction_coverage_lower",
+            "maximum_wilson_half_width",
+            "minimum_labeled_positive_denominator_category",
+            "minimum_labeled_positive_denominator_overall_or_dimension",
+            "minimum_predicted_positive_denominator",
+            "raw_case_requirement",
+            "z"
+          ],
+          "type": "object"
+        },
+        "method": {
+          "type": "string"
+        },
+        "non_inferiority": {
+          "type": "string"
+        },
+        "planning_inputs": {
+          "type": "object"
+        },
+        "precision_target": {
+          "type": "string"
+        },
+        "usable_sample_abort": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "calculation",
+        "method",
+        "non_inferiority",
+        "planning_inputs",
+        "precision_target",
+        "usable_sample_abort"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "kanon-v1.0.0-prospective-release-protocol-v1"
+    },
+    "scoring": {
+      "additionalProperties": false,
+      "properties": {
+        "non_inferiority_margin": {},
+        "official_score_exists_before_completion": {},
+        "policy": {},
+        "required_metrics": {},
+        "threshold_changes_allowed": {}
+      },
+      "required": [
+        "non_inferiority_margin",
+        "official_score_exists_before_completion",
+        "policy",
+        "required_metrics",
+        "threshold_changes_allowed"
+      ],
+      "type": "object"
+    },
+    "status": {
+      "const": "frozen-inactive-awaiting-human-roles-and-metadata-only-construction"
+    },
+    "version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "bindings",
+    "candidate_development",
+    "conclusions",
+    "corpus_selection",
+    "evidence_partitions",
+    "forbidden",
+    "governance",
+    "holdout_execution",
+    "labeling",
+    "sample_size",
+    "schema",
+    "scoring",
+    "status",
+    "version"
+  ],
+  "title": "Kanon v1.0.0 prospective release protocol",
+  "type": "object"
+}
