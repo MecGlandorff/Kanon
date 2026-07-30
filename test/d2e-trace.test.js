@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,6 +12,7 @@ import {
   compareD2aSemantics,
   validateD2eAnalysis
 } from "../scripts/lib/d2e-evidence.js";
+import { finalizeTraceAttempt } from "../scripts/lib/d2e-finalize.js";
 import { analyzeCase } from "../scripts/lib/eval-corpus/runner.js";
 import {
   createRankingTraceCollector,
@@ -18,6 +20,10 @@ import {
   TRACE_LIMITS,
   validateRankingTrace
 } from "../scripts/lib/d2e-trace.js";
+import {
+  safeJsonStringify,
+  safeTerminalText
+} from "../src/trust.js";
 import {
   canSymlink,
   makeFixture,
@@ -250,6 +256,7 @@ test("D.2E schemas are valid JSON and evaluator tooling is not shipped", () => {
     "scripts/d2e-trace.js",
     "scripts/d2e-conclude.js",
     "scripts/d2e-preserve.js",
+    "scripts/lib/d2e-finalize.js",
     "scripts/lib/d2e-trace.js",
     "scripts/lib/d2e-evidence.js",
     "eval/d2e/PROTOCOL.md",
@@ -446,6 +453,178 @@ test("worker trace success or failure cannot alter prediction output", () => {
   });
 });
 
+test("top-level D.2E finalization writes the exact safe manifest and rejects a bad receipt binding", () => {
+  const binding = {
+    source_commit: "a".repeat(40),
+    protocol_sha256: "b".repeat(64),
+    trace_schema_sha256: "c".repeat(64),
+    analysis_schema_sha256: "d".repeat(64),
+    corpus_sha256: "e".repeat(64),
+    d2a_report_sha256: "f".repeat(64),
+    cache_identity_sha256: "1".repeat(64),
+    artifact_sha256: "2".repeat(64)
+  };
+  const hostileId =
+    "owner/\u202Erepo\u001b]0;hostile-title\u0007\nnext";
+
+  function prepareAttempt(prefix) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    const caseDirectory = path.join(root, "cases");
+    fs.mkdirSync(caseDirectory);
+    const bindingBytes = `${safeJsonStringify(binding)}\n`;
+    const reportBytes = `${safeJsonStringify({
+      schema: "synthetic-d2e-report-v1",
+      cases: 30
+    })}\n`;
+    fs.writeFileSync(
+      path.join(root, "attempt-binding.json"),
+      bindingBytes
+    );
+    const reportPath = path.join(root, "raw-report.json");
+    fs.writeFileSync(reportPath, reportBytes);
+    const receipts = [];
+    let traceBytes = 0;
+    let candidateCount = 0;
+    for (let index = 0; index < 30; index += 1) {
+      const ordinal = index + 1;
+      const fileName =
+        `case-${String(ordinal).padStart(3, "0")}.json`;
+      const trace = {
+        limits: { candidate_count: ordinal },
+        completeness: { complete: true }
+      };
+      const bytes = `${JSON.stringify(trace)}\n`;
+      fs.writeFileSync(path.join(caseDirectory, fileName), bytes);
+      receipts.push({
+        id: index === 0 ? hostileId : `owner/repository-${ordinal}`,
+        revision: String(index).padStart(40, "0"),
+        ordinal,
+        status: "written",
+        file_name: fileName,
+        sha256: sha256(bytes),
+        bytes: Buffer.byteLength(bytes),
+        complete: true,
+        validation_failures: []
+      });
+      traceBytes += Buffer.byteLength(bytes);
+      candidateCount += ordinal;
+    }
+    return {
+      attempt: { root, caseDirectory, binding },
+      reportPath,
+      receipts,
+      bindingBytes,
+      reportBytes,
+      traceBytes,
+      candidateCount
+    };
+  }
+
+  const successful = prepareAttempt("kanon-d2e-finalize-success-");
+  const manifest = finalizeTraceAttempt(
+    successful.attempt,
+    { ranking_trace: { receipts: successful.receipts } },
+    successful.reportPath
+  );
+  assert.deepEqual(
+    fs.readdirSync(successful.attempt.root).sort(),
+    [
+      "attempt-binding.json",
+      "cases",
+      "raw-report.json",
+      "trace-manifest.json"
+    ]
+  );
+  assert.deepEqual(
+    Object.keys(manifest).sort(),
+    [
+      "schema",
+      "attempt",
+      "retries",
+      "source_commit",
+      "protocol_sha256",
+      "trace_schema_sha256",
+      "analysis_schema_sha256",
+      "corpus_sha256",
+      "d2a_report_sha256",
+      "cache_identity_sha256",
+      "artifact_sha256",
+      "attempt_binding_sha256",
+      "raw_report_sha256",
+      "trace_set_sha256",
+      "case_count",
+      "candidate_count",
+      "trace_bytes",
+      "complete",
+      "failures",
+      "case_files"
+    ].sort()
+  );
+  assert.equal(manifest.schema, "kanon-d2e-trace-manifest-v1");
+  assert.equal(manifest.complete, true);
+  assert.deepEqual(manifest.failures, []);
+  assert.equal(manifest.case_count, 30);
+  assert.equal(manifest.candidate_count, successful.candidateCount);
+  assert.equal(manifest.trace_bytes, successful.traceBytes);
+  assert.equal(
+    manifest.attempt_binding_sha256,
+    sha256(successful.bindingBytes)
+  );
+  assert.equal(
+    manifest.raw_report_sha256,
+    sha256(successful.reportBytes)
+  );
+  assert.equal(manifest.case_files[0].id, safeTerminalText(hostileId));
+  assert.deepEqual(
+    manifest.case_files.map((item, index) => ({
+      ordinal: item.ordinal,
+      file: item.file,
+      candidate_count: item.candidate_count,
+      complete: item.complete
+    })),
+    Array.from({ length: 30 }, (_, index) => ({
+      ordinal: index + 1,
+      file: `cases/case-${String(index + 1).padStart(3, "0")}.json`,
+      candidate_count: index + 1,
+      complete: true
+    }))
+  );
+  assert.equal(
+    manifest.trace_set_sha256,
+    sha256(
+      JSON.stringify(
+        manifest.case_files.map((item) => ({
+          ordinal: item.ordinal,
+          sha256: item.sha256
+        }))
+      )
+    )
+  );
+  const persisted = fs.readFileSync(
+    path.join(successful.attempt.root, "trace-manifest.json"),
+    "utf8"
+  );
+  assert.equal(persisted, `${safeJsonStringify(manifest)}\n`);
+  assert.deepEqual(JSON.parse(persisted), manifest);
+
+  const failed = prepareAttempt("kanon-d2e-finalize-failure-");
+  failed.receipts[0].sha256 = "0".repeat(64);
+  const rejected = finalizeTraceAttempt(
+    failed.attempt,
+    { ranking_trace: { receipts: failed.receipts } },
+    failed.reportPath
+  );
+  assert.equal(rejected.complete, false);
+  assert.deepEqual(rejected.failures, ["trace-binding-1"]);
+  assert.equal(rejected.case_count, 30);
+  assert.equal(
+    fs.existsSync(
+      path.join(failed.attempt.root, "trace-manifest.json")
+    ),
+    true
+  );
+});
+
 function rankingFixture() {
   const hostileName = `src/hostile-\u202E-name.js`;
   const longBinary = "x".repeat(180);
@@ -583,4 +762,8 @@ function analysisFixture(supported) {
     limitations: ["Outcome-aware development evidence."],
     correction_implemented: false
   };
+}
+
+function sha256(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }
