@@ -174,7 +174,8 @@ test("real runner executes bounded synthetic trace-on and trace-off controls exa
     declaration.curation.visits.some(
       (item) =>
         item.stage === "package-declarations" &&
-        item.decision === "policy-excluded"
+        item.decision === "selected" &&
+        item.heuristic === "manifest-entrypoint"
     )
   );
   assert.ok(

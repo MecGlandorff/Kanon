@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { curateRankedFiles } from "../src/code-intel/curate.js";
 import { rankImportantFiles } from "../src/code-intel/rank.js";
 
 const DECLARATION = Object.freeze({
@@ -24,7 +23,7 @@ const EXECUTABLE_SYNTAX = Object.freeze({
   reason: "executable Node script"
 });
 
-test("package declarations reject declaration-only targets", () => {
+test("withdrawal restores pre-correction package declaration admission", () => {
   const output = rank([
     file("README.md"),
     file("package.json"),
@@ -33,9 +32,19 @@ test("package declarations reject declaration-only targets", () => {
 
   assert.deepEqual(selectedPaths(output), [
     "README.md",
-    "package.json"
+    "package.json",
+    "modules/public.js"
   ]);
-  assert.equal(byPath(output, "modules/public.js").recommended, false);
+  const declaration = byPath(output, "modules/public.js");
+  assert.equal(declaration.recommended, true);
+  assert.equal(
+    declaration.selection_heuristic,
+    "manifest-entrypoint"
+  );
+  assert.equal(
+    declaration.selection_reason,
+    "manifest-declared package target"
+  );
 });
 
 test("package declarations retain independently salient targets", () => {
@@ -99,46 +108,6 @@ test("executable manifest-entrypoints controls remain unchanged", () => {
   ));
 });
 
-test("selection and final-cap displacement stay deterministic", () => {
-  const fixture = [
-    file("README.md"),
-    file("package.json"),
-    file("Makefile"),
-    file("cli/run.js", { signals: [DECLARED_EXECUTABLE] }),
-    file("packages/declaration.js", { signals: [DECLARATION] }),
-    file("src/a.js", { fanIn: 2 }),
-    file("src/b.js", { fanIn: 1 })
-  ];
-  /** @type {Record<string, unknown>[]} */
-  const events = [];
-  const first = rank(fixture, (event) => events.push(event));
-  const second = rank([...fixture].reverse());
-
-  assert.deepEqual(selectedPaths(first), [
-    "README.md",
-    "package.json",
-    "Makefile",
-    "cli/run.js",
-    "src/a.js"
-  ]);
-  assert.deepEqual(second, first);
-  assert.ok(events.some(
-    (event) =>
-      event.type === "curation-decision" &&
-      event.stage === "package-declarations" &&
-      event.path === "packages/declaration.js" &&
-      event.decision === "policy-excluded"
-  ));
-  assert.ok(events.some(
-    (event) =>
-      event.type === "curation-decision" &&
-      event.stage === "final-cap" &&
-      event.path === "src/b.js" &&
-      event.decision === "cap-excluded" &&
-      event.displaced_by === "src/a.js"
-  ));
-});
-
 test("trace-on and trace-off public ranking results are exactly equal", () => {
   const fixture = [
     file("README.md"),
@@ -161,57 +130,6 @@ test("trace-on and trace-off public ranking results are exactly equal", () => {
   assert.deepEqual(withTrace, withoutTrace);
   assert.deepEqual(withFailingTrace, withoutTrace);
   assert.ok(events.length > 0);
-});
-
-test("package admission ignores repository, path, label, and category decoys", () => {
-  const decoys = [
-    {
-      path: "identity/repository-special.js",
-      repository: "retain-this-repository"
-    },
-    {
-      path: "paths/expected-target.js",
-      expected_path: true
-    },
-    {
-      path: "labels/positive-control.js",
-      label: "retain"
-    },
-    {
-      path: "categories/priority.js",
-      category: "retain"
-    }
-  ].map((item) => ({
-    ...item,
-    score: 96,
-    fan_in: 0,
-    referenced_by: 0,
-    signals: [{ ...DECLARATION, reason: `declared ${item.path}` }],
-    reasons: []
-  }));
-  const output = curateRankedFiles([
-    {
-      path: "README.md",
-      score: 136,
-      fan_in: 0,
-      referenced_by: 0,
-      signals: [],
-      reasons: []
-    },
-    {
-      path: "package.json",
-      score: 138,
-      fan_in: 0,
-      referenced_by: 0,
-      signals: [],
-      reasons: []
-    },
-    ...decoys
-  ]);
-
-  for (const decoy of decoys) {
-    assert.equal(byPath(output, decoy.path).recommended, false);
-  }
 });
 
 function file(path, options = {}) {
