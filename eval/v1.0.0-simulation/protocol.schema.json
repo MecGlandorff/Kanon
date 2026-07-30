@@ -1,0 +1,89 @@
+{
+  "$id": "https://kanon.invalid/schema/v1.0.0-synthetic-governance-tabletop-protocol-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "evidence_classification": "simulated-development-only",
+  "human_independence": false,
+  "prospective_protocol_activated": false,
+  "release_authority": false,
+  "simulation": true,
+  "additionalProperties": false,
+  "properties": {
+    "attempt": {
+      "type": "object"
+    },
+    "candidate": {
+      "type": "object"
+    },
+    "conclusions": {
+      "type": "object"
+    },
+    "design": {
+      "type": "object"
+    },
+    "evidence_classification": {
+      "const": "simulated-development-only"
+    },
+    "human_independence": {
+      "const": false
+    },
+    "namespace": {
+      "const": "eval/v1.0.0-simulation"
+    },
+    "ordering": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 18,
+      "minItems": 18,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "persona_ids": {
+      "const": [
+        "SIM-CO",
+        "SIM-CE",
+        "SIM-LA",
+        "SIM-LB",
+        "SIM-ADJ",
+        "SIM-RO"
+      ]
+    },
+    "prospective_protocol_activated": {
+      "const": false
+    },
+    "release_authority": {
+      "const": false
+    },
+    "schema": {
+      "const": "kanon-v1.0.0-synthetic-governance-tabletop-protocol-v1"
+    },
+    "simulation": {
+      "const": true
+    },
+    "status": {
+      "const": "frozen-simulation-only"
+    },
+    "version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "attempt",
+    "candidate",
+    "conclusions",
+    "design",
+    "evidence_classification",
+    "human_independence",
+    "namespace",
+    "ordering",
+    "persona_ids",
+    "prospective_protocol_activated",
+    "release_authority",
+    "schema",
+    "simulation",
+    "status",
+    "version"
+  ],
+  "title": "Kanon v1.0.0 synthetic governance tabletop protocol",
+  "type": "object"
+}
