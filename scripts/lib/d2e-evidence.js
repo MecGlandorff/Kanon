@@ -346,7 +346,7 @@ function proveReportTraceAgreement(report, traces) {
   }
 }
 
-function buildMechanismAnalysis(input) {
+export function buildMechanismAnalysis(input) {
   const comparativeMap = comparativeStatusMap(input.comparative);
   const statusCounts = emptyStatusCounts();
   const categoryCounts = new Map();
