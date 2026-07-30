@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 import crypto from "node:crypto";
+import fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { atomicWriteContained } from "../../../src/persistence/safe-fs.js";
+import { resolveContainedPath } from "../../../src/path-security.js";
 import {
   createRankingTraceCollector,
   validateRankingTrace
 } from "../d2e-trace.js";
+import { canonicalJson } from "../d2e-evidence.js";
 
 try {
   const input = JSON.parse(await readStdin(64 * 1024));
@@ -56,7 +59,7 @@ function preserveRankingTrace(request, collector, analysis) {
     if (
       !request ||
       typeof request.output_directory !== "string" ||
-      !/^case-\d{3}\.json$/.test(String(request.file_name || ""))
+      !/^(?:case-)?\d{3}\.json$/.test(String(request.file_name || ""))
     ) {
       throw new Error("Invalid ranking trace output request.");
     }
@@ -65,12 +68,22 @@ function preserveRankingTrace(request, collector, analysis) {
       trace,
       request.binding
     );
-    const bytes = `${JSON.stringify(trace)}\n`;
-    atomicWriteContained(
-      request.output_directory,
-      request.file_name,
-      bytes
-    );
+    const bytes = request.canonical_serialization === true
+      ? `${canonicalJson(trace)}\n`
+      : `${JSON.stringify(trace)}\n`;
+    if (request.exclusive_creation === true) {
+      writeExclusiveContained(
+        request.output_directory,
+        request.file_name,
+        bytes
+      );
+    } else {
+      atomicWriteContained(
+        request.output_directory,
+        request.file_name,
+        bytes
+      );
+    }
     return {
       status: "written",
       file_name: request.file_name,
@@ -98,6 +111,43 @@ function preserveRankingTrace(request, collector, analysis) {
         String(error?.message || error || "trace failure").slice(0, 1_000)
       ]
     };
+  }
+}
+
+function writeExclusiveContained(rootPath, relative, contents) {
+  const root = resolveContainedPath(rootPath, ".", {
+    allowRoot: true,
+    type: "directory"
+  });
+  if (!root.ok) {
+    throw new Error("Unsafe ranking trace output directory.");
+  }
+  const target = resolveContainedPath(root.root, relative, {
+    type: "file"
+  });
+  if (target.status !== "missing" || target.path === null) {
+    throw new Error("Ranking trace output must be previously absent.");
+  }
+  const descriptor = fs.openSync(
+    target.path,
+    fs.constants.O_CREAT |
+      fs.constants.O_EXCL |
+      fs.constants.O_WRONLY |
+      (fs.constants.O_NOFOLLOW || 0),
+    0o600
+  );
+  try {
+    fs.writeFileSync(descriptor, contents, "utf8");
+    fs.fchmodSync(descriptor, 0o600);
+    fs.fsyncSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
+  const parent = fs.openSync(root.root, fs.constants.O_RDONLY);
+  try {
+    fs.fsyncSync(parent);
+  } finally {
+    fs.closeSync(parent);
   }
 }
 

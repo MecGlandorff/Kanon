@@ -60,9 +60,16 @@ export async function runCorpus(corpus, options = {}) {
     35_000
   );
   const results = [];
+  const traceOffResults = [];
   const rankingTraceReceipts = [];
   let analyzerVersion = options.analyzerVersion || VERSION;
   for (const [caseIndex, item] of selected.entries()) {
+    if (caseIndex === 0 && options.onAttemptConsume) {
+      options.onAttemptConsume({
+        caseOrdinal: 1,
+        component: "canonical-d2e-corpus-runner"
+      });
+    }
     try {
       options.onProgress?.({ phase: "checkout", id: item.id });
       const checkout = ensureCheckout(item, {
@@ -83,7 +90,13 @@ export async function runCorpus(corpus, options = {}) {
               output_directory:
                 options.rankingTrace.outputDirectory,
               file_name:
-                `case-${String(caseIndex + 1).padStart(3, "0")}.json`,
+                `${options.rankingTrace.fileNamePrefix ?? "case-"}${String(
+                  caseIndex + 1
+                ).padStart(3, "0")}.json`,
+              canonical_serialization:
+                options.rankingTrace.canonicalSerialization === true,
+              exclusive_creation:
+                options.rankingTrace.exclusiveCreation === true,
               binding: {
                 protocolSha256:
                   options.rankingTrace.protocolSha256,
@@ -121,6 +134,25 @@ export async function runCorpus(corpus, options = {}) {
         ...scoreCase(item, analysis, corpus.policy),
         analysis_duration_ms: analysisDurationMs
       });
+      if (options.traceOffControl) {
+        const controlStarted = Date.now();
+        try {
+          const control = analyzeCase(
+            analyzerModule,
+            checkout,
+            item,
+            analysisTimeoutMs
+          );
+          traceOffResults.push({
+            ...scoreCase(item, control, corpus.policy),
+            analysis_duration_ms: Date.now() - controlStarted
+          });
+        } catch (controlError) {
+          traceOffResults.push(
+            scoreErrorCase(item, controlError, corpus.policy)
+          );
+        }
+      }
     } catch (error) {
       options.onProgress?.({
         phase: "error",
@@ -134,7 +166,9 @@ export async function runCorpus(corpus, options = {}) {
           ordinal: caseIndex + 1,
           status: "analysis-error",
           file_name:
-            `case-${String(caseIndex + 1).padStart(3, "0")}.json`,
+            `${options.rankingTrace.fileNamePrefix ?? "case-"}${String(
+              caseIndex + 1
+            ).padStart(3, "0")}.json`,
           sha256: null,
           bytes: 0,
           complete: false,
@@ -144,6 +178,11 @@ export async function runCorpus(corpus, options = {}) {
         });
       }
       results.push(scoreErrorCase(item, error, corpus.policy));
+      if (options.traceOffControl) {
+        traceOffResults.push(
+          scoreErrorCase(item, error, corpus.policy)
+        );
+      }
     }
   }
 
@@ -173,7 +212,7 @@ export async function runCorpus(corpus, options = {}) {
     );
   }
 
-  return {
+  const run = {
     generated_at: new Date().toISOString(),
     candidate: corpus.release
       ? {
@@ -234,6 +273,32 @@ export async function runCorpus(corpus, options = {}) {
         }
       : {})
   };
+  if (options.traceOffControl) {
+    const controlSummary = aggregateScores(
+      traceOffResults,
+      corpus.policy,
+      {
+        expectedCaseCount:
+          corpus.evaluation_role === "release"
+            ? corpus.cases.length
+            : selected.length,
+        requireCompleteScans:
+          corpus.evaluation_role === "release"
+      }
+    );
+    const controlRun = structuredClone(run);
+    controlRun.results = traceOffResults;
+    controlRun.summary = controlSummary;
+    controlRun.final = {
+      passed: controlSummary.passed,
+      reasons: controlSummary.passed
+        ? ["All predeclared gates passed."]
+        : controlSummary.failures
+    };
+    delete controlRun.ranking_trace;
+    options.onTraceOffComplete?.(controlRun);
+  }
+  return run;
 }
 
 function observeDevelopmentCandidate(version) {

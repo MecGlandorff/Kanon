@@ -23,11 +23,22 @@ import {
   repositoryCacheName
 } from "./lib/eval-corpus/checkout.js";
 import { finalizeTraceAttempt } from "./lib/d2e-finalize.js";
+import {
+  finalizePostCorrectionTraceAttempt,
+  loadPostCorrectionAuthority,
+  POST_CORRECTION_AUTHORITY_SHA256,
+  preservePostCorrectionAttempt,
+  preservePostCorrectionFailure,
+  writeAttemptConsumption,
+  writePostCorrectionJsonFile
+} from "./lib/d2e-post-correction.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
+let activePostCorrectionAttempt = null;
+let postCorrectionFinalized = false;
 
 try {
   const options = parseArgs(process.argv.slice(2));
@@ -67,6 +78,7 @@ try {
     ? prepareTraceAttempt(options, corpus, artifactOptions)
     : null;
 
+  let traceOffRun = null;
   const run = await runCorpus(corpus, {
     cacheRoot: options.cache,
     fetch: options.fetch,
@@ -90,8 +102,30 @@ try {
             protocolSha256: options.traceProtocolSha256,
             traceSourceCommit: options.traceSourceCommit,
             artifactSha256: artifactOptions.artifactSha256,
-            corpusSha256: corpus._manifest.sha256
+            corpusSha256: corpus._manifest.sha256,
+            ...(traceAttempt.postCorrection
+              ? {
+                  canonicalSerialization: true,
+                  exclusiveCreation: true,
+                  fileNamePrefix: ""
+                }
+              : {})
           }
+        }
+      : {}),
+    ...(traceAttempt?.postCorrection
+      ? {
+          onAttemptConsume({ component }) {
+            writeAttemptConsumption({
+              attemptRoot: traceAttempt.root,
+              component,
+              preAttemptHead: traceAttempt.binding.source_commit
+            });
+          },
+          onTraceOffComplete(value) {
+            traceOffRun = value;
+          },
+          traceOffControl: true
         }
       : {})
   });
@@ -115,17 +149,93 @@ try {
     process.stdout.write(renderCorpusReport(run));
   }
   if (options.jsonOutput) {
-    writeJsonOutput(options.jsonOutput, run);
+    writeJsonOutput(
+      options.jsonOutput,
+      run,
+      traceAttempt?.postCorrection === true
+    );
   }
-  const traceResult = traceAttempt
-    ? finalizeTraceAttempt(traceAttempt, run, options.jsonOutput)
-    : null;
-  process.exitCode = traceResult && !traceResult.complete
-    ? 2
-    : run.summary.passed
-      ? 0
-      : 1;
+  let traceResult = null;
+  if (traceAttempt?.postCorrection) {
+    if (!traceOffRun) {
+      throw new Error("Post-correction trace-off control is unavailable.");
+    }
+    const traceOffPath = path.join(
+      traceAttempt.root,
+      "trace-off-report.json"
+    );
+    writeJsonOutput(traceOffPath, traceOffRun, true);
+    traceResult = finalizePostCorrectionTraceAttempt({
+      attempt: traceAttempt,
+      corpus,
+      primaryRun: run,
+      traceOffRun
+    });
+    if (!traceResult.complete) {
+      const preserved = preservePostCorrectionFailure({
+        repoRoot,
+        attemptRoot: traceAttempt.root,
+        error: traceResult.failures.join(", ")
+      });
+      postCorrectionFinalized = true;
+      process.stderr.write(
+        `Post-correction attempt preserved at ${preserved.destination_relative}\n`
+      );
+      process.exitCode = 2;
+    } else {
+      const preserved = preservePostCorrectionAttempt(
+        repoRoot,
+        traceAttempt.root
+      );
+      postCorrectionFinalized = true;
+      process.stdout.write(
+        `${JSON.stringify({
+          post_correction_attempt: preserved.destination_relative,
+          complete_tree_sha256: preserved.complete_tree_sha256,
+          trace_set_sha256: traceResult.trace_set_sha256
+        })}\n`
+      );
+      process.exitCode = 0;
+    }
+  } else {
+    traceResult = traceAttempt
+      ? finalizeTraceAttempt(traceAttempt, run, options.jsonOutput)
+      : null;
+    process.exitCode = traceResult && !traceResult.complete
+      ? 2
+      : run.summary.passed
+        ? 0
+        : 1;
+  }
 } catch (error) {
+  if (
+    activePostCorrectionAttempt &&
+    !postCorrectionFinalized &&
+    fs.existsSync(
+      path.join(
+        activePostCorrectionAttempt.root,
+        "attempt-consumption.json"
+      )
+    )
+  ) {
+    try {
+      const preserved = preservePostCorrectionFailure({
+        repoRoot,
+        attemptRoot: activePostCorrectionAttempt.root,
+        error: error?.message || error
+      });
+      postCorrectionFinalized = true;
+      process.stderr.write(
+        `Post-correction failed attempt preserved at ${preserved.destination_relative}\n`
+      );
+    } catch (preservationError) {
+      process.stderr.write(
+        `Post-correction failure preservation error: ${String(
+          preservationError?.message || preservationError
+        ).slice(0, 2_000)}\n`
+      );
+    }
+  }
   process.stderr.write(`Kanon corpus error: ${error.message}\n`);
   process.exitCode = 2;
 }
@@ -298,7 +408,8 @@ function parseArgs(argv) {
     rankingTraceDirectory: null,
     traceProtocolSha256: null,
     traceSourceCommit: null,
-    expectedD2aSha256: null
+    expectedD2aSha256: null,
+    postCorrectionAuthoritySha256: null
   };
   const valueFlags = new Map([
     ["--corpus", "corpus"],
@@ -312,7 +423,11 @@ function parseArgs(argv) {
     ["--ranking-trace-directory", "rankingTraceDirectory"],
     ["--trace-protocol-sha256", "traceProtocolSha256"],
     ["--trace-source-commit", "traceSourceCommit"],
-    ["--expected-d2a-sha256", "expectedD2aSha256"]
+    ["--expected-d2a-sha256", "expectedD2aSha256"],
+    [
+      "--post-correction-authority-sha256",
+      "postCorrectionAuthoritySha256"
+    ]
   ]);
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -379,6 +494,23 @@ function parseArgs(argv) {
   ) {
     throw new Error("--expected-d2a-sha256 must be lowercase SHA-256.");
   }
+  if (
+    options.postCorrectionAuthoritySha256 &&
+    options.postCorrectionAuthoritySha256 !==
+      POST_CORRECTION_AUTHORITY_SHA256
+  ) {
+    throw new Error(
+      "--post-correction-authority-sha256 does not match the frozen authority."
+    );
+  }
+  if (
+    options.postCorrectionAuthoritySha256 &&
+    !traceFields.every(Boolean)
+  ) {
+    throw new Error(
+      "Post-correction evaluation requires the complete D.2E trace invocation."
+    );
+  }
   return options;
 }
 
@@ -390,10 +522,14 @@ function requireValue(argv, index, flag) {
   return value;
 }
 
-function writeJsonOutput(outputPath, run) {
+function writeJsonOutput(outputPath, run, canonical = false) {
   const resolved = path.resolve(outputPath);
   const parent = canonicalDirectory(path.dirname(resolved));
   const relative = path.basename(resolved);
+  if (canonical) {
+    writePostCorrectionJsonFile(parent, relative, run);
+    return;
+  }
   atomicWriteContained(
     parent,
     relative,
@@ -461,7 +597,13 @@ function prepareTraceAttempt(options, corpus, artifactOptions) {
     );
   }
   const traceRoot = prepareAbsentTraceRoot(requestedTraceRoot);
-  const caseDirectory = path.join(traceRoot, "cases");
+  const postCorrection = Boolean(
+    options.postCorrectionAuthoritySha256
+  );
+  const caseDirectory = path.join(
+    traceRoot,
+    postCorrection ? "traces" : "cases"
+  );
   fs.mkdirSync(caseDirectory, { mode: 0o700 });
   const traceSchemaPath = path.join(
     repoRoot,
@@ -475,8 +617,13 @@ function prepareTraceAttempt(options, corpus, artifactOptions) {
     "d2e",
     "analysis.schema.json"
   );
+  const authority = postCorrection
+    ? loadPostCorrectionAuthority(repoRoot).authority
+    : null;
   const binding = {
-    schema: "kanon-d2e-trace-attempt-binding-v1",
+    schema: postCorrection
+      ? "kanon-d2e-post-correction-attempt-binding-v1"
+      : "kanon-d2e-trace-attempt-binding-v1",
     attempt: 1,
     retries: 0,
     source_commit: identity.commit,
@@ -528,18 +675,59 @@ function prepareTraceAttempt(options, corpus, artifactOptions) {
         maxElapsedMs: 30_000,
         useGitIgnore: false
       }
-    }
+    },
+    ...(postCorrection
+      ? {
+          authority_commit:
+            "2ee3091005b86db6eada2d2b15e0deeae96deb46",
+          authority_sha256: POST_CORRECTION_AUTHORITY_SHA256,
+          correction_commit: authority.bindings.correction_commit,
+          ordered_revisions_sha256:
+            authority.bindings.ordered_revisions_sha256,
+          paired_configuration_file_sha256:
+            authority.bindings.paired_configuration_file_sha256,
+          paired_configuration_canonical_sha256:
+            authority.bindings.canonical_paired_configuration_sha256,
+          scoring_policy_sha256:
+            authority.bindings.scoring_policy_sha256,
+          threshold_projection_sha256:
+            authority.bindings.threshold_projection_sha256,
+          public_capability_sha256:
+            authority.bindings.public_capability_sha256,
+          invocation: {
+            artifact_bound: true,
+            full_corpus: true,
+            no_fetch: true,
+            runner: "scripts/eval-corpus.js",
+            runner_invocations: 1,
+            trace_modes: ["trace-on", "trace-off"]
+          }
+        }
+      : {})
   };
-  atomicWriteContained(
-    traceRoot,
-    "attempt-binding.json",
-    `${safeJsonStringify(binding)}\n`
-  );
-  return {
+  if (postCorrection) {
+    writePostCorrectionJsonFile(
+      traceRoot,
+      "attempt-binding.json",
+      binding
+    );
+  } else {
+    atomicWriteContained(
+      traceRoot,
+      "attempt-binding.json",
+      `${safeJsonStringify(binding)}\n`
+    );
+  }
+  const attempt = {
     root: traceRoot,
     caseDirectory,
-    binding
+    binding,
+    postCorrection
   };
+  if (postCorrection) {
+    activePostCorrectionAttempt = attempt;
+  }
+  return attempt;
 }
 
 function verifyFrozenDevelopmentCache(selectedPath, d2aPath, corpus) {
@@ -722,6 +910,8 @@ D.2E trace options (all required together; development/full/no-fetch only):
   --trace-protocol-sha256 <sha>   Frozen D.2E protocol identity
   --trace-source-commit <commit>  Exact clean instrumentation commit
   --expected-d2a-sha256 <sha>     Frozen D.2A raw-report identity
+  --post-correction-authority-sha256 <sha>
+                                    Freeze the single paired post-correction attempt
 
 Required together for an artifact-bound development run or release:
   --artifact-tarball <path>       Exact packed artifact
