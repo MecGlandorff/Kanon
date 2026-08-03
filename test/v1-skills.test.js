@@ -11,7 +11,7 @@ import { captureCli, makeFixture } from "./helpers.js";
 
 const NOW = Date.parse("2026-07-28T08:00:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
-const PACKAGE_VERSION = "0.4.0-rc.1";
+const PACKAGE_VERSION = "1.0.0";
 
 test("orient is structurally equivalent across both host adapters", async () => {
   const root = makeFixture({

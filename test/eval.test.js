@@ -555,7 +555,7 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
     `export function analyzeRepo() {
       return ${JSON.stringify({
         state: {
-          version: "0.4.0-rc.1",
+          version: "1.0.0",
           important_files: item.labels.important_files.map(
             (label) => ({ path: label.path })
           ),
@@ -586,7 +586,7 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
     `${JSON.stringify({
       schema: "kanon-artifact-conformance-v1",
       candidate_commit: head.stdout.trim(),
-      candidate_version: "0.4.0-rc.1",
+      candidate_version: "1.0.0",
       artifact_sha256: sha256File(tarball),
       installed_package_root: fs.realpathSync(artifactRoot),
       checks: [],
@@ -835,7 +835,7 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
       "--candidate-commit",
       "a".repeat(40),
       "--candidate-version",
-      "0.4.0-rc.1"
+      "1.0.0"
     ],
     conformOptions
   );
@@ -844,7 +844,7 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
 
   assert.equal(report.passed, true, report.reasons.join("\n"));
   assert.equal(report.artifact_sha256, sha256File(tarball));
-  assert.equal(report.candidate_version, "0.4.0-rc.1");
+  assert.equal(report.candidate_version, "1.0.0");
   assert.ok(
     report.checks.some((check) =>
       /wrapper refresh/.test(check.name)

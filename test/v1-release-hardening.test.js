@@ -193,6 +193,17 @@ test("security, release, compatibility, limitations, and six skills agree", () =
 });
 
 test("package metadata and expected inventory are exact and dependency-free", () => {
+  const lock = JSON.parse(read("package-lock.json"));
+  assert.equal(packageJson.version, "1.0.0");
+  assert.equal(lock.version, "1.0.0");
+  assert.equal(lock.packages[""].version, "1.0.0");
+  assert.equal(JSON.parse(read(".claude-plugin/plugin.json")).version, "1.0.0");
+  assert.equal(JSON.parse(read(".codex-plugin/plugin.json")).version, "1.0.0");
+  assert.equal(read("src/version.js"), read("runtime/src/version.js"));
+  const sourceMetadata = JSON.parse(read("src/v1/build-metadata.json"));
+  const runtimeMetadata = JSON.parse(read("runtime/build-metadata.json"));
+  assert.deepEqual(sourceMetadata, runtimeMetadata);
+  assert.equal(sourceMetadata.package_version, "1.0.0");
   assert.equal(packageJson.private, true);
   assert.equal(packageJson.license, "MIT");
   assert.match(packageJson.repository.url, /^git\+https:\/\/github\.com\//u);
