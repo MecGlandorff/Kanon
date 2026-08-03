@@ -7,6 +7,10 @@ import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import { validateDevelopmentReport } from "./lib/development-report.js";
+import {
+  releasePolicyFromEnvironment,
+  validateReleasePolicy
+} from "./lib/maintainer-stable-release.js";
 
 const options = parseArgs(process.argv.slice(2));
 const bundle = canonicalDirectory(options.bundle);
@@ -15,6 +19,12 @@ const artifactSha256 = sha256File(tarball.path);
 if (artifactSha256 !== options.artifactSha256) {
   throw new Error("Release bundle artifact hash does not match the candidate.");
 }
+
+const releasePolicy = validateReleasePolicy(process.cwd(), {
+  candidateVersion: options.candidateVersion,
+  releaseKind: options.releaseKind,
+  ...releasePolicyFromEnvironment()
+});
 
 const conformance = filesMatching(
   bundle,
@@ -41,7 +51,7 @@ const development = readNamedReport(
 const developmentValidation = validateDevelopmentReport(development.value, {
   candidateCommit: options.candidateCommit,
   candidateVersion: options.candidateVersion,
-  requireThresholdPass: options.releaseKind === "stable"
+  requireThresholdPass: options.releaseKind !== "prerelease"
 });
 const release = optionalNamedReport(bundle, "release-eval.json");
 if (options.releaseKind === "stable") {
@@ -49,7 +59,7 @@ if (options.releaseKind === "stable") {
     throw new Error("Stable release kind requires a stable semantic version.");
   }
   validateReleaseEvaluation(release?.value, options, artifactSha256);
-} else {
+} else if (options.releaseKind === "prerelease") {
   if (!options.candidateVersion.includes("-")) {
     throw new Error("Prerelease kind requires a prerelease version.");
   }
@@ -58,12 +68,17 @@ if (options.releaseKind === "stable") {
       "A prerelease no-holdout bundle must not imply a held-out result."
     );
   }
+} else if (release) {
+  throw new Error(
+    "A maintainer-stable bundle must not imply an evidence-strict held-out result."
+  );
 }
 
 const manifest = {
-  schema: "kanon-release-binding-v2",
+  schema: "kanon-release-binding-v3",
   generated_at: new Date().toISOString(),
   release_kind: options.releaseKind,
+  assurance_lane: releasePolicy.assurance_lane,
   candidate_commit: options.candidateCommit,
   candidate_version: options.candidateVersion,
   tag: `v${options.candidateVersion}`,
@@ -93,6 +108,21 @@ const manifest = {
   })),
   held_out_capability_estimate_claimed:
     options.releaseKind === "stable",
+  evidence_strict_release_supported:
+    releasePolicy.evidence_strict_release_supported,
+  independence_established: releasePolicy.independence_established,
+  holdout_performance_established:
+    releasePolicy.holdout_performance_established,
+  maintainer_certification_sha256:
+    releasePolicy.maintainer_certification_bound
+      ? process.env.KANON_MAINTAINER_CERTIFICATION_SHA256
+      : null,
+  signed_waiver_sha256:
+    releasePolicy.maintainer_certification_bound
+      ? process.env.KANON_SIGNED_WAIVER_SHA256
+      : null,
+  publication_authorized: false,
+  release_action_occurred: false,
   prerelease_notice:
     options.releaseKind === "prerelease"
       ? "No held-out capability estimate is claimed for this prerelease."
@@ -152,8 +182,10 @@ function parseArgs(argv) {
   if (!/^[0-9a-f]{64}$/.test(output.artifactSha256)) {
     throw new Error("Artifact SHA-256 must be lowercase hex.");
   }
-  if (!["stable", "prerelease"].includes(output.releaseKind)) {
-    throw new Error("Release kind must be stable or prerelease.");
+  if (!["stable", "prerelease", "maintainer-stable"].includes(output.releaseKind)) {
+    throw new Error(
+      "Release kind must be prerelease, stable, or maintainer-stable."
+    );
   }
   return output;
 }

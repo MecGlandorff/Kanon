@@ -18,6 +18,8 @@
   "scripts": {
     "build:skill": "node scripts/build-skill.js",
     "build:package": "node scripts/build-package.js",
+    "sync:version": "node scripts/sync-version.js",
+    "check:version": "node scripts/sync-version.js --check",
     "check:skill": "node scripts/build-skill.js --check",
     "conform:artifact": "node scripts/conform-artifact.js",
     "eval:corpus": "node scripts/eval-corpus.js",
@@ -26,8 +28,9 @@
     "eval:release": "node scripts/eval-corpus.js --corpus eval/release-corpus.json --require-role release",
     "results:dev": "node scripts/render-results.js",
     "test": "node --test",
+    "test:release": "node --test test/v1-release-candidate-transition.test.js test/v1-release-hardening.test.js test/v1-release-candidate-evidence.test.js",
     "typecheck": "tsc --project tsconfig.json",
-    "validate": "npm run check:skill && npm run typecheck && node --test"
+    "validate": "npm run check:version && npm run check:skill && npm run typecheck && node --test"
   },
   "keywords": [
     "repo",
@@ -41,6 +44,11 @@
   "license": "MIT",
   "engines": {
     "node": "^20.0.0 || ^22.0.0 || ^24.0.0 || ^25.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "registry": "https://registry.npmjs.org"
   },
   "devDependencies": {
     "@types/node": "20.19.43",

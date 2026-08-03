@@ -1,17 +1,40 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
-import { loadAnalysisAuthority, validateAuthorityDocument } from "../scripts/lib/d2e-analysis-authority.js";
+import { validateAuthorityDocument } from "../scripts/lib/d2e-analysis-authority.js";
 import { buildMechanismAnalysis } from "../scripts/lib/d2e-evidence.js";
+import { runGit } from "../src/git-runner.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const CANDIDATE_START = "134c6d268784e285a96cb445889c40573ff846d0";
 
 test("D.2E-A authority is exact, development-only, additive, and unshipped", () => {
-  const { authority } = loadAnalysisAuthority(repoRoot);
+  const relative = "eval/d2e/ANALYSIS_AUTHORITY.json";
+  const bytes = fs.readFileSync(path.join(repoRoot, relative), "utf8");
+  const frozenAuthority = runGit(
+    repoRoot,
+    ["show", `${CANDIDATE_START}:${relative}`],
+    { noLazyFetch: true }
+  );
+  assert.equal(frozenAuthority.ok, true, frozenAuthority.diagnostic);
+  assert.equal(bytes, frozenAuthority.stdout);
+  const authority = JSON.parse(bytes);
   assert.doesNotThrow(() => validateAuthorityDocument(authority));
+  const frozenPackage = runGit(
+    repoRoot,
+    ["show", `${CANDIDATE_START}:package.json`],
+    { noLazyFetch: true }
+  );
+  assert.equal(frozenPackage.ok, true, frozenPackage.diagnostic);
+  assert.equal(
+    crypto.createHash("sha256").update(frozenPackage.stdout).digest("hex"),
+    authority.bindings.package_sha256
+  );
+  assert.equal(authority.bindings.package_version, "0.4.0-rc.1");
   for (const mutate of [
     (value) => { value.strict_equivalence = "passed"; },
     (value) => { value.unknown.pop(); },
@@ -27,7 +50,6 @@ test("D.2E-A authority is exact, development-only, additive, and unshipped", () 
   for (const relative of ["eval/d2e/ANALYSIS_AUTHORITY.json", "scripts/lib/d2e-analysis-authority.js"]) {
     assert.equal(shipped.has(relative), false, relative);
   }
-  assert.equal(JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"))).version, "0.4.0-rc.1");
 });
 
 test("frozen mechanism analysis covers every candidate and retains exact gates", () => {

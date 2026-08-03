@@ -52,6 +52,7 @@ for (const sourceRelative of publicSkillFiles(repoRoot)) {
 }
 for (const [sourceRelative, destinationRelative] of [
   ["packaging/README.md", "README.md"],
+  ["SECURITY.md", "SECURITY.md"],
   ["LICENSE", "LICENSE"]
 ]) {
   copyAllowedFile(
@@ -216,6 +217,7 @@ function publicManifest(source) {
     keywords: source.keywords,
     author: source.author,
     license: source.license,
-    engines: source.engines
+    engines: source.engines,
+    publishConfig: source.publishConfig
   };
 }

@@ -4,6 +4,10 @@ import fs from "node:fs";
 import { runGit } from "../src/git-runner.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { VERSION } from "../src/version.js";
+import {
+  releasePolicyFromEnvironment,
+  validateReleasePolicy
+} from "./lib/maintainer-stable-release.js";
 
 const root = process.cwd();
 const expectedCommit = process.env.KANON_CANDIDATE_COMMIT;
@@ -44,18 +48,11 @@ if (pkg.version !== expectedVersion || VERSION !== expectedVersion) {
     `Version mismatch: input=${expectedVersion}, package=${pkg.version}, runtime=${VERSION}.`
   );
 }
-if (
-  releaseKind === "stable" &&
-  expectedVersion.includes("-")
-) {
-  throw new Error("A stable release requires a stable semantic version.");
-}
-if (
-  releaseKind === "prerelease" &&
-  !expectedVersion.includes("-")
-) {
-  throw new Error("A prerelease requires a prerelease semantic version.");
-}
+validateReleasePolicy(root, {
+  candidateVersion: expectedVersion,
+  releaseKind,
+  ...releasePolicyFromEnvironment()
+});
 process.stdout.write(
   `Candidate ${expectedCommit} is clean at ${expectedVersion}.\n`
 );

@@ -5,11 +5,17 @@ It is not a JavaScript library and does not install a global terminal command.
 
 ## Install
 
-Install or download the package, then install the complete package root as a
-plugin for Codex CLI or Claude Code. The package contains separate host
-manifests, shared `skills/`, and one shared `runtime/`. It contains no
-production lifecycle hook. Node.js major 20, 22, 24, or 25 is required when
-the agent invokes the bundled wrappers.
+Install the exact package without lifecycle scripts into a user-controlled
+directory, then configure Codex CLI or Claude Code to load the complete
+installed package root:
+
+```text
+npm install --ignore-scripts --prefix <plugin-directory> @mecglandorff/kanon@<exact-version>
+```
+
+The package contains separate host manifests, shared `skills/`, and one shared
+`runtime/`. It contains no production lifecycle hook. Node.js majors 20, 22,
+24, and 25 are supported when the agent invokes the bundled wrappers.
 
 The plugin includes:
 
@@ -47,3 +53,14 @@ full-history export remain unavailable.
 
 Project source, development commands, and evaluation disclosures are available
 in the [Kanon repository](https://github.com/MecGlandorff/Kanon).
+
+Exactly six canonical stable skills are shipped: `orient`, `resume`, `verify`,
+`status`, `steer`, and `aswitch`. Host-specific plugin loading and native
+plugin-data wiring remain Unknown until verified in the installed host.
+
+Security reporting and supported-version policy are included in `SECURITY.md`.
+Release, rollback, deprecation, and post-publication procedures are maintained
+in the repository's `RELEASING.md`. This artifact does not claim
+evidence-strict release support, independence, blinded review, causal
+improvement, generalization, official holdout performance, or independent
+validation. Accepted risks remain open.

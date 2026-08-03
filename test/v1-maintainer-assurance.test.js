@@ -5,9 +5,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
 import {
-  loadHistoricalMaintainerBundle
-} from "../eval/v1.0.0-maintainer-certification/lib/validator.js";
-import {
   CANDIDATE_SOURCE_COMMIT,
   FORBIDDEN_CLAIMS,
   GATE_IDS,
@@ -18,6 +15,7 @@ import {
   WAIVER_RISK_IDS,
   assertMaintainerPath,
   deriveMaintainerConclusion,
+  loadCanonicalJson,
   validateHumanIdentity,
   validateProtocol,
   validatePublicClaims,
@@ -32,7 +30,30 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
-const bundle = loadHistoricalMaintainerBundle(repoRoot);
+const protocol = loadCanonicalJson(
+  path.join(repoRoot, "eval/v1.0.0-maintainer/PROTOCOL.json")
+);
+const ledger = loadCanonicalJson(
+  path.join(repoRoot, "eval/v1.0.0-maintainer/RISK_LEDGER.json")
+);
+const schema = loadCanonicalJson(
+  path.join(repoRoot, "eval/v1.0.0-maintainer/schema.json")
+);
+const waiver = loadCanonicalJson(
+  path.join(repoRoot, "eval/v1.0.0-maintainer/WAIVER.template.json")
+);
+const bundle = {
+  approval: "awaiting",
+  hashes: {
+    protocol: protocol.sha256,
+    risk_ledger: ledger.sha256,
+    schema: schema.sha256,
+    waiver: waiver.sha256
+  },
+  ledger: ledger.value,
+  protocol: protocol.value,
+  waiver: waiver.value
+};
 const allMechanicalPass = Object.fromEntries(
   GATE_IDS
     .filter((id) => id !== "authentic-solo-maintainer-approval")

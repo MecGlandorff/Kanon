@@ -10,6 +10,7 @@ import {
 } from "../eval/v1.0.0-maintainer/lib/validator.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const candidateStart = "134c6d268784e285a96cb445889c40573ff846d0";
 const transitionPath = path.join(
   repoRoot,
   "eval/v1.0.0-maintainer-certification/TRANSITION.json"
@@ -46,7 +47,7 @@ test("transition binds the frozen standard, ledger, waiver, history, capability,
   ]) {
     const binding = bindings[key];
     assert.equal(
-      sha256(fs.readFileSync(path.join(repoRoot, binding.path))),
+      sha256(gitBlob(candidateStart, binding.path)),
       binding.sha256
     );
   }

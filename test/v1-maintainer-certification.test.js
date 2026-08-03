@@ -5,37 +5,31 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  GATE_IDS,
   loadCanonicalJson,
   validateWaiver
 } from "../eval/v1.0.0-maintainer/lib/validator.js";
 import {
-  CORRECTED_README_SHA256,
-  CURRENT_PACKAGE_SHA256,
   RESPONSIBILITIES_RELATIVE,
   TRANSITION_SHA256,
-  applyAuthorizedReadmeCorrection,
-  certificationEvidenceDirectories,
-  deriveLiveMaintainerCertification,
-  validateCertificationEvidence,
-  validateCurrentProductState,
-  validateHistoricalState,
-  validateLiveDocumentation,
-  validateSignedMaintainerWaiver,
   validateTransitionAuthority,
   validateTransitionValue
 } from "../eval/v1.0.0-maintainer-certification/lib/validator.js";
+import {
+  validateCandidateDiffScope,
+  validateCandidateTransitionAuthority,
+  validateCertifiedCandidateInputs,
+  validateFrozenSignedWaiver
+} from "../eval/v1.0.0-candidate/lib/validator.js";
 import { canonicalJson } from "../scripts/lib/v1-prospective-release.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const mechanicalGateIds = GATE_IDS.filter(
-  (id) => id !== "authentic-solo-maintainer-approval"
-);
-const allPass = Object.fromEntries(
-  mechanicalGateIds.map((id) => [id, "pass"])
+const evidenceRoot = path.join(
+  repoRoot,
+  "eval/v1.0.0-maintainer-certification",
+  "evidence-sha256-49b1ee409f32eabaa6558f794c1199f3d3595635d1252ab6600ace375ecd9de8"
 );
 
-test("versioned transition authority retains its exact canonical commitment", () => {
+test("historical documentation transition retains its exact commitment", () => {
   const transition = validateTransitionAuthority(repoRoot);
   assert.equal(transition.sha256, TRANSITION_SHA256);
   assert.equal(
@@ -47,32 +41,34 @@ test("versioned transition authority retains its exact canonical commitment", ()
       .previous_documentation_gate_must_not_be_relabelled_passing,
     true
   );
+  assert.doesNotThrow(() => validateTransitionValue(transition.transition));
 });
 
-test("historical standard, evidence, validator, template, and test bytes remain exact", () => {
-  const transition = validateTransitionAuthority(repoRoot).transition;
-  const historical = validateHistoricalState(repoRoot, transition);
-  assert.equal(
-    sha256(historical.historicalReadme),
-    transition.bindings.historical_readme.sha256
-  );
-  assert.equal(historical.protocol.status, "frozen-awaiting-solo-maintainer-approval");
-  assert.equal(
-    historical.ledger.status,
-    "frozen-awaiting-solo-maintainer-risk-decision"
-  );
+test("historical protocol, risk ledger, and waiver bytes remain exact", () => {
+  for (const [relative, digest] of [
+    [
+      "eval/v1.0.0-maintainer/PROTOCOL.json",
+      "635a08e4058407624fdb1779f1b4127a9e8d821dc50386dbae61fd39b2844092"
+    ],
+    [
+      "eval/v1.0.0-maintainer/RISK_LEDGER.json",
+      "838351cad051c13c0316f169ee30630d131292cf8061de0a25234376894167e7"
+    ],
+    [
+      "eval/v1.0.0-maintainer/WAIVER.json",
+      "9d0770ce609479eca5f7b27dcb92dad69a287913ed62a236afc4ed5ae499a2a6"
+    ]
+  ]) {
+    assert.equal(sha256(fs.readFileSync(path.join(repoRoot, relative))), digest);
+  }
 });
 
-test("the exact signed waiver is authenticated-proceed without changing risk meaning", () => {
-  const result = validateSignedMaintainerWaiver(repoRoot);
-  assert.equal(result.approval, "authenticated-proceed");
-  assert.equal(
-    result.waiver_sha256,
-    "9d0770ce609479eca5f7b27dcb92dad69a287913ed62a236afc4ed5ae499a2a6"
-  );
-  assert.equal(result.waiver.accepted_risk_ids.length, 18);
-  assert.equal(result.waiver.failed_gates_called_passing.length, 0);
-  assert.equal(result.waiver.release_action_occurred, false);
+test("exact signed waiver remains mechanically authenticated without disclosure", () => {
+  assert.deepEqual(validateFrozenSignedWaiver(repoRoot), {
+    approval: "authenticated-proceed",
+    waiver_sha256:
+      "9d0770ce609479eca5f7b27dcb92dad69a287913ed62a236afc4ed5ae499a2a6"
+  });
 });
 
 test("signed-waiver mutation remains rejected by the frozen validator", () => {
@@ -114,114 +110,62 @@ test("signed-waiver mutation remains rejected by the frozen validator", () => {
   }
 });
 
-test("current README is exactly the authorized six-skill repair", () => {
-  const transition = validateTransitionAuthority(repoRoot).transition;
-  const historical = validateHistoricalState(repoRoot, transition);
-  const documentation = validateLiveDocumentation(
-    repoRoot,
-    historical,
-    transition
+test("prior certification evidence remains exact and content-addressed", () => {
+  assert.deepEqual(fs.readdirSync(evidenceRoot).sort(), [
+    "certification.json",
+    "complete-tree-commitment.json",
+    "run-record.json"
+  ]);
+  const certificationBytes = fs.readFileSync(
+    path.join(evidenceRoot, "certification.json")
   );
-  assert.deepEqual(documentation, {
-    corrected_readme_sha256: CORRECTED_README_SHA256,
-    historical_gate: "fail",
-    stable_skills: [
-      "orient",
-      "resume",
-      "verify",
-      "status",
-      "steer",
-      "aswitch"
-    ],
-    status: "pass"
+  const runBytes = fs.readFileSync(path.join(evidenceRoot, "run-record.json"));
+  assert.equal(
+    sha256(certificationBytes),
+    "017bca4aa2aff3d461a71acde5634b3fccb99b385a24e2500af31813f8f46415"
+  );
+  assert.equal(
+    sha256(runBytes),
+    "4c2a67166eb35b75b2530ee154fd8d9aa40e452fdf71d717952dc71c2933a468"
+  );
+  const certification = JSON.parse(certificationBytes.toString("utf8"));
+  const run = JSON.parse(runBytes.toString("utf8"));
+  const tree = JSON.parse(
+    fs.readFileSync(path.join(evidenceRoot, "complete-tree-commitment.json"))
+  );
+  assert.equal(certification.result, "maintainer-certification-ready");
+  assert.deepEqual(certification.boundaries, {
+    evidence_strict_release_supported: false,
+    holdout_performance_established: false,
+    independence_established: false,
+    next_permissible_action:
+      "separately-authorized-principal-level-release-hardening-and-exact-v1.0.0-candidate-preparation",
+    publication_authorized: false,
+    release_action_occurred: false
   });
-  const reconstructed = applyAuthorizedReadmeCorrection(
-    historical.historicalReadme.toString("utf8"),
-    transition.documentation_correction
-  );
-  assert.equal(sha256(Buffer.from(reconstructed)), CORRECTED_README_SHA256);
-});
-
-test("arbitrary historical, capability, artifact, and claim-boundary drift is rejected", () => {
-  const original = validateTransitionAuthority(repoRoot).transition;
-  for (const mutate of [
-    (value) => {
-      value.bindings.historical_readme.sha256 = "0".repeat(64);
-    },
-    (value) => {
-      value.bindings.maintainer_protocol.sha256 = "1".repeat(64);
-    },
-    (value) => {
-      value.bindings.canonical_capabilities.sha256 = "2".repeat(64);
-    },
-    (value) => {
-      value.bindings.production_artifact.sha256 = "3".repeat(64);
-    },
-    (value) => {
-      value.preservation.claim_boundary_change_allowed = true;
-    }
-  ]) {
-    const changed = structuredClone(original);
-    mutate(changed);
-    assert.throws(
-      () => validateTransitionValue(changed),
-      /maintainer-certification/u
-    );
-  }
-});
-
-test("current version, dependencies, capabilities, runtime, and package scope are unchanged", () => {
-  const product = validateCurrentProductState(repoRoot);
-  assert.equal(product.package_version, "0.4.0-rc.1");
+  assert.equal(run.release_action_occurred, false);
   assert.equal(
-    product.public_capabilities_sha256,
-    "bfc00d445cc480389559fd8c115a6ae2607dd6b7241dd0e256565bde5f0256cf"
+    run.artifact.production_sha256,
+    "0f87af4dfd851c268891c96237accf20b5089b0e0b95e10ac1417efebcca83a9"
   );
-  assert.equal(product.generated_runtime_delta, 0);
-  assert.equal(product.package_inventory_count, 128);
-});
-
-test("live conclusion is mechanical while historical not-ready remains historical", () => {
-  const ready = deriveLiveMaintainerCertification(repoRoot, allPass);
-  assert.equal(ready.result, "maintainer-certification-ready");
-  assert.equal(ready.documentation.historical_gate, "fail");
-  assert.equal(ready.documentation.status, "pass");
-  assert.deepEqual(ready.risk_state.resolved_by_current_evidence, [
-    "RISK-PUBLIC-DOCUMENTATION-DRIFT"
-  ]);
-  assert.deepEqual(ready.risk_state.open_nonwaivable, [
-    "RISK-FUTURE-MAINTENANCE-OBLIGATIONS"
-  ]);
-  assert.deepEqual(ready.risk_state.unknown, [
-    "RISK-LABEL-VALIDITY",
-    "RISK-GENERALIZATION",
-    "RISK-NATIVE-WINDOWS-LINUX"
-  ]);
-
-  const failed = { ...allPass, "complete-project-validation": "fail" };
+  assert.equal(run.artifact.byte_identical, true);
   assert.equal(
-    deriveLiveMaintainerCertification(repoRoot, failed).result,
-    "maintainer-certification-not-ready"
-  );
-  const unknown = { ...allPass, "installed-artifact-conformance": "unknown" };
-  assert.equal(
-    deriveLiveMaintainerCertification(repoRoot, unknown).result,
-    "maintainer-certification-inconclusive"
-  );
-  assert.throws(
-    () =>
-      deriveLiveMaintainerCertification(repoRoot, {
-        ...allPass,
-        "accurate-readme-changelog-installation-compatibility-security-and-limitations":
-          "fail"
-      }),
-    /live-documentation-gate-current-evidence/u
+    tree.semantic_sha256,
+    "49b1ee409f32eabaa6558f794c1199f3d3595635d1252ab6600ace375ecd9de8"
   );
 });
 
-test("active test discovery is unchanged and only the stale live-path responsibility moves", () => {
-  const responsibilityPath = path.join(repoRoot, RESPONSIBILITIES_RELATIVE);
-  const bytes = fs.readFileSync(responsibilityPath);
+test("candidate transition owns current release hardening without rewriting history", () => {
+  const transition = validateCandidateTransitionAuthority(repoRoot);
+  const certified = validateCertifiedCandidateInputs(repoRoot);
+  assert.equal(transition.transition.boundaries.publication_authorized, false);
+  assert.equal(transition.transition.boundaries.release_action_occurred, false);
+  assert.equal(certified.approval, "authenticated-proceed");
+  assert.doesNotThrow(() => validateCandidateDiffScope(repoRoot));
+});
+
+test("historical test-responsibility record remains historical and unchanged", () => {
+  const bytes = fs.readFileSync(path.join(repoRoot, RESPONSIBILITIES_RELATIVE));
   const responsibility = JSON.parse(bytes.toString("utf8"));
   assert.equal(
     bytes.equals(Buffer.from(`${canonicalJson(responsibility)}\n`)),
@@ -231,36 +175,9 @@ test("active test discovery is unchanged and only the stale live-path responsibi
     responsibility.historical_suite.original_sha256,
     "ade10a090d10e39dcf9f1d410b8695cba10309da60c9a727e1d719cba9d26c96"
   );
-  assert.deepEqual(responsibility.active_suite.excluded, []);
-  assert.equal(responsibility.active_suite.includes_all_test_files, true);
   assert.equal(responsibility.package_scripts.changed, false);
-  assert.equal(responsibility.package_scripts.package_sha256, CURRENT_PACKAGE_SHA256);
-  for (const [relative, digest] of Object.entries(
-    responsibility.active_suite.bindings
-  )) {
-    assert.equal(sha256(fs.readFileSync(path.join(repoRoot, relative))), digest);
-  }
-  assert.equal(
-    sha256(
-      fs.readFileSync(
-        path.join(repoRoot, responsibility.active_suite.transitioned_test)
-      )
-    ),
-    responsibility.active_suite.current_sha256
-  );
-});
-
-test("a content-addressed certification tree is unique and valid when present", () => {
-  const evidence = certificationEvidenceDirectories(repoRoot);
-  assert.ok(evidence.length <= 1);
-  if (evidence.length === 1) {
-    const validated = validateCertificationEvidence(repoRoot, evidence[0]);
-    assert.equal(
-      validated.certification.result,
-      "maintainer-certification-ready"
-    );
-    assert.match(validated.evidence_tree_sha256, /^[0-9a-f]{64}$/u);
-  }
+  assert.equal(responsibility.active_suite.includes_all_test_files, true);
+  assert.deepEqual(responsibility.active_suite.excluded, []);
 });
 
 function sha256(bytes) {

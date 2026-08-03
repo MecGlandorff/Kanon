@@ -31,6 +31,14 @@ scorecards, refactor advice, dead-code advice, numeric health scores, and
 ready-to-paste agent prompts are experimental source work and are not shipped
 in the public skill artifact.
 
+The v1.0.0 candidate follows the solo-maintainer `maintainer-stable` lane. Its
+signed waiver and maintainer certification are exact mechanical inputs, while
+accepted risks remain open. It does not establish evidence-strict release
+support, independence, blinded review, causal improvement, generalization,
+official holdout performance, or independent validation. The prospective
+protocol remains inactive, and the six-person simulation is simulated
+development evidence only.
+
 ### Planned Codex ablation
 
 A future evaluation will compare the same Codex configuration on paired,
@@ -47,10 +55,19 @@ security evaluation, and allowed claim language are specified in
 
 ## Use
 
-Install the complete package root as a plugin for Codex CLI or Claude Code.
+Install the exact package without lifecycle scripts into a user-controlled
+plugin directory, then configure Codex CLI or Claude Code to load the complete
+installed package root:
+
+```text
+npm install --ignore-scripts --prefix <plugin-directory> @mecglandorff/kanon@<exact-version>
+```
+
 The package has separate host manifests, shared skills, and one shared ESM
 runtime. Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25
-are supported.
+are supported. Bash and PowerShell wrappers are included. Host-specific plugin
+loading and native plugin-data wiring depend on the installed host and remain
+Unknown until verified there.
 
 Starting with v0.4, the
 [`@mecglandorff/kanon`](https://www.npmjs.com/package/@mecglandorff/kanon)
@@ -66,7 +83,7 @@ $kanon
 Brief this repo and tell me which evidence supports the first edit.
 ```
 
-The current development artifact exposes six stable, read-only v1 skills:
+The public artifact exposes exactly six canonical stable v1 skills:
 
 | Stable skill | Behavior |
 | --- | --- |
@@ -139,6 +156,19 @@ The slice 8 context receipt is advisory data only. It is not stored, enforced,
 invalidated by hooks, or used to block mutation. Its freshness remains Unknown
 when current evidence or a host-session binding is unavailable.
 
+## Security and release status
+
+Report vulnerabilities privately and review supported versions in
+[`SECURITY.md`](SECURITY.md). Release, rollback, deprecation, exact-artifact
+reuse, and post-publication verification are specified in
+[`RELEASING.md`](RELEASING.md).
+
+The local v1.0.0 candidate is not a publication. GitHub environment protection,
+repository permissions, artifact-attestation availability, immutable-release
+settings, npm trusted-publisher configuration, and registry policy remain
+Unknown until remotely verified. Native Linux and Windows conformance also
+remain Unknown until the validate-only remote matrix passes.
+
 ## Development
 
 ```bash
@@ -149,11 +179,12 @@ npm run eval:dev
 ```
 
 `npm run eval:dev` uses visible labels and may guide generic implementation
-work. A workflow-dispatched release candidate must also pass it. Stable
-publication additionally requires an independently frozen
+work. A workflow-dispatched release candidate must also pass it. The existing
+evidence-strict `stable` lane additionally requires an independently frozen
 `eval/release-corpus.json`; a missing, partial, development-role, or
-threshold-failing corpus blocks stable publication. False positives cost five
-times false negatives, and every scored dimension and category has its own
-precision and recall floor.
+threshold-failing corpus blocks that lane. The separate `maintainer-stable`
+lane requires the exact signed waiver and maintainer certification and makes no
+holdout or independence claim. False positives cost five times false negatives,
+and every scored dimension and category has its own precision and recall floor.
 
 MIT

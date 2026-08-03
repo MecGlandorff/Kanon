@@ -292,6 +292,7 @@ test("package builder uses an exact production allowlist", () => {
     "MANIFEST.sha256",
     "README.md",
     "SBOM.json",
+    "SECURITY.md",
     "package.json"
   ].sort();
   assert.deepEqual(actual, expected);
@@ -311,6 +312,14 @@ test("package builder uses an exact production allowlist", () => {
   assert.equal(actual.includes("runtime/core/handoff.js"), true);
   assert.equal(actual.includes("runtime/core/handoff-store.js"), true);
   assert.equal(actual.includes("runtime/skills/aswitch.js"), true);
+  const publicManifest = JSON.parse(
+    fs.readFileSync(path.join(output, "package.json"), "utf8")
+  );
+  assert.deepEqual(publicManifest.publishConfig, {
+    access: "public",
+    provenance: true,
+    registry: "https://registry.npmjs.org"
+  });
   const conformanceSource = fs.readFileSync(
     path.join(repoRoot, "scripts", "conform-artifact.js"),
     "utf8"
