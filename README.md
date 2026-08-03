@@ -66,14 +66,16 @@ $kanon
 Brief this repo and tell me which evidence supports the first edit.
 ```
 
-The current development artifact exposes four stable, read-only v1 skills:
+The current development artifact exposes six stable, read-only v1 skills:
 
 | Stable skill | Behavior |
 | --- | --- |
-| `orient` | Read instructions first, inspect bounded task-relevant evidence and Git, and return a minimal non-persisted receipt. |
-| `resume` | Compare authoritative live evidence with safe prior continuity claims through the shared engine. |
-| `verify` | Separate documentation and generated-artifact contradictions from non-observation; validation declarations are not execution success. |
-| `status` | Report embedded version, exact-version deprecation, notice mode, enforcement false, hook observability, and receipt availability. |
+| `orient` | Load a small task-relevant body of repository evidence, with explicit limitations and a non-enforcing context receipt. |
+| `resume` | Resume from authoritative live repository evidence while keeping stored continuity conflicts and Unknowns visible. |
+| `verify` | Verify documentation, continuity, generated-artifact, declared-validation, and available receipt claims without inventing execution success. |
+| `status` | Report embedded version, exact-version deprecation, notice mode, enforcement false, hook observability, receipt availability, and bounded diagnostics. |
+| `steer` | Maintain one bounded evidence-aware implementation slice through Understand, choose, act, verify, and reassess without orchestrating or executing work. |
+| `aswitch` | Prepare or receive a bounded consent-driven handoff between Codex CLI and Claude Code with a manual fallback. |
 
 Every stable invocation consults the same exact-installed-version deprecation
 checker. Network, host, hook, or session evidence that is unavailable remains

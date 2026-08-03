@@ -5,6 +5,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
 import {
+  loadHistoricalMaintainerBundle
+} from "../eval/v1.0.0-maintainer-certification/lib/validator.js";
+import {
   CANDIDATE_SOURCE_COMMIT,
   FORBIDDEN_CLAIMS,
   GATE_IDS,
@@ -16,7 +19,6 @@ import {
   assertMaintainerPath,
   deriveMaintainerConclusion,
   validateHumanIdentity,
-  validateMaintainerBundle,
   validateProtocol,
   validatePublicClaims,
   validateRiskAcceptance,
@@ -30,7 +32,7 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
-const bundle = validateMaintainerBundle(repoRoot);
+const bundle = loadHistoricalMaintainerBundle(repoRoot);
 const allMechanicalPass = Object.fromEntries(
   GATE_IDS
     .filter((id) => id !== "authentic-solo-maintainer-approval")
