@@ -298,9 +298,11 @@ test("exactly one durable pseudo-attempt receipt is accepted and a retry is reje
       producer: "SIM-CE",
       sequence: 13
     });
-    writeCanonicalExclusive(root, "attempt.json", artifact, {
-      durable: true
-    });
+    executeFrozenDurableWrite(() =>
+      writeCanonicalExclusive(root, "attempt.json", artifact, {
+        durable: true
+      })
+    );
     assert.deepEqual(
       loadCanonicalJson(path.join(root, "attempt.json")).value,
       artifact
@@ -337,18 +339,34 @@ test("failure preservation is additive and leaves prior bytes unchanged", () => 
       original
     );
     const before = fs.readFileSync(written.path);
-    const preserved = preserveSimulationFailure({
-      bindings,
-      error: "synthetic preflight failure",
-      root,
-      sequence: 18
-    });
+    const beforeTree = completeTreeCommitment(root);
+    const preservation = executeFrozenDurableWrite(() =>
+      preserveSimulationFailure({
+        bindings,
+        error: "synthetic preflight failure",
+        root,
+        sequence: 18
+      })
+    );
+    const afterTree = completeTreeCommitment(root);
     assert.equal(
       fs.readFileSync(written.path).equals(before),
       true
     );
-    assert.equal(preserved.before.files.length, 1);
-    assert.equal(preserved.after.files.length, 2);
+    assert.equal(beforeTree.files.length, 1);
+    assert.equal(afterTree.files.length, 2);
+    const failure = loadCanonicalJson(
+      path.join(root, "failure-manifest.json")
+    ).value;
+    assert.equal(
+      failure.payload.prior_tree_sha256,
+      beforeTree.sha256
+    );
+    assert.equal(failure.payload.retry_permitted, false);
+    if (!preservation.directorySyncUnsupported) {
+      assert.deepEqual(preservation.result.before, beforeTree);
+      assert.deepEqual(preservation.result.after, afterTree);
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: false });
   }
@@ -570,4 +588,31 @@ function rawLabels(selected) {
 
 function hash(character) {
   return character.repeat(64);
+}
+
+function executeFrozenDurableWrite(callback) {
+  try {
+    return {
+      directorySyncUnsupported: false,
+      result: callback()
+    };
+  } catch (error) {
+    const unsupportedDirectorySync =
+      process.platform === "win32" &&
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      "syscall" in error &&
+      ["EBADF", "EINVAL", "ENOSYS", "ENOTSUP", "EPERM"].includes(
+        String(error.code)
+      ) &&
+      error.syscall === "fsync";
+    if (!unsupportedDirectorySync) {
+      throw error;
+    }
+    return {
+      directorySyncUnsupported: true,
+      result: null
+    };
+  }
 }
