@@ -8,7 +8,11 @@ import { spawnSync } from "node:child_process";
 import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
-import { PUBLIC_COMMANDS } from "./lib/artifact-files.js";
+import { validateEmbeddedBuildMetadata } from "../src/v1/core/build-metadata.js";
+import {
+  IMPLEMENTED_STABLE_SKILLS,
+  PUBLIC_COMMANDS
+} from "./lib/artifact-files.js";
 import { npmInvocation } from "./lib/npm-runner.js";
 
 const options = parseArgs(process.argv.slice(2));
@@ -89,6 +93,108 @@ function inspectPackage(root, input) {
       !manifest.dependencies,
       "public manifest exposes no scripts, bin, exports, or dependencies"
     ));
+    const codexManifest = readJsonFile(
+      root,
+      ".codex-plugin/plugin.json",
+      256 * 1024
+    );
+    const claudeManifest = readJsonFile(
+      root,
+      ".claude-plugin/plugin.json",
+      256 * 1024
+    );
+    const runtimeManifest = readJsonFile(
+      root,
+      "runtime/package.json",
+      64 * 1024
+    );
+    const buildMetadata = readJsonFile(
+      root,
+      "runtime/build-metadata.json",
+      32 * 1024
+    );
+    checks.push(result(
+      codexManifest.name === "kanon" &&
+      claudeManifest.name === "kanon" &&
+      codexManifest.version === input.candidateVersion &&
+      claudeManifest.version === input.candidateVersion &&
+      codexManifest.skills === "./skills/" &&
+      claudeManifest.skills === "./skills/",
+      "separate host manifests share the package version and skill root"
+    ));
+    checks.push(result(
+      runtimeManifest.private === true &&
+      runtimeManifest.type === "module" &&
+      runtimeManifest.imports?.["#kanon-continuity"] ===
+        "./src/continuity/engine.js" &&
+      !runtimeManifest.dependencies,
+      "shared runtime has an independent ESM boundary, continuity binding, and no dependencies"
+    ));
+    const metadataResult = validateEmbeddedBuildMetadata(buildMetadata);
+    checks.push(result(
+      metadataResult.ok &&
+      metadataResult.value.package_version === input.candidateVersion &&
+      JSON.stringify(metadataResult.value.public_capabilities.skills) ===
+        JSON.stringify(["kanon", ...IMPLEMENTED_STABLE_SKILLS]) &&
+      metadataResult.value.public_capabilities.hosts["codex-cli"]
+        .enforcement === false &&
+      metadataResult.value.public_capabilities.hosts["claude-code"]
+        .enforcement === false &&
+      metadataResult.value.public_capabilities.hosts["codex-cli"]
+        .lifecycle_notice_hook === "Unavailable" &&
+      metadataResult.value.public_capabilities.hosts["claude-code"]
+        .lifecycle_notice_hook === "Unavailable" &&
+      metadataResult.value.public_capabilities.notice.automatic === false &&
+      metadataResult.value.public_capabilities.notice.delivery ===
+        "explicit-skill-and-status-output" &&
+      metadataResult.value.public_capabilities.receipts.enforcement ===
+        false &&
+      metadataResult.value.public_capabilities.receipts.evaluation ===
+        "explicit-kanon-invocation-only" &&
+      metadataResult.value.public_capabilities.receipts.persistence ===
+        "validated-plugin-data-when-available" &&
+      metadataResult.value.public_capabilities.receipts.repository_fallback ===
+        false,
+      "embedded capability metadata is valid, explicit-only, receipt-aware, and non-enforcing"
+    ));
+    checks.push(result(
+      !Object.hasOwn(codexManifest, "hooks") &&
+      !Object.hasOwn(claudeManifest, "hooks"),
+      "host manifests declare no production lifecycle hook"
+    ));
+    checks.push(result(
+      fs.statSync(
+        path.join(root, "runtime", "core", "plugin-data.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "receipt-store.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "handoff.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "core", "handoff-store.js")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "skills", "aswitch.js")
+      ).isFile(),
+      "shared hardened plugin-data, receipt, and handoff modules are shipped"
+    ));
+    checks.push(result(
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-dispatch")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-dispatch.ps1")
+      ).isFile() &&
+      fs.statSync(
+        path.join(root, "runtime", "bin", "kanon-write.js")
+      ).isFile() &&
+      !fs.existsSync(
+        path.join(root, "runtime", "bin", "kanon.js")
+      ),
+      "shared fixed-command dispatch and narrow compatibility write runtime are shipped"
+    ));
     const shipped = fs
       .readdirSync(path.join(root, "skills", "kanon", "scripts"))
       .sort();
@@ -100,21 +206,102 @@ function inspectPackage(root, input) {
       .sort();
     checks.push(result(
       JSON.stringify(shipped) === JSON.stringify(expected),
-      "only supported public wrappers are shipped"
+      "only supported compatibility wrappers are shipped"
     ));
+    for (const skill of IMPLEMENTED_STABLE_SKILLS) {
+      const stableScripts = fs
+        .readdirSync(path.join(root, "skills", skill, "scripts"))
+        .sort();
+      checks.push(result(
+        fs.statSync(path.join(root, "skills", skill, "SKILL.md")).isFile() &&
+        JSON.stringify(stableScripts) === JSON.stringify([
+          `kanon-${skill}`,
+          `kanon-${skill}.ps1`
+        ]),
+        `stable ${skill} skill and wrappers are shipped`
+      ));
+    }
     const all = allFiles(root).map((file) =>
       path.relative(root, file).replaceAll("\\", "/")
     );
+    checks.push(result(
+      !all.some((file) =>
+        /(?:^|\/)hooks(?:\/|$)|notice-hook\.js$/.test(file)
+      ),
+      "installed artifact contains no lifecycle-hook declaration or runner"
+    ));
+    const lifecycleSurface = all
+      .filter((file) => /\.(?:js|json|ya?ml)$/.test(file))
+      .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+      .join("\n");
+    checks.push(result(
+      !/PreToolUse|hook_event_name|notice-hook\.js/.test(lifecycleSurface),
+      "installed executable and manifest content contains no lifecycle-hook surface"
+    ));
     checks.push(result(
       !all.some((file) =>
         /(?:^|\/)(?:improve|refactor)(?:\/|\.js$)/.test(file)
       ),
       "experimental improve/refactor modules are absent"
     ));
+    checks.push(result(
+      !all.some((file) =>
+        /(?:^|\/)(?:terminal-launch|full-history)(?:\/|[.-])/.test(file)
+      ),
+      "unimplemented terminal-launch and full-history surfaces are absent"
+    ));
+    checks.push(result(
+      !all.some((file) =>
+        /^(?:docs|eval|spikes|src|test|node_modules)\//.test(file) ||
+        /(?:^|\/)(?:tsconfig\.json|package-lock\.json)$/.test(file) ||
+        /(?:launcher|transcript-reader)/i.test(file)
+      ),
+      "development tools, Guard spikes, launchers, and transcript readers are absent"
+    ));
+    const runtimeSurface = all
+      .filter((file) =>
+        /^(?:runtime\/.*\.js|\.codex-plugin\/.*\.json|\.claude-plugin\/.*\.json)$/.test(
+          file
+        )
+      )
+      .map((file) => fs.readFileSync(path.join(root, file), "utf8"))
+      .join("\n");
+    checks.push(result(
+      !/CODEX_HOME|CLAUDE_CONFIG_DIR|history\.jsonl|(?:^|[\\/])\.codex[\\/]sessions|(?:^|[\\/])\.claude[\\/]projects/m.test(
+        runtimeSurface
+      ),
+      "runtime contains no undocumented Codex or Claude state access"
+    ));
+    const readme = fs.readFileSync(
+      path.join(root, "README.md"),
+      "utf8"
+    );
+    checks.push(result(
+      /orient.*resume.*verify.*status.*steer.*aswitch/s.test(readme) &&
+      /no\s+production lifecycle hook/i.test(readme) &&
+      /no automatic lifecycle notice/i.test(readme) &&
+      /Native Codex and Claude plugin-data wiring is unproven[\s\S]*Unknown/.test(
+        readme
+      ) &&
+      /never launches a host/.test(readme),
+      "installed README matches the six-skill explicit-only capability contract"
+    ));
   } catch (error) {
     checks.push(result(false, `package inspection failed: ${error.message}`));
   }
   return checks;
+}
+
+function readJsonFile(root, relative, maximumBytes) {
+  const selected = resolveContainedPath(root, relative, { type: "file" });
+  if (!selected.ok || selected.stat.size > maximumBytes) {
+    throw new Error(`unsafe or oversized JSON file: ${relative}`);
+  }
+  const value = JSON.parse(fs.readFileSync(selected.path, "utf8"));
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`JSON file must contain an object: ${relative}`);
+  }
+  return value;
 }
 
 function verifyManifest(root) {
@@ -142,9 +329,49 @@ function verifyManifest(root) {
 }
 
 function exerciseWrappers(packageRoot) {
-  const checks = [];
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-conform-"));
+  try {
+    return exerciseWrappersInFixture(packageRoot, fixture);
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+function exerciseWrappersInFixture(packageRoot, fixture) {
+  const checks = [];
   const marker = path.join(fixture, "repository-code-executed");
+  const hostileNodeMarker = path.join(fixture, "hostile-node-executed");
+  const hostileDirnameMarker = path.join(
+    fixture,
+    "hostile-dirname-executed"
+  );
+  const bashEnvironmentMarker = path.join(
+    fixture,
+    "hostile-bash-environment-executed"
+  );
+  const nodeOptionsMarker = path.join(
+    fixture,
+    "hostile-node-options-executed"
+  );
+  const nodeRedirectWarnings = path.join(
+    fixture,
+    "hostile-node-redirect-warnings"
+  );
+  const nodeCoverage = path.join(fixture, "hostile-node-coverage");
+  const nodeCompileCache = path.join(
+    fixture,
+    "hostile-node-compile-cache"
+  );
+  fs.writeFileSync(
+    path.join(fixture, "hostile-bash-environment"),
+    `: > ${JSON.stringify(bashEnvironmentMarker)}\n`
+  );
+  fs.writeFileSync(
+    path.join(fixture, "hostile-node-options.cjs"),
+    `require("node:fs").writeFileSync(${JSON.stringify(
+      nodeOptionsMarker
+    )}, "executed");\n`
+  );
   fs.writeFileSync(path.join(fixture, "README.md"), "# Fixture\n\nRun `npm test`.\n");
   fs.writeFileSync(
     path.join(fixture, "package.json"),
@@ -156,37 +383,193 @@ function exerciseWrappers(packageRoot) {
       }
     })}\n`
   );
+  if (process.platform === "win32") {
+    fs.writeFileSync(
+      path.join(fixture, "node.cmd"),
+      "@echo off\r\ntype nul > \"%CD%\\hostile-node-executed\"\r\nexit /b 97\r\n"
+    );
+    fs.writeFileSync(
+      path.join(fixture, "dirname.cmd"),
+      "@echo off\r\ntype nul > \"%CD%\\hostile-dirname-executed\"\r\nexit /b 97\r\n"
+    );
+  } else {
+    for (const [name, markerName] of [
+      ["node", "hostile-node-executed"],
+      ["dirname", "hostile-dirname-executed"]
+    ]) {
+      const hostile = path.join(fixture, name);
+      fs.writeFileSync(
+        hostile,
+        `#!/bin/sh\n: > "$PWD/${markerName}"\nexit 97\n`
+      );
+      fs.chmodSync(hostile, 0o755);
+    }
+  }
   const scripts = path.join(packageRoot, "skills", "kanon", "scripts");
   const family = process.platform === "win32" ? "powershell" : "bash";
+  const rejected = family === "powershell"
+    ? spawnPowerShell(
+        path.join(
+          packageRoot,
+          "runtime",
+          "bin",
+          "kanon-dispatch.ps1"
+        ),
+        ["unsupported"],
+        fixture,
+        true
+      )
+    : spawnSync(
+        path.join(packageRoot, "runtime", "bin", "kanon-dispatch"),
+        ["unsupported"],
+        runOptions(fixture, true)
+      );
+  checks.push(result(
+    rejected.status === 127 && !fs.existsSync(hostileNodeMarker),
+    "shared dispatch rejects unknown commands before PATH resolution"
+  ));
   for (const command of PUBLIC_COMMANDS) {
-    const wrapper = path.join(
-      scripts,
-      `kanon-${command}${family === "powershell" ? ".ps1" : ""}`
+    checks.push(
+      exerciseWrapper(
+        path.join(scripts, wrapperName(command, family)),
+        command,
+        family,
+        fixture,
+        "compatibility"
+      )
     );
-    const args = wrapperArguments(command);
-    const execution = family === "powershell"
-      ? spawnPowerShell(wrapper, args, fixture)
-      : spawnSync(wrapper, args, runOptions(fixture));
-    checks.push({
-      name: `${family} wrapper ${command}`,
-      passed: execution.status === 0,
-      reason:
-        execution.status === 0
-          ? `${family} wrapper ${command} passed`
-          : `${family} wrapper ${command} failed: ${
-              execution.stderr?.trim() || execution.status
-            }`
-    });
+  }
+  for (const skill of IMPLEMENTED_STABLE_SKILLS) {
+    checks.push(
+      exerciseWrapper(
+        path.join(
+          packageRoot,
+          "skills",
+          skill,
+          "scripts",
+          wrapperName(skill, family)
+        ),
+        skill,
+        family,
+        fixture,
+        "stable"
+      )
+    );
   }
   checks.push(result(
     !fs.existsSync(marker),
     "declared destructive package script was not executed"
   ));
   checks.push(result(
+    !fs.existsSync(hostileNodeMarker),
+    "repository-controlled PATH node executable was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(hostileDirnameMarker),
+    "repository-controlled PATH dirname executable was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(bashEnvironmentMarker),
+    "repository-controlled BASH_ENV startup file was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(nodeOptionsMarker),
+    "repository-controlled NODE_OPTIONS module was not executed"
+  ));
+  checks.push(result(
+    !fs.existsSync(nodeRedirectWarnings) &&
+      !fs.existsSync(nodeCoverage) &&
+      !fs.existsSync(nodeCompileCache),
+    "repository-controlled Node write destinations were not used"
+  ));
+  checks.push(result(
     fs.existsSync(path.join(fixture, ".kanon", "STATE.json")),
     "refresh exercised bounded write workflow"
   ));
   return checks;
+}
+
+function exerciseWrapper(wrapper, command, family, fixture, surface) {
+  const args = wrapperArguments(command);
+  const input = wrapperInput(command);
+  const execution = family === "powershell"
+    ? spawnPowerShell(wrapper, args, fixture, true, input)
+    : spawnSync(wrapper, args, runOptions(fixture, true, input));
+  const semantic = execution.status === 0
+    ? validateStableJsonWrapper(command, execution.stdout)
+    : { ok: false, diagnostic: "" };
+  const passed = execution.status === 0 && semantic.ok;
+  return {
+    name: `${family} ${surface} wrapper ${command}`,
+    passed,
+    reason:
+      passed
+        ? `${family} ${surface} wrapper ${command} passed${
+            semantic.diagnostic ? `: ${semantic.diagnostic}` : ""
+          }`
+        : `${family} ${surface} wrapper ${command} failed: ${
+            semantic.diagnostic ||
+            execution.stderr?.trim() ||
+            execution.status
+          }`
+  };
+}
+
+function validateStableJsonWrapper(command, stdout) {
+  if (command !== "steer" && command !== "aswitch") {
+    return { ok: true, diagnostic: "" };
+  }
+  try {
+    const output = JSON.parse(stdout);
+    const baseValid =
+      output?.schema === "kanon-stable-skill-result-v1" &&
+      output.skill === command &&
+      output.host?.mode === "notice" &&
+      output.host.enforcement === false;
+    if (!baseValid) {
+      return {
+        ok: false,
+        diagnostic: `${command} output failed the stable result contract`
+      };
+    }
+    if (command === "steer") {
+      const valid =
+        output.report?.schema === "kanon-steer-report-v1" &&
+        output.report.state?.schema === "kanon-steer-state-v1" &&
+        output.report.state.authorization === false;
+      return {
+        ok: valid,
+        diagnostic: valid
+          ? "validated non-authorizing steer result"
+          : "steer output failed the state contract"
+      };
+    }
+    const modes = output.report?.payload_options?.map(
+      (option) => option?.mode
+    );
+    const valid =
+      output.report?.schema === "kanon-aswitch-report-v1" &&
+      output.report.stage === "AwaitingTarget" &&
+      output.report.authorization === false &&
+      output.report.automatic_launch === false &&
+      JSON.stringify(modes) ===
+        JSON.stringify(["last-plan", "compacted", "full-history"]);
+    return {
+      ok: valid,
+      diagnostic: valid
+        ? "validated consent-gated aswitch result"
+        : "aswitch output failed the handoff contract"
+    };
+  } catch {
+    return {
+      ok: false,
+      diagnostic: `${command} output was not valid JSON`
+    };
+  }
+}
+
+function wrapperName(command, family) {
+  return `kanon-${command}${family === "powershell" ? ".ps1" : ""}`;
 }
 
 function wrapperArguments(command) {
@@ -199,15 +582,64 @@ function wrapperArguments(command) {
   if (command === "todo") {
     return ["list"];
   }
+  if (command === "orient") {
+    return ["artifact conformance"];
+  }
+  if (command === "steer") {
+    return ["--state-stdin", "--json"];
+  }
+  if (command === "aswitch") {
+    return ["--request-stdin", "--json"];
+  }
   return command === "brief" ? ["--json"] : [];
 }
 
-function spawnPowerShell(wrapper, args, cwd) {
+function wrapperInput(command) {
+  if (command === "steer") {
+    return `${JSON.stringify({
+        schema: "kanon-steer-request-v1",
+        phase: "understand",
+        desired_outcome: "verify installed artifact behavior",
+        completion_criteria: ["installed wrapper exits successfully"],
+        constraints: ["do not execute repository code"],
+        user_decisions: [],
+        evidence_references: [],
+        unknowns: [],
+        next_slice: {
+          objective: "inspect one bounded installed wrapper",
+          boundaries: ["read-only invocation"]
+        },
+        required_verification: ["observe wrapper status"],
+        stop_or_redirect_reasons: []
+      })}\n`;
+  }
+  if (command === "aswitch") {
+    return `${JSON.stringify({
+      schema: "kanon-aswitch-request-v1",
+      operation: "preview",
+      target_host: null,
+      payload_mode: null,
+      destination_root: null,
+      last_plan: null,
+      compacted: null,
+      approval: null
+    })}\n`;
+  }
+  return undefined;
+}
+
+function spawnPowerShell(
+  wrapper,
+  args,
+  cwd,
+  poisonPath = false,
+  input = undefined
+) {
   for (const binary of ["pwsh", "powershell.exe"]) {
     const found = spawnSync(
       binary,
       ["-NoProfile", "-File", wrapper, ...args],
-      runOptions(cwd)
+      runOptions(cwd, poisonPath, input)
     );
     if (!found.error || found.error.code !== "ENOENT") {
       return found;
@@ -216,14 +648,36 @@ function spawnPowerShell(wrapper, args, cwd) {
   return { status: null, stderr: "PowerShell unavailable" };
 }
 
-function runOptions(cwd) {
+function runOptions(cwd, poisonPath = false, input = undefined) {
   return {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    env: {
+      ...process.env,
+      BASH_ENV: path.join(cwd, "hostile-bash-environment"),
+      GIT_TERMINAL_PROMPT: "0",
+      NODE_COMPILE_CACHE: path.join(
+        cwd,
+        "hostile-node-compile-cache"
+      ),
+      NODE_OPTIONS:
+        `--require=${path.join(cwd, "hostile-node-options.cjs")}`,
+      NODE_PATH: cwd,
+      NODE_REDIRECT_WARNINGS: path.join(
+        cwd,
+        "hostile-node-redirect-warnings"
+      ),
+      NODE_V8_COVERAGE: path.join(cwd, "hostile-node-coverage"),
+      ...(poisonPath
+        ? {
+            PATH: `${cwd}${path.delimiter}${process.env.PATH || ""}`
+          }
+        : {})
+    },
     maxBuffer: 8 * 1024 * 1024,
     timeout: 30_000,
-    windowsHide: true
+    windowsHide: true,
+    ...(input === undefined ? {} : { input })
   };
 }
 

@@ -1,0 +1,20 @@
+{
+  "name": "kanon-guard-spike-codex",
+  "interface": {
+    "displayName": "Kanon Guard feasibility spike (Codex CLI)"
+  },
+  "plugins": [
+    {
+      "name": "kanon-guard-spike-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/kanon-guard-spike-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

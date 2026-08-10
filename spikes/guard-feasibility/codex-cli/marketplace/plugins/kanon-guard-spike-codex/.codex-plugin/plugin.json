@@ -1,0 +1,19 @@
+{
+  "name": "kanon-guard-spike-codex",
+  "version": "0.0.0",
+  "description": "Disposable v1 Guard feasibility probe for Codex CLI.",
+  "author": {
+    "name": "Kanon v1 feasibility spike"
+  },
+  "license": "MIT",
+  "interface": {
+    "displayName": "Kanon Guard spike (Codex CLI)",
+    "shortDescription": "Disposable PreToolUse feasibility probe.",
+    "longDescription": "An unshipped, local-only Guard feasibility probe for Codex CLI.",
+    "developerName": "Kanon",
+    "category": "Productivity",
+    "capabilities": [
+      "Write"
+    ]
+  }
+}

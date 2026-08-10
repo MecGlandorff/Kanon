@@ -1,0 +1,429 @@
+{
+  "schema": "kanon-guard-feasibility-report-v2",
+  "follow_up": "run-a1-hardened",
+  "host": "claude-code",
+  "generated_at": "2026-07-27T20:21:07.356Z",
+  "claimed_surface": {
+    "cli": "claude --plugin-dir",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "non-interactive local CLI",
+    "permission_contract": "dontAsk, one built-in tool, and an exact Bash allow rule only when a fixed scratch command must be observable",
+    "model_alias": "haiku",
+    "effort": "low",
+    "max_budget_usd_per_attempt": 0.05,
+    "max_model_attempts": 6,
+    "max_budget_usd_total": 0.3,
+    "timeout_ms_per_attempt": 180000,
+    "max_output_bytes_per_stream": 8388608,
+    "cli_version": "2.1.219 (Claude Code)"
+  },
+  "known": [
+    "Directly proven on this named surface: discovery, scratch_cleanup, execution_completed."
+  ],
+  "likely": [],
+  "unknown": [
+    "Claude Code output did not directly expose a resumable session identifier.",
+    "Claude Code exposes no separately inspectable per-plugin hook-trust state in this non-interactive plugin-dir probe.",
+    "Hard Guard is not claimable on this surface; direct proof is missing for: untrusted_hook, shell_denial, patch_denial, rewrite_schema_and_effect, metadata, resume, compaction, disabled_hooks, trusted_hook."
+  ],
+  "stale_or_suspicious": [],
+  "suggested": [
+    "Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go."
+  ],
+  "setup": [
+    {
+      "name": "trusted-executable-resolution",
+      "resolved_outside_repository": true,
+      "ambient_environment_inherited": false
+    },
+    {
+      "name": "claude-version",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "cb758819034d05e8cc7388238af3ba029dfed891a74bce2c348d2da06a268ffd",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 22,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "authentication",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "logged_in": true
+    }
+  ],
+  "attempts": [
+    {
+      "name": "shell-deny",
+      "invocation": {
+        "executable": "claude",
+        "arguments": [
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--include-hook-events",
+          "--plugin-dir",
+          "<disposable-plugin-root>",
+          "--max-budget-usd",
+          "0.05",
+          "--model",
+          "haiku",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "dontAsk",
+          "--setting-sources",
+          "",
+          "--strict-mcp-config",
+          "--mcp-config",
+          "{\"mcpServers\":{}}",
+          "--no-chrome",
+          "--tools",
+          "Bash",
+          "--allowedTools",
+          "<exact-scratch-command-permission-rule>",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "000cc0ced200cf6825f125a859012ad9f060c5a45edee29de89bc3b0336c7add"
+      },
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "2122456c9827a04aff9792c1149505097ac016d61c330a0df0dd73976358987c",
+        "stdout_bytes": 0,
+        "stderr_bytes": 94
+      },
+      "observation_count": 1,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": false,
+          "plugin_data_created_directory_count": 0,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    },
+    {
+      "name": "write-deny",
+      "invocation": {
+        "executable": "claude",
+        "arguments": [
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--include-hook-events",
+          "--plugin-dir",
+          "<disposable-plugin-root>",
+          "--max-budget-usd",
+          "0.05",
+          "--model",
+          "haiku",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "dontAsk",
+          "--setting-sources",
+          "",
+          "--strict-mcp-config",
+          "--mcp-config",
+          "{\"mcpServers\":{}}",
+          "--no-chrome",
+          "--tools",
+          "Write",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "d2b5929cd97b04d29c2d25307dc79c3cba29901a525e6e88dae6c2d68955734b"
+      },
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "2122456c9827a04aff9792c1149505097ac016d61c330a0df0dd73976358987c",
+        "stdout_bytes": 0,
+        "stderr_bytes": 94
+      },
+      "observation_count": 1,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": false,
+          "plugin_data_created_directory_count": 0,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    },
+    {
+      "name": "edit-deny",
+      "invocation": {
+        "executable": "claude",
+        "arguments": [
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--include-hook-events",
+          "--plugin-dir",
+          "<disposable-plugin-root>",
+          "--max-budget-usd",
+          "0.05",
+          "--model",
+          "haiku",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "dontAsk",
+          "--setting-sources",
+          "",
+          "--strict-mcp-config",
+          "--mcp-config",
+          "{\"mcpServers\":{}}",
+          "--no-chrome",
+          "--tools",
+          "Edit",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "968c71ef3fd4591fc7fd56d8edfbfb6cc371d466314c1186f5a3285e94a60fae"
+      },
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "2122456c9827a04aff9792c1149505097ac016d61c330a0df0dd73976358987c",
+        "stdout_bytes": 0,
+        "stderr_bytes": 94
+      },
+      "observation_count": 1,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": false,
+          "plugin_data_created_directory_count": 0,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_preserved": true
+    },
+    {
+      "name": "shell-rewrite",
+      "invocation": {
+        "executable": "claude",
+        "arguments": [
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--include-hook-events",
+          "--plugin-dir",
+          "<disposable-plugin-root>",
+          "--max-budget-usd",
+          "0.05",
+          "--model",
+          "haiku",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "dontAsk",
+          "--setting-sources",
+          "",
+          "--strict-mcp-config",
+          "--mcp-config",
+          "{\"mcpServers\":{}}",
+          "--no-chrome",
+          "--tools",
+          "Bash",
+          "--allowedTools",
+          "<exact-scratch-command-permission-rule>",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "0d38d6e56ffd1cfcba5ed45dbbc60af17b65dc5f71a5c667da4d8f10e2f43a8f"
+      },
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "2122456c9827a04aff9792c1149505097ac016d61c330a0df0dd73976358987c",
+        "stdout_bytes": 0,
+        "stderr_bytes": 94
+      },
+      "observation_count": 1,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": false,
+          "plugin_data_created_directory_count": 0,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        }
+      ],
+      "original_side_effect_exists": false,
+      "rewritten_side_effect_exists": false,
+      "rewritten_contents_sha256": null
+    },
+    {
+      "name": "hooks-disabled",
+      "invocation": {
+        "executable": "claude",
+        "arguments": [
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--include-hook-events",
+          "--plugin-dir",
+          "<disposable-plugin-root>",
+          "--max-budget-usd",
+          "0.05",
+          "--model",
+          "haiku",
+          "--effort",
+          "low",
+          "--permission-mode",
+          "dontAsk",
+          "--setting-sources",
+          "",
+          "--strict-mcp-config",
+          "--mcp-config",
+          "{\"mcpServers\":{}}",
+          "--no-chrome",
+          "--tools",
+          "Bash",
+          "--allowedTools",
+          "<exact-scratch-command-permission-rule>",
+          "--safe-mode",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "e512ab4a26d162bec0629ffc202ee547794ad6ed60dc11fdf2c8d90ad5a7e9bb"
+      },
+      "process": {
+        "status": 1,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "feb1740346a5db353a734dd0eed0a277c2e772aa11b7bad480afe3a0256c0d25",
+        "stdout_bytes": 0,
+        "stderr_bytes": 74
+      },
+      "observation_count": 0,
+      "observations": [],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    }
+  ],
+  "criteria": {
+    "discovery": "proven",
+    "untrusted_hook": "unknown",
+    "trusted_hook": "unknown",
+    "shell_denial": "unknown",
+    "patch_denial": "unknown",
+    "rewrite_schema_and_effect": "unknown",
+    "metadata": "unknown",
+    "resume": "unknown",
+    "compaction": "unknown",
+    "disabled_hooks": "unknown",
+    "scratch_cleanup": "proven",
+    "execution_completed": "proven"
+  },
+  "cleanup": [
+    {
+      "name": "scratch-remove",
+      "removed": true
+    }
+  ],
+  "disposition": "no-go"
+}

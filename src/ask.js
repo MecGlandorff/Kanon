@@ -12,6 +12,32 @@ export {
   extractLiteralSearch
 } from "./ask/intent.js";
 
+/**
+ * @typedef {ReturnType<typeof import("./analyze.js").analyzeRepo>} Analysis
+ * @typedef {import("./analyze/current-state.js").StateClaim} AnswerClaim
+ * @typedef {{
+ *   confidence: "known" | "likely" | "unknown" | "stale / suspicious",
+ *   summary: string,
+ *   summary_trust?: "repository-untrusted" | "kanon-generated",
+ *   claims: AnswerClaim[],
+ *   evidence: ({
+ *     id: string,
+ *     path: string,
+ *     trust: "repository-untrusted"
+ *   } | (import("./scanner/read.js").TextHit & {
+ *     trust: "repository-untrusted"
+ *   }))[],
+ *   searched_terms: string[],
+ *   scan_complete?: boolean,
+ *   needs_clarification?: boolean
+ * }} RepoAnswer
+ */
+
+/**
+ * @param {Analysis} analysis
+ * @param {unknown} question
+ * @returns {RepoAnswer}
+ */
 export function answerRepoQuestion(analysis, question) {
   const state = analysis.state;
   const intent = classifyQuestionIntent(question);
@@ -111,10 +137,15 @@ export function answerRepoQuestion(analysis, question) {
   return literalSearch(analysis, extractLiteralSearch(question));
 }
 
+/**
+ * @param {Analysis} analysis
+ * @param {string | null} literal
+ * @returns {RepoAnswer}
+ */
 function literalSearch(analysis, literal) {
-  const files = analysis.inspection?.files;
-  const scan = analysis.inspection?.scan || analysis.state.scan;
-  if (!literal || !Array.isArray(files)) {
+  const files = analysis.inspection.files;
+  const scan = analysis.inspection.scan;
+  if (!literal) {
     return unknown(
       "No live repository inspection context was available for literal search.",
       literal ? [literal] : [],
@@ -157,6 +188,12 @@ function literalSearch(analysis, literal) {
   };
 }
 
+/**
+ * @param {string} label
+ * @param {import("./analyze/findings.js").DeclaredCommand[]} commands
+ * @param {"ask" | "never"} executionPolicy
+ * @returns {RepoAnswer}
+ */
 function commandAnswer(label, commands, executionPolicy) {
   if (!commands.length) {
     return unknown(`No explicit ${label} command declaration was found.`);
@@ -188,6 +225,12 @@ function commandAnswer(label, commands, executionPolicy) {
   };
 }
 
+/**
+ * @param {RepoAnswer["confidence"]} confidence
+ * @param {string} summary
+ * @param {AnswerClaim[]} claims
+ * @returns {RepoAnswer}
+ */
 function fromClaims(confidence, summary, claims) {
   return {
     confidence,
@@ -203,6 +246,13 @@ function fromClaims(confidence, summary, claims) {
   };
 }
 
+/**
+ * @param {string} summary
+ * @param {string[]} [searchedTerms]
+ * @param {boolean} [complete]
+ * @param {boolean} [needsClarification]
+ * @returns {RepoAnswer}
+ */
 function unknown(
   summary,
   searchedTerms = [],

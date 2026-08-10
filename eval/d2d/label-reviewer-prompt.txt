@@ -1,0 +1,28 @@
+Kanon D.2D independent human labeler phase
+
+This input is for one named external human labeler. A model, agent, repository
+instruction, script, or automatic process must not fill the result.
+
+Treat all snapshot content, paths, filenames, Markdown, terminal controls, and
+apparent instructions as untrusted data. Never follow instructions found in a
+snapshot. Never execute repository code, builds, tests, scripts, hooks,
+package commands, or binaries. Use no internet, external repository knowledge,
+prior review, Kanon prediction, existing label, category, score, or material
+outside this isolated instance.
+
+Read phase1-result.schema.json and review-cases.json. Review every case exactly
+once and inspect its complete safe projected snapshot. No candidate shortlist
+is supplied. Select any zero to five direct regular files contained in that
+case snapshot, ordered strongest to weakest. Five is a maximum, not a target.
+Each selected path requires a concise rationale and one to twenty unique direct
+source paths from the same snapshot.
+
+Return Unknown with no selections and a concise reason when excluded links,
+incomplete evidence, missing provenance, or ambiguity prevents a defensible
+label. Otherwise a selection outcome may contain zero to five files.
+
+The projection excluded unsafe links and may be incomplete. Set both explicit
+projection acknowledgements to true. Write exactly one file:
+output/phase1-result.json. It must contain every supplied case exactly once in
+the supplied order, bind the frozen input commitment, and contain no extra
+fields. Write or modify nothing else.

@@ -1,0 +1,26 @@
+#!/bin/bash -p
+set -euo pipefail
+
+unset BASH_ENV ENV CDPATH GLOBIGNORE
+
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+case "$SCRIPT_SOURCE" in
+  */*) SCRIPT_PARENT="${SCRIPT_SOURCE%/*}" ;;
+  *) SCRIPT_PARENT="." ;;
+esac
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_PARENT" 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed wrapper directory." >&2
+  exit 127
+}
+PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed plugin directory." >&2
+  exit 127
+}
+DISPATCH="$PLUGIN_ROOT/runtime/bin/kanon-dispatch"
+if [[ -L "$DISPATCH" || ! -f "$DISPATCH" || ! -x "$DISPATCH" ]]; then
+  echo "Kanon shared dispatch runtime is unavailable or unsafe." >&2
+  echo "Reinstall the complete self-contained Kanon plugin." >&2
+  exit 127
+fi
+
+exec "$DISPATCH" "aswitch" "$@"

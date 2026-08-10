@@ -1,0 +1,57 @@
+{
+  "schema": "kanon-build-metadata-v1",
+  "package_name": "@mecglandorff/kanon",
+  "package_version": "1.0.0",
+  "plugin_name": "kanon",
+  "runtime": {
+    "format": "esm",
+    "runtime_dependencies": 0
+  },
+  "public_capabilities": {
+    "skills": [
+      "kanon",
+      "orient",
+      "resume",
+      "status",
+      "verify",
+      "steer",
+      "aswitch"
+    ],
+    "hosts": {
+      "codex-cli": {
+        "mode": "notice",
+        "enforcement": false,
+        "hook_status": "Unknown",
+        "lifecycle_notice_hook": "Unavailable",
+        "notice_delivery": "explicit-skill-and-status-output"
+      },
+      "claude-code": {
+        "mode": "notice",
+        "enforcement": false,
+        "hook_status": "Unknown",
+        "lifecycle_notice_hook": "Unavailable",
+        "notice_delivery": "explicit-skill-and-status-output"
+      }
+    },
+    "notice": {
+      "advisory": true,
+      "automatic": false,
+      "blocks": false,
+      "rewrites": false,
+      "approves": false,
+      "suppresses": false,
+      "forces_reading": false,
+      "claims_understanding": false,
+      "delivery": "explicit-skill-and-status-output",
+      "future_requirement": "host-and-platform-specific-proven-executable-argument-vector-and-environment-boundary"
+    },
+    "receipts": {
+      "role": "advisory-continuity-evidence",
+      "enforcement": false,
+      "evaluation": "explicit-kanon-invocation-only",
+      "persistence": "validated-plugin-data-when-available",
+      "repository_fallback": false,
+      "unavailable_host_evidence": "Unknown"
+    }
+  }
+}

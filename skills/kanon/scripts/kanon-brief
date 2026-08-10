@@ -1,25 +1,26 @@
-#!/usr/bin/env bash
+#!/bin/bash -p
 set -euo pipefail
 
-COMMAND="brief"
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_KANON="$SCRIPT_DIR/../runtime/bin/kanon.js"
+unset BASH_ENV ENV CDPATH GLOBIGNORE
 
-if [[ ! -f "$LOCAL_KANON" ]]; then
-  echo "Kanon skill runtime is incomplete: expected $LOCAL_KANON." >&2
-  echo "Reinstall the complete self-contained Kanon skill." >&2
+SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+case "$SCRIPT_SOURCE" in
+  */*) SCRIPT_PARENT="${SCRIPT_SOURCE%/*}" ;;
+  *) SCRIPT_PARENT="." ;;
+esac
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_PARENT" 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed wrapper directory." >&2
+  exit 127
+}
+PLUGIN_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P)" || {
+  echo "Kanon could not resolve its installed plugin directory." >&2
+  exit 127
+}
+DISPATCH="$PLUGIN_ROOT/runtime/bin/kanon-dispatch"
+if [[ -L "$DISPATCH" || ! -f "$DISPATCH" || ! -x "$DISPATCH" ]]; then
+  echo "Kanon shared dispatch runtime is unavailable or unsafe." >&2
+  echo "Reinstall the complete self-contained Kanon plugin." >&2
   exit 127
 fi
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25." >&2
-  exit 127
-fi
-
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [[ ! "$NODE_MAJOR" =~ ^(20|22|24|25)$ ]]; then
-  echo "Kanon requires Node.js major 20, 22, 24, or 25; found $(node --version)." >&2
-  exit 127
-fi
-
-exec node "$LOCAL_KANON" "$COMMAND" "$@"
+exec "$DISPATCH" "brief" "$@"

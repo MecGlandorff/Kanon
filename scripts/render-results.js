@@ -56,6 +56,8 @@ function render(run, source) {
     "",
     `Analyzer: \`${safe(run.analyzer.version)}\` (${safe(run.analyzer.source)})`,
     "",
+    `Artifact SHA-256: \`${safe(run.artifact?.sha256 || "not-applicable")}\` (conformance: \`${String(run.artifact?.conformance?.passed ?? "not-applicable")}\`)`,
+    "",
     `Corpus SHA-256: \`${safe(run.corpus.manifest_sha256)}\``,
     "",
     "## Gate",

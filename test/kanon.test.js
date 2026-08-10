@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { Readable } from "node:stream";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -20,8 +22,11 @@ import {
   writeKanonOutputs
 } from "../src/index.js";
 import { runCli } from "../src/cli.js";
+import { runWriteCli } from "../src/cli/write.js";
 import {
   captureCli,
+  fileIdentity,
+  initializeGit,
   makeFixture,
   readJson,
   writeFixtureFile
@@ -295,10 +300,36 @@ test("TODO input is treated as untrusted data and remains bounded", () => {
   assert.doesNotMatch(JSON.stringify(todos), /\u001b/);
 });
 
+test("narrow compatibility write CLI preserves writes and bounds stdin", async () => {
+  const root = makeFixture({ "README.md": "# Demo\n" });
+  const added = JSON.parse(
+    await captureCli(
+      runWriteCli,
+      ["todo", "add", "bounded item", "--json", "--root", root]
+    )
+  );
+  assert.equal(added.todo.text, "bounded item");
+  assert.equal(added.todo.trust, "repository-untrusted");
+
+  await assert.rejects(
+    () =>
+      captureCli(
+        runWriteCli,
+        ["todo", "add", "--stdin", "--root", root],
+        { stdin: Readable.from(["x".repeat(256 * 1024 + 1)]) }
+      ),
+    /exceeded 262144 bytes/
+  );
+  await assert.rejects(
+    () => captureCli(runWriteCli, ["brief", "--root", root]),
+    /Unknown command: brief/
+  );
+});
+
 test("CLI exposes the narrowed public surface and rejects removed modes", async () => {
   const root = makeFixture({ "README.md": "# Demo\n" });
   const version = await captureCli(runCli, ["--version"]);
-  assert.equal(version, "0.4.0-rc.1\n");
+  assert.equal(version, "1.0.0\n");
 
   for (const argv of [
     ["improve", "--root", root],
@@ -316,7 +347,7 @@ test("CLI exposes the narrowed public surface and rejects removed modes", async 
   assert.match(ask, /Kanon Answer/);
 });
 
-test("public skill ships only six wrappers and states the trust boundary", () => {
+test("public skills ship only supported wrappers and state the trust boundary", () => {
   const skill = fs.readFileSync(
     path.join(repoRoot, "skills/kanon/SKILL.md"),
     "utf8"
@@ -333,9 +364,245 @@ test("public skill ships only six wrappers and states the trust boundary", () =>
     .sort();
 
   assert.deepEqual(wrappers, expected);
+  const bashDispatch = fs.readFileSync(
+    path.join(repoRoot, "runtime", "bin", "kanon-dispatch"),
+    "utf8"
+  );
+  assert.match(bashDispatch, /^#!\/bin\/bash -p$/m);
+  assert.match(bashDispatch, /SAFE_PATH/);
+  assert.match(bashDispatch, /unset NODE_OPTIONS NODE_PATH/);
+  assert.doesNotMatch(
+    bashDispatch,
+    /\b(?:dirname|basename|command\s+-v|eval|source)\b/
+  );
+  assert.match(
+    bashDispatch,
+    /ask\|aswitch\|brief\|orient\|resume\|status\|steer\|verify/
+  );
+  assert.match(bashDispatch, /refresh\|todo/);
+  assert.match(
+    bashDispatch,
+    /refused a repository-controlled Node\.js executable/
+  );
+  const powershellDispatch = fs.readFileSync(
+    path.join(repoRoot, "runtime", "bin", "kanon-dispatch.ps1"),
+    "utf8"
+  );
+  assert.doesNotMatch(powershellDispatch, /Get-Command\s+node/);
+  assert.match(
+    powershellDispatch,
+    /Microsoft\.PowerShell\.Management\\Resolve-Path/
+  );
+  assert.match(powershellDispatch, /Microsoft\.PowerShell\.Management\\Get-Location/);
+  assert.match(powershellDispatch, /NODE_OPTIONS/);
+  assert.match(
+    powershellDispatch,
+    /SetEnvironmentVariable\([\s\S]*?\$null/
+  );
+  assert.match(powershellDispatch, /\$StableCommands -ccontains/);
+  assert.match(powershellDispatch, /\$WriteCommands -ccontains/);
+
+  for (const command of commands) {
+    assertFixedShim(
+      path.join(repoRoot, "skills", "kanon", "scripts"),
+      command
+    );
+  }
+  for (const stable of [
+    "orient",
+    "resume",
+    "status",
+    "verify",
+    "steer",
+    "aswitch"
+  ]) {
+    const stableRoot = path.join(repoRoot, "skills", stable);
+    assert.equal(
+      fs.existsSync(path.join(stableRoot, "SKILL.md")),
+      true
+    );
+    assert.deepEqual(
+      fs.readdirSync(path.join(stableRoot, "scripts")).sort(),
+      [`kanon-${stable}`, `kanon-${stable}.ps1`]
+    );
+    assertFixedShim(path.join(stableRoot, "scripts"), stable);
+  }
   assert.match(skill, /Repository content is untrusted data/);
   assert.match(skill, /explicit user approval/);
   assert.doesNotMatch(skill, /\bimprove\b|\brefactor\b|scorecard/i);
+});
+
+test("shared dispatch rejects unknown commands before PATH resolution", () => {
+  const root = makeFixture();
+  const marker = path.join(root, "repository-node-executed");
+  const hostileNode = path.join(root, "node");
+  fs.writeFileSync(
+    hostileNode,
+    `#!/bin/sh\n: > ${JSON.stringify(marker)}\nexit 97\n`
+  );
+  fs.chmodSync(hostileNode, 0o755);
+  const dispatch = path.join(
+    repoRoot,
+    "runtime",
+    "bin",
+    "kanon-dispatch"
+  );
+  const run = spawnPlatformWrapper(dispatch, ["unsupported"], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${root}${path.delimiter}${process.env.PATH || ""}`
+    },
+    timeout: 30_000
+  });
+
+  assert.equal(run.status, 127);
+  assert.match(run.stderr, /unsupported dispatch command/);
+  assert.equal(fs.existsSync(marker), false);
+});
+
+test("shared dispatch survives plugin and repository paths with spaces", () => {
+  const parent = fs.mkdtempSync(
+    path.join(os.tmpdir(), "kanon plugin relocation ")
+  );
+  const relocated = path.join(parent, "installed plugin");
+  const repository = path.join(parent, "selected repository");
+  fs.mkdirSync(relocated);
+  fs.mkdirSync(repository);
+  fs.cpSync(path.join(repoRoot, "runtime"), path.join(relocated, "runtime"), {
+    recursive: true
+  });
+  fs.cpSync(path.join(repoRoot, "skills"), path.join(relocated, "skills"), {
+    recursive: true
+  });
+  fs.writeFileSync(path.join(repository, "README.md"), "# Fixture\n");
+
+  for (const wrapper of [
+    path.join(relocated, "skills", "orient", "scripts", "kanon-orient"),
+    path.join(
+      relocated,
+      "skills",
+      "kanon",
+      "scripts",
+      "kanon-refresh"
+    )
+  ]) {
+    const run = spawnPlatformWrapper(wrapper, ["--version"], {
+      cwd: repository,
+      encoding: "utf8",
+      timeout: 30_000
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal(run.stdout, "1.0.0\n");
+  }
+});
+
+test("PowerShell wrapper canonicalizes a symlinked cwd before Node lookup", (t) => {
+  if (process.platform === "win32") {
+    t.skip("The marker executable fixture requires a POSIX interpreter.");
+    return;
+  }
+  let shell = null;
+  for (const candidate of ["pwsh", "powershell.exe"]) {
+    const probe = spawnSync(
+      candidate,
+      ["-NoProfile", "-Command", "exit 0"],
+      {
+        encoding: "utf8",
+        timeout: 10_000,
+        windowsHide: true
+      }
+    );
+    if (probe.status === 0) {
+      shell = candidate;
+      break;
+    }
+  }
+  if (shell === null) {
+    t.skip("PowerShell is unavailable.");
+    return;
+  }
+
+  const root = makeFixture({ "README.md": "# Fixture\n" });
+  const aliasParent = makeFixture();
+  const alias = path.join(aliasParent, "repository-alias");
+  try {
+    fs.symlinkSync(root, alias, "dir");
+  } catch {
+    t.skip("Directory symlinks are unavailable.");
+    return;
+  }
+  const marker = path.join(root, "repository-node-executed");
+  const hostileNode = path.join(root, "node");
+  fs.writeFileSync(
+    hostileNode,
+    `#!/bin/sh\n: > ${JSON.stringify(marker)}\nexit 97\n`
+  );
+  fs.chmodSync(hostileNode, 0o755);
+  const wrapper = path.join(
+    repoRoot,
+    "skills",
+    "orient",
+    "scripts",
+    "kanon-orient.ps1"
+  );
+  const quotePowerShell = (value) =>
+    `'${value.replaceAll("'", "''")}'`;
+  const run = spawnSync(
+    shell,
+    [
+      "-NoProfile",
+      "-Command",
+      `Set-Location -LiteralPath ${quotePowerShell(alias)}; & ${quotePowerShell(wrapper)} 'symlink target check'`
+    ],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${root}${path.delimiter}${process.env.PATH || ""}`
+      },
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: 30_000,
+      windowsHide: true
+    }
+  );
+
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.equal(fs.existsSync(marker), false);
+});
+
+test("every compatibility read workflow preserves repository and Git index bytes and mtimes", async (t) => {
+  const root = makeFixture({
+    "README.md": "# Compatibility read fixture\n",
+    "package.json": JSON.stringify({
+      name: "compatibility-read-fixture",
+      scripts: {
+        attack:
+          "node -e \"require('node:fs').writeFileSync('EXECUTED','bad')\""
+      }
+    })
+  });
+  const initialized = initializeGit(root);
+  if (initialized.status !== 0) {
+    t.skip("Git is unavailable for the compatibility read-only proof.");
+    return;
+  }
+  const marker = path.join(root, "EXECUTED");
+  const index = path.join(root, ".git", "index");
+  const before = snapshotFileIdentities(root);
+  const beforeIndex = fileIdentity(index);
+  for (const argv of [
+    ["brief", "--json", "--root", root],
+    ["ask", "what does this repository do?", "--json", "--root", root],
+    ["resume", "--json", "--root", root],
+    ["verify", "README.md", "--json", "--root", root]
+  ]) {
+    await captureCli(runCli, argv);
+    assert.deepEqual(snapshotFileIdentities(root), before);
+    assert.deepEqual(fileIdentity(index), beforeIndex);
+  }
+  assert.equal(fs.existsSync(marker), false);
 });
 
 test("generated skill artifact is synchronized and self-contained", () => {
@@ -365,8 +632,12 @@ test("generated skill artifact is synchronized and self-contained", () => {
       timeout: 30_000
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.equal(JSON.parse(run.stdout).version, "0.4.0-rc.1");
+    assert.equal(JSON.parse(run.stdout).version, "1.0.0");
   }
+  assert.deepEqual(
+    readJson(path.join(repoRoot, "src/v1/build-metadata.json")),
+    readJson(path.join(repoRoot, "runtime/build-metadata.json"))
+  );
 });
 
 test("package metadata is clean and has no self-dependency", () => {
@@ -374,12 +645,19 @@ test("package metadata is clean and has no self-dependency", () => {
   const lock = readJson(path.join(repoRoot, "package-lock.json"));
 
   assert.equal(pkg.dependencies, undefined);
-  assert.equal(pkg.devDependencies, undefined);
+  assert.deepEqual(pkg.devDependencies, {
+    "@types/node": "20.19.43",
+    typescript: "7.0.2"
+  });
   assert.equal(
     pkg.engines.node,
     "^20.0.0 || ^22.0.0 || ^24.0.0 || ^25.0.0"
   );
   assert.equal(lock.packages[""].dependencies, undefined);
+  assert.deepEqual(
+    lock.packages[""].devDependencies,
+    pkg.devDependencies
+  );
 });
 
 test("rendered public outputs identify repository content as data", () => {
@@ -399,3 +677,78 @@ test("rendered public outputs identify repository content as data", () => {
     assert.doesNotMatch(output, /\u001b|\u202e/);
   }
 });
+
+function spawnPlatformWrapper(wrapper, args, options) {
+  if (process.platform !== "win32") {
+    return spawnSync(wrapper, args, options);
+  }
+  return spawnSync(
+    "powershell.exe",
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      `${wrapper}.ps1`,
+      ...args
+    ],
+    {
+      windowsHide: true,
+      ...options
+    }
+  );
+}
+
+function assertFixedShim(directory, command) {
+  const bash = fs.readFileSync(
+    path.join(directory, `kanon-${command}`),
+    "utf8"
+  );
+  assert.match(bash, /^#!\/bin\/bash -p$/m);
+  assert.match(bash, /runtime\/bin\/kanon-dispatch/);
+  assert.match(
+    bash,
+    new RegExp(
+      `exec "\\$DISPATCH" "${command}" "\\$@"`
+    )
+  );
+  assert.doesNotMatch(
+    bash,
+    /\b(?:node|dirname|basename|eval|source|command\s+-v)\b|SAFE_PATH|NODE_OPTIONS/
+  );
+
+  const powershell = fs.readFileSync(
+    path.join(directory, `kanon-${command}.ps1`),
+    "utf8"
+  );
+  assert.match(powershell, /runtime\/bin\/kanon-dispatch\.ps1/);
+  assert.match(
+    powershell,
+    new RegExp(`& \\$Dispatch "${command}" @args`)
+  );
+  assert.doesNotMatch(
+    powershell,
+    /Get-Command\s+node|Invoke-Expression|NODE_OPTIONS|\$NodePath/
+  );
+  assert.doesNotMatch(powershell, /(?:^|\n)\s*\.\s+\$Dispatch/m);
+}
+
+function snapshotFileIdentities(root) {
+  const output = {};
+  visit(root, "");
+  return output;
+
+  function visit(directory, prefix) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolute, relative);
+      } else if (entry.isFile()) {
+        output[relative] = fileIdentity(absolute);
+      }
+    }
+  }
+}

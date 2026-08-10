@@ -31,6 +31,14 @@ scorecards, refactor advice, dead-code advice, numeric health scores, and
 ready-to-paste agent prompts are experimental source work and are not shipped
 in the public skill artifact.
 
+The v1.0.0 candidate follows the solo-maintainer `maintainer-stable` lane. Its
+signed waiver and maintainer certification are exact mechanical inputs, while
+accepted risks remain open. It does not establish evidence-strict release
+support, independence, blinded review, causal improvement, generalization,
+official holdout performance, or independent validation. The prospective
+protocol remains inactive, and the six-person simulation is simulated
+development evidence only.
+
 ### Planned Codex ablation
 
 A future evaluation will compare the same Codex configuration on paired,
@@ -47,9 +55,19 @@ security evaluation, and allowed claim language are specified in
 
 ## Use
 
-Copy the complete `skills/kanon/` directory into your agent's skills directory.
-Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25 are
-supported.
+Install the exact package without lifecycle scripts into a user-controlled
+plugin directory, then configure Codex CLI or Claude Code to load the complete
+installed package root:
+
+```text
+npm install --ignore-scripts --prefix <plugin-directory> @mecglandorff/kanon@<exact-version>
+```
+
+The package has separate host manifests, shared skills, and one shared ESM
+runtime. Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25
+are supported. Bash and PowerShell wrappers are included. Host-specific plugin
+loading and native plugin-data wiring depend on the installed host and remain
+Unknown until verified there.
 
 Starting with v0.4, the
 [`@mecglandorff/kanon`](https://www.npmjs.com/package/@mecglandorff/kanon)
@@ -65,14 +83,29 @@ $kanon
 Brief this repo and tell me which evidence supports the first edit.
 ```
 
-The supported core workflows are:
+The public artifact exposes exactly six canonical stable v1 skills:
+
+| Stable skill | Behavior |
+| --- | --- |
+| `orient` | Load a small task-relevant body of repository evidence, with explicit limitations and a non-enforcing context receipt. |
+| `resume` | Resume from authoritative live repository evidence while keeping stored continuity conflicts and Unknowns visible. |
+| `verify` | Verify documentation, continuity, generated-artifact, declared-validation, and available receipt claims without inventing execution success. |
+| `status` | Report embedded version, exact-version deprecation, notice mode, enforcement false, hook observability, receipt availability, and bounded diagnostics. |
+| `steer` | Maintain one bounded evidence-aware implementation slice through Understand, choose, act, verify, and reassess without orchestrating or executing work. |
+| `aswitch` | Prepare or receive a bounded consent-driven handoff between Codex CLI and Claude Code with a manual fallback. |
+
+Every stable invocation consults the same exact-installed-version deprecation
+checker. Network, host, hook, or session evidence that is unavailable remains
+Unknown and does not block the read workflow.
+
+The v0.4 compatibility workflows remain:
 
 | Intent | Workflow |
 | --- | --- |
-| Orient to a repository | `brief` |
-| Ask about purpose, run, test, Git, docs drift, or literal text | `ask` |
-| Check conventional README drift | `verify` |
-| Resume from persisted repo state | `resume` |
+| Orient to a repository | `brief` → stable `orient` |
+| Ask one narrow purpose, run, test, Git, docs-drift, or literal-search question | `ask` → stable `orient` or `verify` |
+| Check conventional README drift | `verify` → stable `verify` |
+| Resume from persisted repo state | `resume` → stable `resume` |
 | Refresh continuity state | `refresh` |
 | Track human follow-up | `todo` |
 
@@ -113,9 +146,28 @@ snapshots/      historical state
 hard retention limits. Reaching a limit produces a warning rather than
 unbounded growth.
 
-`skills/kanon/` is the supported integration artifact. Its Bash and PowerShell
-wrappers call the bundled runtime from the repository being inspected; they are
-agent hooks, not a global terminal package.
+The complete package root is the supported integration artifact. Its Bash and
+PowerShell wrappers call the shared root runtime from the repository being
+inspected; they are agent hooks, not a global terminal package. Codex CLI and
+Claude Code are both in advisory notice mode: enforcement is false, and the
+notice never claims that repository context was read or understood.
+
+The slice 8 context receipt is advisory data only. It is not stored, enforced,
+invalidated by hooks, or used to block mutation. Its freshness remains Unknown
+when current evidence or a host-session binding is unavailable.
+
+## Security and release status
+
+Report vulnerabilities privately and review supported versions in
+[`SECURITY.md`](SECURITY.md). Release, rollback, deprecation, exact-artifact
+reuse, and post-publication verification are specified in
+[`RELEASING.md`](RELEASING.md).
+
+The local v1.0.0 candidate is not a publication. GitHub environment protection,
+repository permissions, artifact-attestation availability, immutable-release
+settings, npm trusted-publisher configuration, and registry policy remain
+Unknown until remotely verified. Native Linux and Windows conformance also
+remain Unknown until the validate-only remote matrix passes.
 
 ## Development
 
@@ -127,11 +179,12 @@ npm run eval:dev
 ```
 
 `npm run eval:dev` uses visible labels and may guide generic implementation
-work. A workflow-dispatched release candidate must also pass it. Stable
-publication additionally requires an independently frozen
+work. A workflow-dispatched release candidate must also pass it. The existing
+evidence-strict `stable` lane additionally requires an independently frozen
 `eval/release-corpus.json`; a missing, partial, development-role, or
-threshold-failing corpus blocks stable publication. False positives cost five
-times false negatives, and every scored dimension and category has its own
-precision and recall floor.
+threshold-failing corpus blocks that lane. The separate `maintainer-stable`
+lane requires the exact signed waiver and maintainer certification and makes no
+holdout or independence claim. False positives cost five times false negatives,
+and every scored dimension and category has its own precision and recall floor.
 
 MIT

@@ -2,7 +2,8 @@
 
 Kanon does not execute repository code. Read workflows do not intentionally
 write the selected repository; only explicit refresh and TODO mutations write
-bounded files under `.kanon/`.
+bounded files under `.kanon/`. Explicit orient may replace advisory receipt
+data only in a validated plugin-data directory outside the repository.
 
 ## AI trust boundary
 
@@ -39,6 +40,35 @@ same-user process from replacing an ancestor concurrently. Kanon reduces this
 risk with no-follow file opens and identity checks, but directory
 file-descriptor-relative traversal is not portable in the supported Node.js
 runtime. This race is a residual threat.
+
+Receipt data is versioned, fixed-size, hash-based, retained for a bounded
+window, and atomically replaced with no-follow handling where available. It
+contains no repository prose, commands, prompts, secrets, or imperative
+instructions. If safe plugin data is unavailable, receipt persistence remains
+Unknown and there is no repository or undocumented host-state fallback.
+
+Steer input is a bounded exact-schema JSON object supplied on standard input,
+not shell arguments. Caller evidence references remain Unknown. The state
+model performs no repository execution, plan action, verification, agent
+management, persistence, or implicit scope expansion.
+
+Aswitch payloads are supplied only through bounded exact-schema JSON standard
+input. Preview and write are separate explicit operations, the approval digest
+must match the exact preview, and the only write target is a content-derived
+file in an existing canonical user-selected directory outside the repository.
+The runtime caps each destination at eight Kanon handoffs and 256 inspected
+directory entries. Windows ACL privacy remains Unknown. Raw handoff content
+never enters process arguments. Slice 11 performs no executable
+resolution or launch; its manual command model is Suggested and explicitly
+unverified. Receiving validation treats a known checksum, canonical-root,
+commit, or complete change-set mismatch as Stale and an unavailable comparison
+as Unknown.
+
+Full-history has no source reader in the shipped artifact. Never discover a
+source by reading Codex or Claude user-state paths. A later user-supplied or
+documented export remains a separate untrusted attachment, requires its own
+risk acknowledgement, and must not be merged into a compacted handoff, fixed
+bootstrap instruction, or process arguments.
 
 ## Git observation
 

@@ -1,0 +1,21 @@
+{
+  "schema_version": "kanon-d2c-comparative-preparation-v1",
+  "starting_head": "5103e75350e06bfadace913faca8477a31684983",
+  "restored_artifact_sha256": "89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a",
+  "raw_report": "eval/results/development-0.4.0-rc.1-d2a-74208b9a.json",
+  "raw_report_sha256": "747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3",
+  "corpus_manifest": "eval/corpus.json",
+  "corpus_manifest_sha256": "4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92",
+  "source_preparation": "eval/d2c/preparation.json",
+  "source_preparation_sha256": "b8b86403935b1d030fe3b74f2da6643c3e18508df0f0d777625a8eeec5fd9b8f",
+  "source_case_snapshots_sha256": "4ad546ef3e7950697f80de7480a98cecc4f5e69de3b1bb7978fe302d228730b6",
+  "source_snapshot_links_rejected": 57,
+  "reviewer_prompt": "eval/d2c/comparative-reviewer-prompt.txt",
+  "reviewer_prompt_sha256": "96b25cee9a79a0ce42b22469fc522d6f4d78db459f5f2cc00f4112011e476670",
+  "result_schema": "eval/d2c/comparative-result.schema.json",
+  "result_schema_sha256": "78e732babb4b4a98ef2a9f607636d82b8e8ccdd4a1a2811333799fc9d8aff96a",
+  "exact_agreement_exclusion_rule": "exclude-if-important-file-prediction-set-equals-label-set",
+  "excluded_exact_agreement_case_count": 2,
+  "excluded_exact_agreement_commitment_sha256": "3571989ebc689a79c3e8056e9b19e7d3f907ebeb90764efd92f0f07c140673c1",
+  "preparation_seed": "5efdba46b675f41b3e18bbfccfe17083213c01c5c236ca8c20d7fdb54f996a93"
+}

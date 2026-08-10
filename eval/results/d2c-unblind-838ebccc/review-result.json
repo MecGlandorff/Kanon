@@ -1,0 +1,1509 @@
+{
+  "schema_version": "kanon-d2c-adjudication-v1",
+  "items": [
+    {
+      "case_id": "case-88928d03efee8d051237",
+      "item_id": "item-a08041e4b5399728ed321a1a",
+      "path": "src/lib.rs",
+      "snapshot_root": "cases/case-88928d03efee8d051237",
+      "file_metadata": {
+        "byte_count": 1671,
+        "sha256": "2d9148e9e10489ae86159b5d0f74f32fc0bb502b908e56b30ced84e94bff2afa"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the crate's documented public surface, module structure, and principal PrettyPrinter API re-exports.",
+      "source_paths": [
+        "src/lib.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-88928d03efee8d051237",
+      "item_id": "item-e2fbd35d699026b50421fb06",
+      "path": "src/controller.rs",
+      "snapshot_root": "cases/case-88928d03efee8d051237",
+      "file_metadata": {
+        "byte_count": 12312,
+        "sha256": "128620a270fc17ed6afc6ffda84896b1d8bb1124b54d3062afd3f0cc085a7aa9"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the central input-processing and output-control pipeline used to run printing across inputs.",
+      "source_paths": [
+        "src/controller.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-1cb3c58132d3ce60508d",
+      "item_id": "item-58d51331791650b66154c891",
+      "path": "crates/turborepo-lib/src/lib.rs",
+      "snapshot_root": "cases/case-1cb3c58132d3ce60508d",
+      "file_metadata": {
+        "byte_count": 4047,
+        "sha256": "7b4c93751abfdaa51525a7b2b36682cdfba48411e70ccd06bc66f96b8b20ef5b"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the library's module graph, public CLI-facing exports, version access, and main execution entry point.",
+      "source_paths": [
+        "crates/turborepo-lib/src/lib.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-1cb3c58132d3ce60508d",
+      "item_id": "item-360b8739f925ba719cfc169e",
+      "path": "crates/turbo-trace/src/main.rs",
+      "snapshot_root": "cases/case-1cb3c58132d3ce60508d",
+      "file_metadata": {
+        "byte_count": 1438,
+        "sha256": "04ac073df5a5c9be8808d6b3dae609ad2e1fe82e6cfd054d42ac5d6af398e841"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the complete executable entry point for the trace tool, including CLI parsing, tracing, output, and failure handling.",
+      "source_paths": [
+        "crates/turbo-trace/src/main.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-6abbf289d53fec9979d951f9",
+      "path": "packages/vue/index.js",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 171,
+        "sha256": "a5287f6056bc5c2c569d318063ee043f55a0d323fa7262f64456d58fd574f928"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Acts as the CommonJS package entry point and selects the production or development build at runtime.",
+      "source_paths": [
+        "packages/vue/index.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-428704b4da1d73f193bf5ec5",
+      "path": "packages/vue/jsx.d.ts",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 741,
+        "sha256": "8a35ec19c6c699c98fd16fc80ae6964d80139c5a8e62ec4a5c60902c1da3285c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Registers the package's global JSX contract, including element, intrinsic-element, and reserved-prop types.",
+      "source_paths": [
+        "packages/vue/jsx.d.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-d7c0449658e1c0594d760332",
+      "path": "packages/reactivity/src/index.ts",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 1772,
+        "sha256": "544c9c181c973e0341e08c326dd9aef97e4b26f69ca2872ca7a7bba015897019"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates and exposes the reactivity package's complete public runtime and type API.",
+      "source_paths": [
+        "packages/reactivity/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-7adc0afe7744a20b53170413",
+      "path": "packages/vue/src/index.ts",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 2958,
+        "sha256": "3d7dd92e347d1ce06591a68617aa0fe178a453df0e63feb7ad98414842939320"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the full build's runtime compiler integration and re-exports the public runtime DOM API.",
+      "source_paths": [
+        "packages/vue/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-824c6c7b0c15c21f18ac4a17",
+      "path": "packages/runtime-core/src/index.ts",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 12255,
+        "sha256": "067f105768c3094437cead9f39958c7843b848f6c6e93d324f85361f944adbf7"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the runtime-core package's broad public API, including rendering, lifecycle, reactivity, and component contracts.",
+      "source_paths": [
+        "packages/runtime-core/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-aeaf6a6e928739b70f99",
+      "item_id": "item-97bb18f581c1b3e33c78b806",
+      "path": "packages/vue/index.mjs",
+      "snapshot_root": "cases/case-aeaf6a6e928739b70f99",
+      "file_metadata": {
+        "byte_count": 27,
+        "sha256": "be2f35590bee45e69850d0d8d48f0b8c8f5c0ef0ecf8a7265ab12fb7add6584d"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the ESM-facing package entry by forwarding the package's JavaScript exports.",
+      "source_paths": [
+        "packages/vue/index.mjs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-70d541ddb7f8ba95de95",
+      "item_id": "item-3979b58746ddf571f0e4fd50",
+      "path": "bakerydemo/urls.py",
+      "snapshot_root": "cases/case-70d541ddb7f8ba95de95",
+      "file_metadata": {
+        "byte_count": 1819,
+        "sha256": "4586a8a098075d2301680dbc4373cb7dd04a71aa87d8dadf0490b04bb528cde4"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the application's root URL routing, including administration, documents, search, API, media, and Wagtail routes.",
+      "source_paths": [
+        "bakerydemo/urls.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-70d541ddb7f8ba95de95",
+      "item_id": "item-fe0b3ad501d324fa58e2eeba",
+      "path": "requirements.txt",
+      "snapshot_root": "cases/case-70d541ddb7f8ba95de95",
+      "file_metadata": {
+        "byte_count": 31,
+        "sha256": "de1f5925c96be652f845a82555f02220e4fb5525e743331134f6f25956dd6c77"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the root dependency installation path by including the production requirements set.",
+      "source_paths": [
+        "requirements.txt"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "item_id": "item-347eb300f5c6c0a33e1fa827",
+      "path": "src/pretix/_base_settings.py",
+      "snapshot_root": "cases/case-9eed4a5b41ba4af420bd",
+      "file_metadata": {
+        "byte_count": 9527,
+        "sha256": "71e5701f2a1d2a4910207b1efecd46792649e7609a1a7939ecf3a861e6f59655"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines shared application settings covering installed apps, localization, templates, static assets, and other foundational configuration.",
+      "source_paths": [
+        "src/pretix/_base_settings.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "item_id": "item-15f736e231747cc1472feece",
+      "path": "src/pretix/urls.py",
+      "snapshot_root": "cases/case-9eed4a5b41ba4af420bd",
+      "file_metadata": {
+        "byte_count": 4129,
+        "sha256": "09a89685807cf5d3b7abfe78978b80d5c5f95524433332184e15720114567b2b"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Composes the application's top-level health, control, API, media, and supporting URL patterns.",
+      "source_paths": [
+        "src/pretix/urls.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "item_id": "item-d636476330652777c65ba6d9",
+      "path": "src/pretix/base/signals.py",
+      "snapshot_root": "cases/case-9eed4a5b41ba4af420bd",
+      "file_metadata": {
+        "byte_count": 48236,
+        "sha256": "18c17bd3d851174fefdce22c900aaaedb865d7fd479778de7c998736514233a4"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the plugin-aware signal dispatch mechanism that gates receivers by active application and plugin scope.",
+      "source_paths": [
+        "src/pretix/base/signals.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9eed4a5b41ba4af420bd",
+      "item_id": "item-f3f113a3ece576ad8e512e18",
+      "path": "src/pretix/settings.py",
+      "snapshot_root": "cases/case-9eed4a5b41ba4af420bd",
+      "file_metadata": {
+        "byte_count": 37944,
+        "sha256": "124d003618123eae26adb8effc83e0e7022dd6986c591fa32c027b760abc716b"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Builds the runtime configuration from base settings and deployment inputs, including secrets, databases, URLs, and plugin settings.",
+      "source_paths": [
+        "src/pretix/settings.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "item_id": "item-d5d0ddfa350de05e58a841ce",
+      "path": "internal/utils/bools.go",
+      "snapshot_root": "cases/case-9a2aa408a5339ef7f9d5",
+      "file_metadata": {
+        "byte_count": 747,
+        "sha256": "c471dbf023b5e5091498a2a96d1fc6003fd774d82791db73e09f24425e856af5"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only one generic boolean-count helper and no evidence of an architectural, entry-point, or public-contract role.",
+      "source_paths": [
+        "internal/utils/bools.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "item_id": "item-ee14e45d76220e17aeeb7181",
+      "path": "web/package.json",
+      "snapshot_root": "cases/case-9a2aa408a5339ef7f9d5",
+      "file_metadata": {
+        "byte_count": 2985,
+        "sha256": "496f798d0833275e6640448c30b035ef2ff3bfc4a0b9cd8b7b491ebd43842da1"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the web application's dependency graph, supported toolchain, and primary build, start, lint, and test workflows.",
+      "source_paths": [
+        "web/package.json"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "item_id": "item-23e8861e675adca8c6dda1b3",
+      "path": "internal/commands/root.go",
+      "snapshot_root": "cases/case-9a2aa408a5339ef7f9d5",
+      "file_metadata": {
+        "byte_count": 2987,
+        "sha256": "5e682bfba40fa4c99281230d216a59caaa411ad8f3b9b28d668f0ef908b39fbd"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs the root CLI command, registers major subcommands, and orchestrates startup validation and service execution.",
+      "source_paths": [
+        "internal/commands/root.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-9a2aa408a5339ef7f9d5",
+      "item_id": "item-9a9a5d978a855e43a2a26ac9",
+      "path": "internal/configuration/schema/server.go",
+      "snapshot_root": "cases/case-9a2aa408a5339ef7f9d5",
+      "file_metadata": {
+        "byte_count": 16596,
+        "sha256": "acb234c9d37319877334ce8c1dacf457b52d0793c12c1de8f1b8525d32e7e753"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the server configuration schema and operational defaults for listeners, TLS, endpoints, rate limits, buffers, and timeouts.",
+      "source_paths": [
+        "internal/configuration/schema/server.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-945e9ac341d6426f8a23ff6b",
+      "path": "packages/adapter-static/index.js",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 3691,
+        "sha256": "412e83960b275bf293f342a186989c6d5d6904e49c0242347a4f4cdeb7ae461c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the adapter's exported behavior for validating prerenderability and writing static sites, assets, fallbacks, and compressed output.",
+      "source_paths": [
+        "packages/adapter-static/index.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-98963bd9c415a1760f6640f4",
+      "path": "packages/kit/src/runtime/server/index.js",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 4835,
+        "sha256": "eebe51ab3b2cc0cc0c3d61b9b5e62890483f3e093721a44d1fc31fe3ac3c26b9"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the server runtime object that initializes hooks and environment state and dispatches application requests.",
+      "source_paths": [
+        "packages/kit/src/runtime/server/index.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-fb673c6b9d7592ca6e3b1636",
+      "path": "packages/kit/src/exports/index.js",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 13316,
+        "sha256": "52c10400926fb460d669246a5f4432fbecfefc1e320837e47afc28a72fabfe3c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements and documents central public package exports for errors, redirects, responses, validation, and URL normalization.",
+      "source_paths": [
+        "packages/kit/src/exports/index.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-500e454447830bdb1f7fd9f4",
+      "path": "packages/package/svelte-package.js",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 43,
+        "sha256": "9d2634a3aee36b0fa55994afe3bb143443f78fd4572d4e673962f1f9551689df"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the executable CLI boundary through a shebang entry point that loads the package command implementation.",
+      "source_paths": [
+        "packages/package/svelte-package.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-615b9425e599bbe6c5f64c34",
+      "path": "packages/kit/package.json",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 4725,
+        "sha256": "1480e50579e460605d1c3b3b4a84fed5e2514886e3699ef5d3075c8362a95ffc"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's published exports, executable mapping, dependencies, files, engines, and lifecycle workflows.",
+      "source_paths": [
+        "packages/kit/package.json"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-b418e22c3077876db652",
+      "item_id": "item-ebb80bbaa7ab99b30f354df1",
+      "path": "packages/kit/svelte-kit.js",
+      "snapshot_root": "cases/case-b418e22c3077876db652",
+      "file_metadata": {
+        "byte_count": 43,
+        "sha256": "9d2634a3aee36b0fa55994afe3bb143443f78fd4572d4e673962f1f9551689df"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the package's executable svelte-kit CLI boundary and forwards directly to its command implementation.",
+      "source_paths": [
+        "packages/kit/svelte-kit.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "item_id": "item-af6afdd26cdb26262d807375",
+      "path": "packages/angular-query-experimental/src/index.ts",
+      "snapshot_root": "cases/case-2b0dc3de4806a1da54d6",
+      "file_metadata": {
+        "byte_count": 1795,
+        "sha256": "49d26d8fcb2198e8e4ae3ec7b84a8d3bb1b13c518071cc83153a937f929a2d0c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the Angular binding's public query, mutation, provider, restoration, and core re-export surface.",
+      "source_paths": [
+        "packages/angular-query-experimental/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "item_id": "item-8d904fa3e78cbba3a7c7bf35",
+      "path": "packages/react-query/src/index.ts",
+      "snapshot_root": "cases/case-2b0dc3de4806a1da54d6",
+      "file_metadata": {
+        "byte_count": 2049,
+        "sha256": "61fe077cb48dc8f389bd61449077cb89c58fe26008f015b3ebfc4e3dc9d33947"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the React binding's public hooks, providers, option builders, boundaries, and core API.",
+      "source_paths": [
+        "packages/react-query/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "item_id": "item-f51cd08d7bb7ae02652e36cd",
+      "path": "packages/query-core/src/index.ts",
+      "snapshot_root": "cases/case-2b0dc3de4806a1da54d6",
+      "file_metadata": {
+        "byte_count": 1714,
+        "sha256": "af93d63f545db3b27d1b38da9a48709233e3a9f37b7585d6629181ab3ec4384c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the query-core package's public managers, caches, clients, observers, hydration, retry, utility, and type exports.",
+      "source_paths": [
+        "packages/query-core/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-2b0dc3de4806a1da54d6",
+      "item_id": "item-7ccd2dfde27ff9b65aca382a",
+      "path": "packages/preact-query/src/index.ts",
+      "snapshot_root": "cases/case-2b0dc3de4806a1da54d6",
+      "file_metadata": {
+        "byte_count": 2050,
+        "sha256": "eae53b721edb8a898520df28f92d1bbd8606edb52758d11096f0ee33b88d0137"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Aggregates the Preact binding's public hooks, providers, option builders, boundaries, and core API.",
+      "source_paths": [
+        "packages/preact-query/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-751868fc6386d15e3d3b5d9f",
+      "path": "segment_anything/segment_anything/common.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 969,
+        "sha256": "ae29785b23f9f1d8af9a8ca019069ae5f1152acb9fc123b6580ed8503c691e47"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Defines only two small supporting neural-network blocks; the file itself does not establish a central package or workflow role.",
+      "source_paths": [
+        "segment_anything/segment_anything/common.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-ceef0c92195443f5afaa2565",
+      "path": "lora/models.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 8836,
+        "sha256": "2578641a8d6881d72de2fcc6277ff9ec542c8f795bb7c6e238972bbe86e43fc5"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the LoRA linear layer and the transformer model architecture used by the fine-tuning workflow.",
+      "source_paths": [
+        "lora/models.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-9ca53074de99a44b2d674041",
+      "path": "whisper/mlx_whisper/__init__.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 149,
+        "sha256": "0af994ff2b9b365f031f1691a992ca45e118c5dbc3a830f264906c0adf4f3a27"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package import surface by exposing transcription, model-loading, decoding, audio, and version interfaces.",
+      "source_paths": [
+        "whisper/mlx_whisper/__init__.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-a68e3d670d9a553445e5ec47",
+      "path": "mnist/README.md",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 415,
+        "sha256": "caaf9a808a23ba8bdef51807cabf0f935bda40d88363ca6f3deaff509e3cde5b"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the example's primary setup, execution, device-selection, and help instructions.",
+      "source_paths": [
+        "mnist/README.md"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-f04912014368ee5d86456779",
+      "path": "lora/lora.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 12032,
+        "sha256": "6bd67eae56b2943643f8d5791254d0dd8cdcdf0a5144b0b90c7616fe64182a24"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the LoRA workflow's CLI, dataset loading, training, evaluation, generation, checkpointing, and model adaptation.",
+      "source_paths": [
+        "lora/lora.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-3f101080969183ccf98fb797",
+      "path": "mnist/mnist.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 2661,
+        "sha256": "1e6bd452395018da4cdfb85c994fedb9815f208ffb910354049753b92bbc49d2"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the example's MNIST and Fashion-MNIST acquisition, preprocessing, caching, and data-return interface.",
+      "source_paths": [
+        "mnist/mnist.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-9b0e9a9f053e18e43f490334",
+      "path": "stable_diffusion/stable_diffusion/config.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 1773,
+        "sha256": "96adac5977afa670a4f0a5cecb01153b38054fa5813671b8c6becd2d68227482"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the model configuration contracts and defaults for the autoencoder, text encoder, UNet, and diffusion process.",
+      "source_paths": [
+        "stable_diffusion/stable_diffusion/config.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f9d19760c12f72eaa933",
+      "item_id": "item-8deaa7d0bb38dc150654ad2f",
+      "path": "mnist/main.py",
+      "snapshot_root": "cases/case-f9d19760c12f72eaa933",
+      "file_metadata": {
+        "byte_count": 2792,
+        "sha256": "4b077fa0ffbb8f9bbef0deb974ab374e4106e43dd4184c06335eb6ae0463a7c0"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the runnable MNIST example entry point and contains its model, training loop, evaluation, and device selection.",
+      "source_paths": [
+        "mnist/main.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-252c319d41b39118878a",
+      "item_id": "item-0d605ad84312e2d6ade22604",
+      "path": "internal/aghhttp/aghhttp.go",
+      "snapshot_root": "cases/case-252c319d41b39118878a",
+      "file_metadata": {
+        "byte_count": 2284,
+        "sha256": "b06b653995988d6dacdffabb7994fd2f0b9bfd31a89525fd1d1a974dde8b74d7"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains a small collection of HTTP response helpers, including an explicitly temporary registration type, without evidence of central orchestration.",
+      "source_paths": [
+        "internal/aghhttp/aghhttp.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-252c319d41b39118878a",
+      "item_id": "item-81f6e449613813179b7feddf",
+      "path": "internal/home/home.go",
+      "snapshot_root": "cases/case-252c319d41b39118878a",
+      "file_metadata": {
+        "byte_count": 38930,
+        "sha256": "e0f638b773a19ca7c58ff56f6ca36c0972eb9439b5bbea8ca000350873243ccf"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Contains the application's main entry point and coordinates configuration, logging, signals, services, modules, and shutdown.",
+      "source_paths": [
+        "internal/home/home.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-252c319d41b39118878a",
+      "item_id": "item-84b2eb9720b688cc08d8ce7b",
+      "path": "go.mod",
+      "snapshot_root": "cases/case-252c319d41b39118878a",
+      "file_metadata": {
+        "byte_count": 6234,
+        "sha256": "9aae49266de6ad9de0e9285d7433f80402c9cb901791f725d45c3b84494b4591"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the Go module identity, language version, direct and indirect dependencies, tools, and ignored module directories.",
+      "source_paths": [
+        "go.mod"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-252c319d41b39118878a",
+      "item_id": "item-2d34c9e0e76b23cb06542155",
+      "path": "client/package.json",
+      "snapshot_root": "cases/case-252c319d41b39118878a",
+      "file_metadata": {
+        "byte_count": 4063,
+        "sha256": "0d8584302c90efcc143806ffe1c2515c886ef041c0d57106a05a8fc7e2c2b7ee"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the client application's scripts, runtime dependencies, development toolchain, and browser support policy.",
+      "source_paths": [
+        "client/package.json"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e9b8b7435e14ce8dca97",
+      "item_id": "item-02e14fb6d94f1310fad701ba",
+      "path": "tests/test.rs",
+      "snapshot_root": "cases/case-e9b8b7435e14ce8dca97",
+      "file_metadata": {
+        "byte_count": 8446,
+        "sha256": "b0fd2481d244afcc591e5c9b8089b1eb36a09f926e8380f0fd75623bc5029a74"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the shared integration-test DSL that constructs fixtures, runs the binary, and verifies status, output, and files.",
+      "source_paths": [
+        "tests/test.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e9b8b7435e14ce8dca97",
+      "item_id": "item-fee99a866a9c92f415c11c9d",
+      "path": "tests/lib.rs",
+      "snapshot_root": "cases/case-e9b8b7435e14ce8dca97",
+      "file_metadata": {
+        "byte_count": 3910,
+        "sha256": "1bbdb9017aa4e094020dea9d44e7c19aa6b29b4620333fdea016e7653ed8873b"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Acts as the integration-test suite root, providing shared support and declaring the full set of test modules.",
+      "source_paths": [
+        "tests/lib.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-e8075ec251910a31e93749bb",
+      "path": "distributed/ddp-tutorial-series/datautils.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 331,
+        "sha256": "6af257501c49d1373b9b57f47e54ec9260eef7d97ad46b59cd0280cbbd6cc779"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only a minimal synthetic Dataset helper and does not itself define the tutorial's distributed workflow.",
+      "source_paths": [
+        "distributed/ddp-tutorial-series/datautils.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-01e3ef9b90e6af5a1f8c986b",
+      "path": "mnist/main.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 5392,
+        "sha256": "30a3359d1911d2d859dd090ce20be7ed132a33f508dc389f40366010b3e9ecc8"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is a complete runnable MNIST example containing the model, training and test loops, CLI, data loading, and checkpoint option.",
+      "source_paths": [
+        "mnist/main.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-3d5f583d177acb8711eee50b",
+      "path": "run_python_examples.sh",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 8648,
+        "sha256": "874417516aa435d60490b1d32dfa94a416f1225c35f29a3c89f60ee8a0c23e51"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Orchestrates integration checks across the repository's Python examples, including selection, setup, execution, cleanup, and aggregate failure reporting.",
+      "source_paths": [
+        "run_python_examples.sh"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-02251314c5039c3775f3b194",
+      "path": "super_resolution/model.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 1060,
+        "sha256": "02edbd87555c4a99136572cc03e27a3b73ecef09127fb00c8ac2e3ac1f6c289c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the super-resolution example's complete neural network architecture and weight initialization.",
+      "source_paths": [
+        "super_resolution/model.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-6f918e0a8ab0d4b624d88af7",
+      "path": "word_language_model/data.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 1482,
+        "sha256": "15784815a6bd18e9b25eadf6ae049915f88d4fb8faebeba9d83ae6ec8e19883d"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the language-model example's vocabulary and corpus tokenization pipeline for train, validation, and test data.",
+      "source_paths": [
+        "word_language_model/data.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-c1502a2debb39f34d87e9044",
+      "path": "distributed/tensor_parallelism/log_utils.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 611,
+        "sha256": "57ab033bd4c0d67fd55e8ffc23164ccafe87034aea82f4ca8f1a994ef01adb04"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only logging and accelerator-count helpers, with no direct evidence of a central tensor-parallel implementation role.",
+      "source_paths": [
+        "distributed/tensor_parallelism/log_utils.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-2023251065c911a3ae736017",
+      "path": "dcgan/main.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 10653,
+        "sha256": "4f6aef3527822a32bcca366e336e941a67d04081f66f568cc24a0a642b5f9555"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the complete DCGAN example, including CLI, datasets, generator and discriminator models, optimization, training, and checkpoints.",
+      "source_paths": [
+        "dcgan/main.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e20f183077ea5021408f",
+      "item_id": "item-7f3fd1d4539e9cd899047737",
+      "path": "distributed/FSDP2/example.py",
+      "snapshot_root": "cases/case-e20f183077ea5021408f",
+      "file_metadata": {
+        "byte_count": 4136,
+        "sha256": "f84fb0503517ee5c6a6100c69bd0ccc55431e141643a32de88fadfb3407ecc6c"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the runnable FSDP2 example's distributed initialization, sharding, precision, prefetching, optimization, and checkpoint flow.",
+      "source_paths": [
+        "distributed/FSDP2/example.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-afc3e17d24393ba3e978",
+      "item_id": "item-289b698c48f36d715cf9a149",
+      "path": "crates/matcher/src/lib.rs",
+      "snapshot_root": "cases/case-afc3e17d24393ba3e978",
+      "file_metadata": {
+        "byte_count": 46637,
+        "sha256": "98f194a9cd6a5db50fdd08fe20913f6865bd78b8760236d50395155121ea806e"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines and documents the matcher crate's core public abstractions, including match ranges, line terminators, byte sets, and matcher interfaces.",
+      "source_paths": [
+        "crates/matcher/src/lib.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-afc3e17d24393ba3e978",
+      "item_id": "item-01a0e33cd229fa14e260c7b6",
+      "path": "crates/core/search.rs",
+      "snapshot_root": "cases/case-afc3e17d24393ba3e978",
+      "file_metadata": {
+        "byte_count": 15915,
+        "sha256": "53627fe6d2216552d3919586cd8746da3f392ba44e3bf59ccdc432c7c14e82d1"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the high-level search worker that coordinates matchers, readers, preprocessing, decompression, binary handling, and printers.",
+      "source_paths": [
+        "crates/core/search.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "item_id": "item-ceed7116fbe48c152708e7b1",
+      "path": "packages/mock-raf/index.d.ts",
+      "snapshot_root": "cases/case-f2a3c500e2f9bd2dfc78",
+      "file_metadata": {
+        "byte_count": 1701,
+        "sha256": "b1bfd0d60119a1c4ef30449b3bbb80f3277892840a020d1254a92d41bb8e87de"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the public TypeScript contract for the mock RAF package's scheduling, cancellation, stepping, flushing, and timing API.",
+      "source_paths": [
+        "packages/mock-raf/index.d.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "item_id": "item-72385f7af810366d64e24344",
+      "path": "packages/shared/src/index.ts",
+      "snapshot_root": "cases/case-f2a3c500e2f9bd2dfc78",
+      "file_metadata": {
+        "byte_count": 927,
+        "sha256": "956d0798e950517d5832a501e7c1608643525391f11d2d6f81e4064be990ff40"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the shared package's public export surface for animation loops, interpolation, colors, hooks, events, fluids, and RAF integration.",
+      "source_paths": [
+        "packages/shared/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "item_id": "item-4dd3a42d05082db92a1e662a",
+      "path": "packages/mock-raf/index.js",
+      "snapshot_root": "cases/case-f2a3c500e2f9bd2dfc78",
+      "file_metadata": {
+        "byte_count": 635,
+        "sha256": "af7cefc221b3098ea7261a43c2f7934f8e921edb54a100201af13c62c282f80e"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the mock RAF package's complete public runtime for scheduling, cancellation, time advancement, stepping, and flushing.",
+      "source_paths": [
+        "packages/mock-raf/index.js"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-f2a3c500e2f9bd2dfc78",
+      "item_id": "item-96bed261a5df5886b01b8de1",
+      "path": "packages/core/src/index.ts",
+      "snapshot_root": "cases/case-f2a3c500e2f9bd2dfc78",
+      "file_metadata": {
+        "byte_count": 661,
+        "sha256": "b489319fca797cf184f0842e3e4474afd656d280f1e8a55442ba762aa5353036"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the core package's public hooks, components, interpolation, controller, spring, frame, async, helper, and type exports.",
+      "source_paths": [
+        "packages/core/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-544d9ef412bce7994a73",
+      "item_id": "item-c9d5470917be37f9303263bd",
+      "path": "packages/config/src/config.ts",
+      "snapshot_root": "cases/case-544d9ef412bce7994a73",
+      "file_metadata": {
+        "byte_count": 6228,
+        "sha256": "02de9d6777f7ad28cdd033616121752eeb38816273898681de8db935fca390c4"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the configuration schema, defaults, validation descriptions, and normalization logic for release behavior.",
+      "source_paths": [
+        "packages/config/src/config.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-544d9ef412bce7994a73",
+      "item_id": "item-6a098820ce2e07af8b4ad8af",
+      "path": "packages/color/src/index.ts",
+      "snapshot_root": "cases/case-544d9ef412bce7994a73",
+      "file_metadata": {
+        "byte_count": 542,
+        "sha256": "2689e917e36e3ace25152874a0dba9bbd3e52aa03ce661b69860b491202d9ae0"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the color package's exported API as a lazy proxy over the runtime text-styling facility.",
+      "source_paths": [
+        "packages/color/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-544d9ef412bce7994a73",
+      "item_id": "item-6d3ff12b7230952321fb483d",
+      "path": "scripts/test-utils/src/index.ts",
+      "snapshot_root": "cases/case-544d9ef412bce7994a73",
+      "file_metadata": {
+        "byte_count": 4752,
+        "sha256": "51aaf984b45a356da2eb7209acdc846cdb7ef754437c9a14fdb505964712ca25"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Provides test-only fixture, mocking, logging, and Git helpers; the evidence does not support a product or public-contract role.",
+      "source_paths": [
+        "scripts/test-utils/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-544d9ef412bce7994a73",
+      "item_id": "item-29a4d3d4a290f78c26b9dc98",
+      "path": "packages/cli/src/index.ts",
+      "snapshot_root": "cases/case-544d9ef412bce7994a73",
+      "file_metadata": {
+        "byte_count": 1964,
+        "sha256": "52414af1d259c94e36ea35d54f770f30aebd3bd4291d0ce5164b477e4a510130"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Is the CLI execution boundary, handling command parsing, interactive presentation, matched-command execution, errors, and exit codes.",
+      "source_paths": [
+        "packages/cli/src/index.ts"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ffea795b67680efb8844",
+      "item_id": "item-a99dbf80190a58e4c10bd39f",
+      "path": "cmd/commands.go",
+      "snapshot_root": "cases/case-ffea795b67680efb8844",
+      "file_metadata": {
+        "byte_count": 22735,
+        "sha256": "ac7b4178c77b18567a9be62c1a4dae020b65ae3e7048acad0284a9196d4cb3a5"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the command registry and configures major operational commands such as run, start, stop, reload, adapt, validate, and storage.",
+      "source_paths": [
+        "cmd/commands.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ffea795b67680efb8844",
+      "item_id": "item-7ec45f939a85cd6c5e45cfb1",
+      "path": "caddyconfig/caddyfile/adapter.go",
+      "snapshot_root": "cases/case-ffea795b67680efb8844",
+      "file_metadata": {
+        "byte_count": 4853,
+        "sha256": "9a7cf9fef6df4475bbdc442a80271bc4d8fc3866f3dc831f3146214c79877a25"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the Caddyfile-to-JSON adapter and its public adapter, unmarshaler, and server-type extension contracts.",
+      "source_paths": [
+        "caddyconfig/caddyfile/adapter.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-6f0e9cbbee1ceda8299c",
+      "item_id": "item-c77419a10bd6b2c223820aa8",
+      "path": "cmd/soft/serve/server.go",
+      "snapshot_root": "cases/case-6f0e9cbbee1ceda8299c",
+      "file_metadata": {
+        "byte_count": 5138,
+        "sha256": "4dfc4d314e8cae5c050cafc8eb53e2291dfe647d97cb6d7086364ce16ae0d436"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs and orchestrates the application's SSH, Git, HTTP, stats, TLS, cron, startup, and shutdown services.",
+      "source_paths": [
+        "cmd/soft/serve/server.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-6f0e9cbbee1ceda8299c",
+      "item_id": "item-5a63f591d33ba10c26fc42f0",
+      "path": "pkg/db/db.go",
+      "snapshot_root": "cases/case-6f0e9cbbee1ceda8299c",
+      "file_metadata": {
+        "byte_count": 1833,
+        "sha256": "e66f647adfb79ba6c5e6c21562d1eeeb70810a2e75ea09fc6426e866a26d2dcb"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines database opening and the transaction commit-and-rollback abstraction used by the application.",
+      "source_paths": [
+        "pkg/db/db.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e1382be027673c336b85",
+      "item_id": "item-96ae053433c94f527ad32688",
+      "path": "djangoproject/hosts.py",
+      "snapshot_root": "cases/case-e1382be027673c336b85",
+      "file_metadata": {
+        "byte_count": 256,
+        "sha256": "3e649b80da3b984bf3752a75467339b6a7a87ad58ac833c94993e8893f5bf9ae"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the application's host-level routing for the primary site, documentation, and dashboard.",
+      "source_paths": [
+        "djangoproject/hosts.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-e1382be027673c336b85",
+      "item_id": "item-174729f452dc48d702a2206c",
+      "path": "setup.cfg",
+      "snapshot_root": "cases/case-e1382be027673c336b85",
+      "file_metadata": {
+        "byte_count": 648,
+        "sha256": "4f62abae30424688dca8f102144bf7ec521fbcc2b64dba4435701248150656f6"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only formatter and linter configuration; its contents do not establish an application, runtime, or public API role.",
+      "source_paths": [
+        "setup.cfg"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-fffe44ecc6f1c62266c4",
+      "item_id": "item-8c34ca0f231191628cc42cf7",
+      "path": "examples/apishowcase/apishowcase.py",
+      "snapshot_root": "cases/case-fffe44ecc6f1c62266c4",
+      "file_metadata": {
+        "byte_count": 860,
+        "sha256": "5e675140c26aa2f34b5da2acefc799c819c509a293450974bba1bc7bf63f3332"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Implements a small optional demonstration application with three routes and no evidence of a repository-wide runtime role.",
+      "source_paths": [
+        "examples/apishowcase/apishowcase.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-fffe44ecc6f1c62266c4",
+      "item_id": "item-57e0d4338a607cea7a1c1bbe",
+      "path": "examples/minitwit/templates/layout.html",
+      "snapshot_root": "cases/case-fffe44ecc6f1c62266c4",
+      "file_metadata": {
+        "byte_count": 1015,
+        "sha256": "6102471341f1843e7653c15ad275ca7b4f20ae94504963b08ebc309e0ab506eb"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Is a presentation template for one optional example and does not define framework behavior or a repository-level interface.",
+      "source_paths": [
+        "examples/minitwit/templates/layout.html"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-4628a39c88a74335c07f",
+      "item_id": "item-1367cef5997711151e901e87",
+      "path": "config/train_shakespeare_char.py",
+      "snapshot_root": "cases/case-4628a39c88a74335c07f",
+      "file_metadata": {
+        "byte_count": 1132,
+        "sha256": "9b41cdfb2c917259d796a8184d835221a349c23cd18a0a63b46da431d95d9c05"
+      },
+      "reviewer_disposition": "unknown",
+      "rationale": "Defines a complete debugging-oriented training preset, but direct evidence does not establish whether this preset is privileged over other configuration variants.",
+      "source_paths": [
+        "config/train_shakespeare_char.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-4628a39c88a74335c07f",
+      "item_id": "item-7d5de0f10e9fc6b84a9ba115",
+      "path": "train.py",
+      "snapshot_root": "cases/case-4628a39c88a74335c07f",
+      "file_metadata": {
+        "byte_count": 14857,
+        "sha256": "413bd97b40bb400a2a0d01230e2946f056c263ebac1b7281c2367d964a123085"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the central training program, including configuration, distributed setup, data batching, model initialization, optimization, evaluation, and checkpointing.",
+      "source_paths": [
+        "train.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-4628a39c88a74335c07f",
+      "item_id": "item-3203617048e5ef98bf6f6bf2",
+      "path": "data/openwebtext/prepare.py",
+      "snapshot_root": "cases/case-4628a39c88a74335c07f",
+      "file_metadata": {
+        "byte_count": 3167,
+        "sha256": "77f3ef0cc8132d77f90c2bd5f9c3be86d1b3da7428e100559c58aee2bcb6eb12"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the OpenWebText ingestion, split, tokenization, and binary serialization pipeline consumed by training.",
+      "source_paths": [
+        "data/openwebtext/prepare.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-631520ae9045bfe9ca44",
+      "item_id": "item-ba9395b9d4f511679474dff0",
+      "path": "pocketbase.go",
+      "snapshot_root": "cases/case-631520ae9045bfe9ca44",
+      "file_metadata": {
+        "byte_count": 9532,
+        "sha256": "7d7a783e5c9b568cd92fa65be68eea8fca29e75742046b60b7b20aa366151ead"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the primary public application launcher, configuration, CLI construction, bootstrap, startup, execution, and graceful termination.",
+      "source_paths": [
+        "pocketbase.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-631520ae9045bfe9ca44",
+      "item_id": "item-6d98fb4223fc55264c1c8f1e",
+      "path": "cmd/serve.go",
+      "snapshot_root": "cases/case-631520ae9045bfe9ca44",
+      "file_metadata": {
+        "byte_count": 1983,
+        "sha256": "4e93819a5d39c48015edce5b5e391662f6402d69cf4bdf8c5b1d7b3713a91163"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the principal serve command, listener defaults, TLS and CORS options, and web-server launch behavior.",
+      "source_paths": [
+        "cmd/serve.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-631520ae9045bfe9ca44",
+      "item_id": "item-0c3006d7fe6f9666a85238c7",
+      "path": "README.md",
+      "snapshot_root": "cases/case-631520ae9045bfe9ca44",
+      "file_metadata": {
+        "byte_count": 6584,
+        "sha256": "52f24855e84d34624dcb41c531a9970d87560eb8ad739942507f4d46d42f5ccc"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the repository's primary description, usage modes, minimal application example, build guidance, testing, security, and contribution information.",
+      "source_paths": [
+        "README.md"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-631520ae9045bfe9ca44",
+      "item_id": "item-2e96daadeb019ed57d16ecf9",
+      "path": "Makefile",
+      "snapshot_root": "cases/case-631520ae9045bfe9ca44",
+      "file_metadata": {
+        "byte_count": 240,
+        "sha256": "b2679e9b1098cc7895b73f5934ca03eedba3a83eaba59276295e4182745ae784"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Contains only convenience targets for linting, testing, type generation, and coverage, without evidence that it is the canonical build or runtime definition.",
+      "source_paths": [
+        "Makefile"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-fec61674a92ab33c152b",
+      "item_id": "item-33f714c5071de47e9d513dc2",
+      "path": "saleor/graphql/api.py",
+      "snapshot_root": "cases/case-fec61674a92ab33c152b",
+      "file_metadata": {
+        "byte_count": 8119,
+        "sha256": "017de8a382061020a64608c5b1411c99b0dcacd93f78baf83722323b80f3358e"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Composes the complete GraphQL query and mutation schema, directives, monitoring, validation, execution backend, and cache.",
+      "source_paths": [
+        "saleor/graphql/api.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-fec61674a92ab33c152b",
+      "item_id": "item-a586ee7c1e236a764206c40b",
+      "path": "README.md",
+      "snapshot_root": "cases/case-fec61674a92ab33c152b",
+      "file_metadata": {
+        "byte_count": 9508,
+        "sha256": "6b285440fe799c8620470efc081157777636d822be759aa8bd812a9855548944"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides the repository's primary product description, architecture, features, installation, documentation, component, and contribution guidance.",
+      "source_paths": [
+        "README.md"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-4760635b80ee4edceab3",
+      "item_id": "item-192a61f0aeddb220f55b1e22",
+      "path": "src/db/mod.rs",
+      "snapshot_root": "cases/case-4760635b80ee4edceab3",
+      "file_metadata": {
+        "byte_count": 9806,
+        "sha256": "d7c5ea411f4b14c2c98ad500db1724d13fefa7d6afae54ba5d706f74f388f89d"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the application's persistent ranked-directory database, including open, save, mutation, sorting, aging, deduplication, and serialization.",
+      "source_paths": [
+        "src/db/mod.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-4760635b80ee4edceab3",
+      "item_id": "item-1b416c108ef0aa537747ef10",
+      "path": "tests/completions.rs",
+      "snapshot_root": "cases/case-4760635b80ee4edceab3",
+      "file_metadata": {
+        "byte_count": 1603,
+        "sha256": "35e44af8262aad35851b497650fa48ad3214f72e0c993aa2a9705e7542c96b7c"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Tests only generated shell-completion scripts and does not establish a central runtime or public API role.",
+      "source_paths": [
+        "tests/completions.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-8684b7a189623f3b052b",
+      "item_id": "item-5716523ac3c9da57105ece4a",
+      "path": "mingpt/trainer.py",
+      "snapshot_root": "cases/case-8684b7a189623f3b052b",
+      "file_metadata": {
+        "byte_count": 3466,
+        "sha256": "7e28e58add6f998e7f2ccf3684a4a22a071ababd484a0f59030349dad4d36878"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's reusable training abstraction, optimizer and data-loader setup, device handling, callbacks, and update loop.",
+      "source_paths": [
+        "mingpt/trainer.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-8684b7a189623f3b052b",
+      "item_id": "item-006eaf30c59990ca4f5277f0",
+      "path": "mingpt/utils.py",
+      "snapshot_root": "cases/case-8684b7a189623f3b052b",
+      "file_metadata": {
+        "byte_count": 3596,
+        "sha256": "243dd4f91c68ea45421bcd4a82fa7fe9e0ee01bf90d52b5feefdb777db6e0568"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides foundational configuration, command-line override, reproducibility, and logging utilities used by the training layer.",
+      "source_paths": [
+        "mingpt/utils.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "item_id": "item-9d4a4fba2e3c3e2121a7e05d",
+      "path": "tinygrad/tensor.py",
+      "snapshot_root": "cases/case-31a3c7c563bf2f4eb54d",
+      "file_metadata": {
+        "byte_count": 26302,
+        "sha256": "659e311698e483b76d8cf6d706d34c4b11a4ee7bb76a89d3ef18891640566c29"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the principal Tensor abstraction and its construction, graph, realization, device, dtype, mutation, and data interfaces.",
+      "source_paths": [
+        "tinygrad/tensor.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "item_id": "item-0342770dfb550a30fc89cd2f",
+      "path": "tinygrad/__init__.py",
+      "snapshot_root": "cases/case-31a3c7c563bf2f4eb54d",
+      "file_metadata": {
+        "byte_count": 674,
+        "sha256": "fc24d5d0df1b1a14bbee0bd2641a61ca5f34ec7d83f1b0b755adf6eb83d5c0be"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the package's top-level public import surface for Tensor, JIT, functions, variables, dtypes, context, counters, fetching, and devices.",
+      "source_paths": [
+        "tinygrad/__init__.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "item_id": "item-7c31ac0a43e75e0d4771c235",
+      "path": "tinygrad/uop/ops.py",
+      "snapshot_root": "cases/case-31a3c7c563bf2f4eb54d",
+      "file_metadata": {
+        "byte_count": 98122,
+        "sha256": "241bc4bbd0de5a1974a4b5d6e22af54c906331c04f2711e54e092f964ec16006"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements foundational UOp graph types, symbolic operations, shapes, traversal, rewriting, and low-level computation representation.",
+      "source_paths": [
+        "tinygrad/uop/ops.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-31a3c7c563bf2f4eb54d",
+      "item_id": "item-333b5e9d1f27c14af7c57e6e",
+      "path": "tinygrad/helpers.py",
+      "snapshot_root": "cases/case-31a3c7c563bf2f4eb54d",
+      "file_metadata": {
+        "byte_count": 32899,
+        "sha256": "5c0a22509a87dda0bb07aa363cc195acae4c6a278c5d9709f6949ee47f2a6a20"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Provides foundational global context, configuration, profiling, caching, shape, arithmetic, platform, and utility infrastructure used across the package.",
+      "source_paths": [
+        "tinygrad/helpers.py"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ee88fe4c02007f836828",
+      "item_id": "item-f897a5289b5b6688a5a9db41",
+      "path": "proto/gen/store/attachment.pb.go",
+      "snapshot_root": "cases/case-ee88fe4c02007f836828",
+      "file_metadata": {
+        "byte_count": 16505,
+        "sha256": "f5ed6ea4b22a85e94bbf118b61638e4ee3c548384cf57c844a19450fb337b228"
+      },
+      "reviewer_disposition": "clearly-unsupported",
+      "rationale": "Explicitly identifies itself as generated protobuf output; direct evidence points to the source schema rather than this artifact as the canonical definition.",
+      "source_paths": [
+        "proto/gen/store/attachment.pb.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ee88fe4c02007f836828",
+      "item_id": "item-e8d58a8e8436b0a734fa5bb4",
+      "path": "store/store.go",
+      "snapshot_root": "cases/case-ee88fe4c02007f836828",
+      "file_metadata": {
+        "byte_count": 1979,
+        "sha256": "f7aef0b64deafc4fb7c291889ba9644978b892c9e3b98de3491f8e3a071973e7"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the central Store object, database driver ownership, application caches, deployment configuration, construction, and shutdown.",
+      "source_paths": [
+        "store/store.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ee88fe4c02007f836828",
+      "item_id": "item-241fe605a03c10417722f784",
+      "path": "web/package.json",
+      "snapshot_root": "cases/case-ee88fe4c02007f836828",
+      "file_metadata": {
+        "byte_count": 3250,
+        "sha256": "b736679a56dc296a13df2efd829d70885f29321e3d0113229802cf2df055bdb6"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the web application's toolchain, release and quality workflows, runtime dependencies, and development dependencies.",
+      "source_paths": [
+        "web/package.json"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-ee88fe4c02007f836828",
+      "item_id": "item-1d24c2dcffb3e2bae2caf790",
+      "path": "server/server.go",
+      "snapshot_root": "cases/case-ee88fe4c02007f836828",
+      "file_metadata": {
+        "byte_count": 6829,
+        "sha256": "4cbc5844cd154566ae5625fc76e00090af95542656846c03e1cd361582025ee8"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Constructs and runs the HTTP server, registers frontend, API, file, RSS, and MCP routes, and coordinates background work and graceful shutdown.",
+      "source_paths": [
+        "server/server.go"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-34b289c7e5030dfd1ea5",
+      "item_id": "item-ed77bcc24147c8e35d12163d",
+      "path": "Makefile",
+      "snapshot_root": "cases/case-34b289c7e5030dfd1ea5",
+      "file_metadata": {
+        "byte_count": 1650,
+        "sha256": "f3d6f25da159316795ec3dc84e2f4a8e3cee873b679233674ab9e5c36d41cf47"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Defines the build target and installation layout for the executable, shell completions, and manual page.",
+      "source_paths": [
+        "Makefile"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-34b289c7e5030dfd1ea5",
+      "item_id": "item-d8bf44ee8de3063283335ff7",
+      "path": "src/walk.rs",
+      "snapshot_root": "cases/case-34b289c7e5030dfd1ea5",
+      "file_metadata": {
+        "byte_count": 24999,
+        "sha256": "c681fba408ebe80138e2d1bc0594a23b5d9fff4224577aa77a8e2cdd18e140a1"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the core parallel filesystem walk, filtering, batching, buffering, output, interruption, and result-limit behavior.",
+      "source_paths": [
+        "src/walk.rs"
+      ],
+      "unknown_option": "unknown"
+    },
+    {
+      "case_id": "case-cb1a8dbcf2fb395aaec0",
+      "item_id": "item-477ac40a86dba1346516e444",
+      "path": "micrograd/nn.py",
+      "snapshot_root": "cases/case-cb1a8dbcf2fb395aaec0",
+      "file_metadata": {
+        "byte_count": 1613,
+        "sha256": "f54453501abc4fd38ae724a8b378d6a5d23bfdd0a49c77e619b95f86ad16594d"
+      },
+      "reviewer_disposition": "clearly-defensible-important",
+      "rationale": "Implements the library's neural-network layer on top of Value, including modules, neurons, layers, MLP composition, parameters, and gradient reset.",
+      "source_paths": [
+        "micrograd/nn.py"
+      ],
+      "unknown_option": "unknown"
+    }
+  ]
+}

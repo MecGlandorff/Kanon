@@ -6,13 +6,25 @@ import {
   formatEvidenceRefs
 } from "./shared.js";
 
+/**
+ * @param {ReturnType<typeof import("../analyze.js").analyzeRepo>} analysis
+ * @param {unknown} question
+ * @param {{answer?: import("../ask.js").RepoAnswer}} [options]
+ * @returns {string}
+ */
 export function renderAsk(analysis, question, options = {}) {
   const answer =
     options.answer || answerRepoQuestion(analysis, question);
   return renderStructuredAnswer(question, answer);
 }
 
+/**
+ * @param {unknown} question
+ * @param {import("../ask.js").RepoAnswer} answer
+ * @returns {string}
+ */
 function renderStructuredAnswer(question, answer) {
+  /** @type {string[]} */
   const lines = [
     "# Kanon Answer",
     "",
@@ -46,7 +58,7 @@ function renderStructuredAnswer(question, answer) {
     lines.push("- None found.");
   }
   for (const item of evidence.slice(0, 12)) {
-    if (item.id) {
+    if ("id" in item) {
       lines.push(
         `- ${codeSpan(item.id)}${
           item.path ? ` ${codeSpan(item.path)}` : ""
@@ -68,6 +80,10 @@ function renderStructuredAnswer(question, answer) {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * @param {import("../ask.js").RepoAnswer["confidence"]} confidence
+ * @returns {string}
+ */
 function labelForConfidence(confidence) {
   if (confidence === "stale / suspicious") {
     return "Stale / suspicious";

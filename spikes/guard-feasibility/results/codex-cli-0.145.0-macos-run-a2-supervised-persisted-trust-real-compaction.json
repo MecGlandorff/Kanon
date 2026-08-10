@@ -1,0 +1,344 @@
+{
+  "schema": "kanon-guard-feasibility-report-v3",
+  "run": "run-a2-supervised-persisted-trust-real-compaction",
+  "host": "codex-cli",
+  "generated_at": "2026-07-27T21:38:31.156Z",
+  "provenance": {
+    "baseline_commit": "17707f3e65dfb2ef309391d363590210199b9d56",
+    "source_commit": "08de9290db031b49119f1dd33522db65573f2e48",
+    "source_sha256": "66cdf5bfa4def30bb76da3d4dc503825e35fb1a4ca0a693a44514ba7b3caed8a",
+    "tracked_source_clean": true,
+    "baseline_is_ancestor": true
+  },
+  "claimed_surface": {
+    "cli": "interactive Codex CLI",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "supervised local TUI",
+    "permission_contract": "workspace-write sandbox, ordinary on-request approvals, fixed disposable plugin, no trust or sandbox bypass",
+    "max_model_turns": 2,
+    "timeout_ms": 900000,
+    "max_output_bytes_per_noninteractive_stream": 8388608,
+    "cli_version": "codex-cli 0.145.0"
+  },
+  "fixture": {
+    "marketplace_name": "kanon-guard-spike-codex",
+    "plugin_id": "kanon-guard-spike-codex@kanon-guard-spike-codex",
+    "identity_sha256": "c0f6d3ef18f5d17673ac5970d6938e36310988ee2cfcb3ce7d9c98d0fa80290c",
+    "exact_identity_verified": true
+  },
+  "session_controls": {
+    "web_search_disabled": true,
+    "apps_and_connectors_disabled": true,
+    "configured_mcp_servers_disabled": true,
+    "memories_disabled": true,
+    "multi_agent_disabled": true,
+    "browser_and_computer_use_disabled": true,
+    "plugin_sharing_disabled": true,
+    "unrelated_plugin_include_only_supported": false,
+    "unrelated_plugin_persistent_state_mutated": false,
+    "other_installed_plugins_present": true
+  },
+  "known": [
+    "Directly proven on this exact named surface: source_binding, authentication, documented_state_preflight, fixture_identity, installed_identity, marker_absence, documented_cleanup, scratch_cleanup, execution_completed."
+  ],
+  "likely": [],
+  "unknown": [
+    "session_configuration is Unknown because direct Run A.2 proof was not retained.",
+    "persisted_exact_hash_trust is Unknown because direct Run A.2 proof was not retained.",
+    "pretooluse_denial is Unknown because direct Run A.2 proof was not retained.",
+    "actual_compaction is Unknown because direct Run A.2 proof was not retained.",
+    "execution_bounds is Unknown because direct Run A.2 proof was not retained."
+  ],
+  "stale_or_suspicious": [],
+  "residual_risks": [
+    "This result is restricted to the exact reported Codex CLI version, macOS arm64 interactive CLI, Bash tool, and committed disposable fixture.",
+    "The run is not installed-artifact, cross-platform, IDE, desktop, web, production Guard, receipt, or notice proof.",
+    "Ordinary Codex session records remain untouched.",
+    "One inert persisted trust decision for the exact disposable hook hash may remain because no documented removal command was used.",
+    "The CLI exposes no documented session-only include-list for installed local plugins; unrelated persistent plugin state is not changed."
+  ],
+  "setup": [
+    {
+      "name": "trusted-executable-resolution",
+      "resolved_outside_repository": true,
+      "ambient_environment_inherited": false
+    },
+    {
+      "name": "codex-version",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "expected_version": true
+    },
+    {
+      "name": "authentication",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "logged_in": true
+    },
+    {
+      "name": "marketplace-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true
+    },
+    {
+      "name": "plugin-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true
+    },
+    {
+      "name": "marketplace-add",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      }
+    },
+    {
+      "name": "marketplace-identity",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "exact_identity": true
+    },
+    {
+      "name": "plugin-add",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      }
+    },
+    {
+      "name": "plugin-identity",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "exact_identity": true
+    }
+  ],
+  "interactive": {
+    "launch": {
+      "executable": "codex",
+      "arguments": [
+        "--strict-config",
+        "--no-alt-screen",
+        "--cd",
+        "<scratch-workspace>",
+        "--sandbox",
+        "workspace-write",
+        "--ask-for-approval",
+        "on-request",
+        "--config",
+        "web_search=\"disabled\"",
+        "--config",
+        "sandbox_workspace_write.network_access=false",
+        "--config",
+        "approvals_reviewer=\"user\"",
+        "--config",
+        "analytics.enabled=false",
+        "--config",
+        "check_for_update_on_startup=false",
+        "--config",
+        "features.apps=false",
+        "--config",
+        "features.enable_mcp_apps=false",
+        "--config",
+        "features.memories=false",
+        "--config",
+        "memories.use_memories=false",
+        "--config",
+        "memories.generate_memories=false",
+        "--config",
+        "features.multi_agent=false",
+        "--config",
+        "features.multi_agent_v2=false",
+        "--config",
+        "features.enable_fanout=false",
+        "--config",
+        "features.in_app_browser=false",
+        "--config",
+        "features.browser_use=false",
+        "--config",
+        "features.browser_use_external=false",
+        "--config",
+        "features.browser_use_full_cdp_access=false",
+        "--config",
+        "features.computer_use=false",
+        "--config",
+        "features.image_generation=false",
+        "--config",
+        "features.plugin_sharing=false",
+        "--config",
+        "features.remote_plugin=false",
+        "--config",
+        "features.skill_mcp_dependency_install=false",
+        "--config",
+        "features.skill_search=false",
+        "--config",
+        "features.tool_suggest=false",
+        "--config",
+        "features.workspace_dependencies=false",
+        "--config",
+        "mcp_servers={}",
+        "--config",
+        "features.plugins=true",
+        "--config",
+        "features.hooks=true"
+      ],
+      "cwd": "<scratch-workspace>",
+      "no_initial_prompt": true,
+      "prompt_sha256": "656a6c6205ec209b8b0933959b8e2c99e8fdb45a35c5f81267da6baad727103e",
+      "maximum_model_turns": 2,
+      "timeout_ms": 900000
+    },
+    "process": {
+      "status": 0,
+      "signal": null,
+      "timed_out": false,
+      "aborted": false,
+      "error_code": null
+    },
+    "supervised_ui": {
+      "expected_version_confirmed": false,
+      "scratch_cwd_confirmed": false,
+      "workspace_write_confirmed": false,
+      "on_request_approvals_confirmed": false,
+      "exact_plugin_source_confirmed": false,
+      "exact_hook_definition_reviewed": false,
+      "persisted_trust_selected_without_bypass": false,
+      "exactly_one_denial_turn_then_real_compact": false,
+      "no_third_model_turn": false,
+      "no_unexpected_matching_hook_source": false
+    },
+    "observation_count": 0,
+    "observations": [],
+    "marker_absent": true
+  },
+  "criteria": {
+    "source_binding": "proven",
+    "authentication": "proven",
+    "documented_state_preflight": "proven",
+    "fixture_identity": "proven",
+    "installed_identity": "proven",
+    "session_configuration": "unknown",
+    "persisted_exact_hash_trust": "unknown",
+    "pretooluse_denial": "unknown",
+    "marker_absence": "proven",
+    "actual_compaction": "unknown",
+    "execution_bounds": "unknown",
+    "documented_cleanup": "proven",
+    "scratch_cleanup": "proven",
+    "execution_completed": "proven"
+  },
+  "cleanup": [
+    {
+      "name": "plugin-remove",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      }
+    },
+    {
+      "name": "marketplace-remove",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      }
+    },
+    {
+      "name": "plugin-cleanup-verification",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true
+    },
+    {
+      "name": "marketplace-cleanup-verification",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "output_redacted": true
+      },
+      "output_valid_json": true,
+      "exact_name_absent": true
+    },
+    {
+      "name": "scratch-remove",
+      "removed": true
+    }
+  ],
+  "accepted_residual_user_state": {
+    "ordinary_session_records_left_untouched": true,
+    "exact_disposable_hook_hash_trust_may_remain": true,
+    "undocumented_state_inspected_or_modified": false
+  },
+  "bounded_model_usage": {
+    "maximum_model_turns": 2,
+    "observed_sequence": "one fixed Bash-denial turn followed by one real interactive /compact operation",
+    "third_model_turn_permitted": false
+  },
+  "errors": [],
+  "disposition": "no-go"
+}

@@ -1,0 +1,701 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanon.invalid/schemas/d2e-ranking-trace-v1.json",
+  "title": "Kanon D.2E bounded ranking trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_sha256",
+    "trace_source_commit",
+    "artifact_sha256",
+    "corpus_sha256",
+    "case",
+    "limits",
+    "scan",
+    "stages",
+    "candidates",
+    "predictions",
+    "completeness"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kanon-d2e-ranking-trace-v1"
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trace_source_commit": {
+      "$ref": "#/$defs/commit"
+    },
+    "artifact_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "corpus_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "ordinal"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "revision": {
+          "$ref": "#/$defs/commit"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_count",
+        "stage_count",
+        "stage_visit_count",
+        "serialized_bytes"
+      ],
+      "properties": {
+        "candidate_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000
+        },
+        "stage_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "stage_visit_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        },
+        "serialized_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 134217728
+        }
+      }
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "complete",
+        "truncated",
+        "budgets_reached",
+        "path_failures",
+        "path_failures_truncated",
+        "unknown_evidence"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "budgets_reached": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/boundedText"
+          }
+        },
+        "path_failures": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "status", "code", "reason"],
+            "properties": {
+              "path": {
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/boundedText"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "$ref": "#/$defs/boundedText"
+              },
+              "code": {
+                "$ref": "#/$defs/boundedText"
+              },
+              "reason": {
+                "$ref": "#/$defs/boundedText"
+              }
+            }
+          }
+        },
+        "path_failures_truncated": {
+          "type": "boolean"
+        },
+        "unknown_evidence": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/boundedText"
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "ordinal",
+          "ordering",
+          "quota",
+          "selected_on_entry",
+          "selected_on_exit"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/boundedText"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32
+          },
+          "ordering": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "$ref": "#/$defs/boundedText"
+            }
+          },
+          "quota": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 25000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "selected_on_entry": {
+            "type": "array",
+            "maxItems": 25000,
+            "items": {
+              "$ref": "#/$defs/candidateId"
+            }
+          },
+          "selected_on_exit": {
+            "type": "array",
+            "maxItems": 25000,
+            "items": {
+              "$ref": "#/$defs/candidateId"
+            }
+          }
+        }
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 25000,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "predictions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["important_files", "run", "test"],
+      "properties": {
+        "important_files": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/boundedText"
+          }
+        },
+        "run": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/command"
+          }
+        },
+        "test": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "$ref": "#/$defs/command"
+          }
+        }
+      }
+    },
+    "completeness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["complete", "checks", "failures", "observer_failures"],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "checks": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "passed"],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/boundedText"
+              },
+              "passed": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "failures": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/boundedText"
+          }
+        },
+        "observer_failures": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200000
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^candidate-[0-9a-f]{64}$"
+    },
+    "boundedText": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "evidenceState": {
+      "enum": [
+        "present",
+        "absent",
+        "rejected",
+        "truncated",
+        "unavailable"
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cwd", "command"],
+      "properties": {
+        "cwd": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "command": {
+          "$ref": "#/$defs/boundedText"
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "reason",
+        "confidence",
+        "source",
+        "contribution"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "reason": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "confidence": {
+          "enum": ["known", "likely", "unknown", "unavailable"]
+        },
+        "source": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "contribution": {
+          "type": "number"
+        }
+      }
+    },
+    "contribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "value": {
+          "type": "number"
+        }
+      }
+    },
+    "visit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "stage_ordinal",
+        "entry_position",
+        "selected_count_on_entry",
+        "decision",
+        "reason",
+        "heuristic",
+        "deduplicated",
+        "displaced_by",
+        "quota",
+        "cap"
+      ],
+      "properties": {
+        "stage": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "stage_ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "entry_position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25000
+        },
+        "selected_count_on_entry": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000
+        },
+        "decision": {
+          "enum": [
+            "selected",
+            "duplicate",
+            "policy-excluded",
+            "quota-excluded",
+            "cap-excluded",
+            "not-selected"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "heuristic": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/boundedText"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deduplicated": {
+          "type": "boolean"
+        },
+        "displaced_by": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/candidateId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quota": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 25000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cap": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 25000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "normalized_path",
+        "discovery_source",
+        "evidence",
+        "ranking",
+        "curation",
+        "final"
+      ],
+      "properties": {
+        "candidate_id": {
+          "$ref": "#/$defs/candidateId"
+        },
+        "normalized_path": {
+          "$ref": "#/$defs/boundedText"
+        },
+        "discovery_source": {
+          "const": "scanner"
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "present", "absent", "rejected", "unknown"],
+          "properties": {
+            "state": {
+              "$ref": "#/$defs/evidenceState"
+            },
+            "present": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/boundedText"
+              }
+            },
+            "absent": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/boundedText"
+              }
+            },
+            "rejected": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/boundedText"
+              }
+            },
+            "unknown": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/boundedText"
+              }
+            }
+          }
+        },
+        "ranking": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "eligible",
+            "eligibility_reason",
+            "input_position",
+            "ranked_position",
+            "score",
+            "fan_in",
+            "referenced_by",
+            "signals",
+            "contributions",
+            "tie_break"
+          ],
+          "properties": {
+            "eligible": {
+              "type": "boolean"
+            },
+            "eligibility_reason": {
+              "$ref": "#/$defs/boundedText"
+            },
+            "input_position": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25000
+            },
+            "ranked_position": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 25000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "score": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fan_in": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "referenced_by": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "signals": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/signal"
+              }
+            },
+            "contributions": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/contribution"
+              }
+            },
+            "tie_break": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["score", "fan_in", "path"],
+              "properties": {
+                "score": {
+                  "oneOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "fan_in": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "path": {
+                  "$ref": "#/$defs/boundedText"
+                }
+              }
+            }
+          }
+        },
+        "curation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["visits", "deduplicated", "displacement"],
+          "properties": {
+            "visits": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "$ref": "#/$defs/visit"
+              }
+            },
+            "deduplicated": {
+              "type": "boolean"
+            },
+            "displacement": {
+              "enum": ["not-applicable", "displaced"]
+            }
+          }
+        },
+        "final": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rank",
+            "selected",
+            "result",
+            "selection_reason",
+            "selection_heuristic"
+          ],
+          "properties": {
+            "rank": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "selected": {
+              "type": "boolean"
+            },
+            "result": {
+              "enum": [
+                "selected",
+                "cap-excluded",
+                "not-selected",
+                "ranking-ineligible"
+              ]
+            },
+            "selection_reason": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/boundedText"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "selection_heuristic": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/boundedText"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

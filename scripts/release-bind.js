@@ -7,6 +7,13 @@ import { atomicWriteContained } from "../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../src/path-security.js";
 import { safeJsonStringify } from "../src/trust.js";
 import { validateDevelopmentReport } from "./lib/development-report.js";
+import {
+  releasePolicyFromEnvironment,
+  validateMaintainerStableEvidenceBinding,
+  validateReleasePolicy
+} from "./lib/maintainer-stable-release.js";
+import { canonicalBytes } from
+  "../eval/v1.0.0-maintainer/lib/validator.js";
 
 const options = parseArgs(process.argv.slice(2));
 const bundle = canonicalDirectory(options.bundle);
@@ -15,6 +22,12 @@ const artifactSha256 = sha256File(tarball.path);
 if (artifactSha256 !== options.artifactSha256) {
   throw new Error("Release bundle artifact hash does not match the candidate.");
 }
+
+const releasePolicy = validateReleasePolicy(process.cwd(), {
+  candidateVersion: options.candidateVersion,
+  releaseKind: options.releaseKind,
+  ...releasePolicyFromEnvironment()
+});
 
 const conformance = filesMatching(
   bundle,
@@ -34,22 +47,60 @@ for (const report of conformance) {
   }
 }
 
-const development = readNamedReport(
+const development = optionalNamedReport(bundle, "development-eval.json");
+const maintainerEvidence = optionalNamedReport(
   bundle,
-  "development-eval.json"
+  "maintainer-evidence-binding.json"
 );
-const developmentValidation = validateDevelopmentReport(development.value, {
-  candidateCommit: options.candidateCommit,
-  candidateVersion: options.candidateVersion,
-  requireThresholdPass: options.releaseKind === "stable"
-});
+let developmentValidation;
+let developmentCorpusSha256;
+if (options.releaseKind === "maintainer-stable") {
+  if (development || !maintainerEvidence) {
+    throw new Error(
+      "Maintainer-stable requires only the frozen development evidence binding."
+    );
+  }
+  const expected = validateMaintainerStableEvidenceBinding(
+    process.cwd(),
+    maintainerEvidence.value
+  );
+  const expectedSha256 = crypto
+    .createHash("sha256")
+    .update(canonicalBytes(expected))
+    .digest("hex");
+  if (maintainerEvidence.sha256 !== expectedSha256) {
+    throw new Error("Maintainer-stable evidence binding is not canonical.");
+  }
+  developmentValidation = {
+    execution_complete: true,
+    thresholds_passed: false,
+    analysis_error_count:
+      expected.frozen_development.analysis_error_count,
+    incomplete_scan_count:
+      expected.frozen_development.incomplete_scan_count,
+    failures: [...expected.frozen_development.threshold_failures]
+  };
+  developmentCorpusSha256 = expected.frozen_development.corpus_sha256;
+} else {
+  if (!development || maintainerEvidence) {
+    throw new Error(
+      "Prerelease and stable lanes require only the workflow development report."
+    );
+  }
+  developmentValidation = validateDevelopmentReport(development.value, {
+    candidateCommit: options.candidateCommit,
+    candidateVersion: options.candidateVersion,
+    requireThresholdPass: options.releaseKind === "stable"
+  });
+  developmentCorpusSha256 = development.value.corpus.manifest_sha256;
+}
 const release = optionalNamedReport(bundle, "release-eval.json");
 if (options.releaseKind === "stable") {
   if (options.candidateVersion.includes("-")) {
     throw new Error("Stable release kind requires a stable semantic version.");
   }
   validateReleaseEvaluation(release?.value, options, artifactSha256);
-} else {
+} else if (options.releaseKind === "prerelease") {
   if (!options.candidateVersion.includes("-")) {
     throw new Error("Prerelease kind requires a prerelease version.");
   }
@@ -58,19 +109,23 @@ if (options.releaseKind === "stable") {
       "A prerelease no-holdout bundle must not imply a held-out result."
     );
   }
+} else if (release) {
+  throw new Error(
+    "A maintainer-stable bundle must not imply an evidence-strict held-out result."
+  );
 }
 
 const manifest = {
-  schema: "kanon-release-binding-v2",
+  schema: "kanon-release-binding-v3",
   generated_at: new Date().toISOString(),
   release_kind: options.releaseKind,
+  assurance_lane: releasePolicy.assurance_lane,
   candidate_commit: options.candidateCommit,
   candidate_version: options.candidateVersion,
   tag: `v${options.candidateVersion}`,
   artifact_sha256: artifactSha256,
   artifact_file: path.basename(tarball.path),
-  development_corpus_sha256:
-    development.value.corpus.manifest_sha256,
+  development_corpus_sha256: developmentCorpusSha256,
   development_execution_complete:
     developmentValidation.execution_complete,
   development_thresholds_passed:
@@ -81,11 +136,22 @@ const manifest = {
     developmentValidation.incomplete_scan_count,
   development_threshold_failures:
     developmentValidation.failures,
+  development_evidence_source:
+    options.releaseKind === "maintainer-stable"
+      ? "frozen-historical-visible-development"
+      : "workflow-development-corpus",
+  development_corpus_executed_in_workflow:
+    options.releaseKind !== "maintainer-stable",
+  holdout_corpus_executed_in_workflow:
+    options.releaseKind === "stable",
+  accepted_risks_remain_open:
+    options.releaseKind === "maintainer-stable" ? true : null,
   release_corpus_sha256:
     release?.value.corpus.manifest_sha256 || null,
   reports: [
     ...conformance,
-    development,
+    ...(development ? [development] : []),
+    ...(maintainerEvidence ? [maintainerEvidence] : []),
     ...(release ? [release] : [])
   ].map((report) => ({
     path: path.basename(report.path),
@@ -93,6 +159,21 @@ const manifest = {
   })),
   held_out_capability_estimate_claimed:
     options.releaseKind === "stable",
+  evidence_strict_release_supported:
+    releasePolicy.evidence_strict_release_supported,
+  independence_established: releasePolicy.independence_established,
+  holdout_performance_established:
+    releasePolicy.holdout_performance_established,
+  maintainer_certification_sha256:
+    releasePolicy.maintainer_certification_bound
+      ? process.env.KANON_MAINTAINER_CERTIFICATION_SHA256
+      : null,
+  signed_waiver_sha256:
+    releasePolicy.maintainer_certification_bound
+      ? process.env.KANON_SIGNED_WAIVER_SHA256
+      : null,
+  publication_authorized: false,
+  release_action_occurred: false,
   prerelease_notice:
     options.releaseKind === "prerelease"
       ? "No held-out capability estimate is claimed for this prerelease."
@@ -152,8 +233,10 @@ function parseArgs(argv) {
   if (!/^[0-9a-f]{64}$/.test(output.artifactSha256)) {
     throw new Error("Artifact SHA-256 must be lowercase hex.");
   }
-  if (!["stable", "prerelease"].includes(output.releaseKind)) {
-    throw new Error("Release kind must be stable or prerelease.");
+  if (!["stable", "prerelease", "maintainer-stable"].includes(output.releaseKind)) {
+    throw new Error(
+      "Release kind must be prerelease, stable, or maintainer-stable."
+    );
   }
   return output;
 }

@@ -3,9 +3,13 @@ import path from "node:path";
 import { analyzeRepo } from "../analyze.js";
 import { answerRepoQuestion } from "../ask.js";
 import {
+  buildContinuityArtifactMetadata,
+  buildContinuityReport
+} from "../continuity/engine.js";
+import {
   inspectKanonTodos,
-  inspectPreviousState,
-  writeKanonOutputs
+  inspectPreviousHandoff,
+  inspectPreviousState
 } from "../persist.js";
 import { renderAsk } from "../render/ask.js";
 import { renderBrief } from "../render/brief.js";
@@ -13,15 +17,17 @@ import {
   renderResume,
   renderVerify
 } from "../render/continuity.js";
-import {
-  safeJsonStringify,
-  safeTerminalText
-} from "../trust.js";
+import { safeJsonStringify } from "../trust.js";
 import { VERSION } from "../version.js";
 import { helpText, parseArgs } from "./args.js";
 import { normalizeIo, writeStdout } from "./io.js";
-import { runTodoCommand } from "./todo.js";
+import { runWriteCommand } from "./write.js";
 
+/**
+ * @param {string[]} [argv]
+ * @param {import("./io.js").IoOptions} [ioOptions]
+ * @returns {Promise<void>}
+ */
 export async function runCli(argv = [], ioOptions = {}) {
   const io = normalizeIo(ioOptions);
   const parsed = parseArgs(argv);
@@ -93,15 +99,27 @@ export async function runCli(argv = [], ioOptions = {}) {
 
     case "resume": {
       const previous = inspectPreviousState(root);
+      const handoff = inspectPreviousHandoff(root);
       const todos = inspectKanonTodos(root);
       const analysis = analyzeRepo(root);
+      const continuity = buildContinuityReport({
+        artifact_metadata:
+          buildContinuityArtifactMetadata(analysis.inspection),
+        current: analysis.state,
+        previous: previous.state,
+        previous_warning: previous.warning || undefined,
+        handoff: handoff.handoff
+      });
       if (parsed.flags.json) {
         writeStdout(
           io,
           `${safeJsonStringify({
             previous: previous.state,
             previous_warning: previous.warning,
+            handoff: handoff.handoff,
+            handoff_warning: handoff.warning,
             current: analysis.state,
+            continuity,
             todos: todos.todos,
             todo_warning: todos.warning
           })}\n`
@@ -112,7 +130,10 @@ export async function runCli(argv = [], ioOptions = {}) {
           renderResume(analysis, previous.state, {
             todos: todos.todos,
             stateWarning: previous.warning,
-            todoWarning: todos.warning
+            todoWarning: todos.warning,
+            handoff: handoff.handoff,
+            handoffWarning: handoff.warning,
+            continuity
           })
         );
       }
@@ -120,26 +141,9 @@ export async function runCli(argv = [], ioOptions = {}) {
     }
 
     case "todo":
-      await runTodoCommand(root, parsed, io);
+    case "refresh":
+      await runWriteCommand(root, parsed, io);
       return;
-
-    case "refresh": {
-      const analysis = analyzeRepo(root);
-      const result = writeKanonOutputs(analysis, {
-        deep: parsed.flags.deep
-      });
-      writeStdout(
-        io,
-        `Kanon refreshed ${safeTerminalText(result.kanonDir)}\n`
-      );
-      for (const file of result.written) {
-        writeStdout(io, `- ${file}\n`);
-      }
-      for (const warning of result.warnings || []) {
-        writeStdout(io, `Warning: ${safeTerminalText(warning)}\n`);
-      }
-      return;
-    }
 
     default:
       throw new Error(`Unknown command: ${parsed.command}\n\n${helpText()}`);

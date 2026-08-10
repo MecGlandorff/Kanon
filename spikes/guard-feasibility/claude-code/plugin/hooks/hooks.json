@@ -1,0 +1,29 @@
+{
+  "description": "Disposable Guard feasibility hooks for Claude Code.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/probe-hook.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/probe-hook.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

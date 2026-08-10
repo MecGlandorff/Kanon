@@ -1,0 +1,618 @@
+{
+  "schema": "kanon-guard-feasibility-report-v1",
+  "host": "codex-cli",
+  "generated_at": "2026-07-27T19:40:59.977Z",
+  "claimed_surface": {
+    "cli": "codex exec",
+    "operating_system": "darwin",
+    "architecture": "arm64",
+    "terminal_surface": "non-interactive local CLI",
+    "cli_version": "codex-cli 0.145.0"
+  },
+  "known": [
+    "Directly proven on this named surface: discovery, shell_denial, patch_denial, rewrite_schema_and_effect, metadata, resume, lifecycle_cleanup, scratch_cleanup, execution_completed."
+  ],
+  "likely": [
+    "Observed but not direct proof: untrusted_hook, disabled_hooks."
+  ],
+  "unknown": [
+    "Hard Guard is not claimable on this surface; direct proof is missing for: untrusted_hook, compaction, disabled_hooks, trusted_hook."
+  ],
+  "stale_or_suspicious": [],
+  "suggested": [
+    "Do not choose notice mode from this report; obtain a user decision if any criterion remains Unknown or no-go."
+  ],
+  "setup": [
+    {
+      "name": "codex-version",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "f9eb0c462cdded1fb971b33c647ff1b8b491dfe962a1506026e07a06f634f651",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 18,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "authentication",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "16118df3eb3595e44a4721878cef0f79910e6564e10ff0e78e451e7c4e478947",
+        "stdout_bytes": 0,
+        "stderr_bytes": 24
+      }
+    },
+    {
+      "name": "marketplace-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "3c6b3021f007eff0964ca187af63c78d79198432bc3f25c2b8bfa0e370f84324",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 737,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "plugin-preflight",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "28f395c9472e66085264bf4779fba123071e905a1c3991005ef3f32e68493acb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 5039,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "marketplace-add",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "c357192ab74c04c0cbb68637fab649ad767a648fbc52a7d7cde5432c52dc0730",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 177,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "plugin-add",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "2515ba69b0c50da4432a1291565d9f780c8e613896fbc7eaae1383c46338e603",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 317,
+        "stderr_bytes": 0
+      }
+    }
+  ],
+  "attempts": [
+    {
+      "name": "untrusted-hook",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "-s",
+          "workspace-write",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "c1707336ee347b80fdbeb39ccaf7372c22a62e067c16d0c711e5e38fbdb4e59c"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "f38c80b2370c32606f5b95aa18d954c9b1f673b9fcf4e25686cb9417422057c0",
+        "stderr_sha256": "1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+        "stdout_bytes": 1251,
+        "stderr_bytes": 39
+      },
+      "observation_count": 0,
+      "observations": [],
+      "side_effect_exists": true,
+      "side_effect_sha256": "3fad87f1a0f4ee7e11de953acd900cbc321b2158494582406b9ddbc05f2b94f6"
+    },
+    {
+      "name": "shell-deny",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "-s",
+          "workspace-write",
+          "--dangerously-bypass-hook-trust",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "bc500046ba45c1d4df6b2c230888b31dcc5e85dfb8b2a1061a11c2ffab774787"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "f7f7578e3436723c5df4b884fed3bc0773c458c8a0423efff3f632c52f95b683",
+        "stderr_sha256": "ee20a06ef15b4750687a36dd3bd1d18e19bc058a22a8e50c78da3a7ddc58d210",
+        "stdout_bytes": 950,
+        "stderr_bytes": 379
+      },
+      "observation_count": 2,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        },
+        {
+          "hook_event_name": "PreToolUse",
+          "session_start_source": null,
+          "tool_name": "Bash",
+          "marker": "deny",
+          "decision": "deny",
+          "session_id_present": true,
+          "turn_id_present": true,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": true,
+            "command": true,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    },
+    {
+      "name": "patch-deny",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "-s",
+          "workspace-write",
+          "--dangerously-bypass-hook-trust",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "5b9d9329d5d9f3b7b8927fe65929575f978480fb820aad3f1b683783f06d6e24"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "94bc9eca265aa5d9ad811b8e7cb0736e6ecf1e9af4677ec49712f6b17219dc10",
+        "stderr_sha256": "45b3ea0d520e54710b2a5895f7e38cc812092ac1af1a9800f63b97e177cb0a7a",
+        "stdout_bytes": 966,
+        "stderr_bytes": 411
+      },
+      "observation_count": 2,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        },
+        {
+          "hook_event_name": "PreToolUse",
+          "session_start_source": null,
+          "tool_name": "apply_patch",
+          "marker": "deny",
+          "decision": "deny",
+          "session_id_present": true,
+          "turn_id_present": true,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": true,
+            "command": true,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    },
+    {
+      "name": "shell-rewrite",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "-s",
+          "workspace-write",
+          "--dangerously-bypass-hook-trust",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "8742b9cca19f5b5c70d1506623ac1d17b8fa7fd07303e37885f8f43fce5ea149"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "4e4b6475da33549a24b751d9ff82936db5a059a63076044b0875b40f4a973516",
+        "stderr_sha256": "1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+        "stdout_bytes": 1637,
+        "stderr_bytes": 39
+      },
+      "observation_count": 2,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "startup",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        },
+        {
+          "hook_event_name": "PreToolUse",
+          "session_start_source": null,
+          "tool_name": "Bash",
+          "marker": "rewrite",
+          "decision": "rewrite",
+          "session_id_present": true,
+          "turn_id_present": true,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": true,
+            "command": true,
+            "file_path": false
+          }
+        }
+      ],
+      "original_side_effect_exists": false,
+      "rewritten_side_effect_exists": true,
+      "rewritten_contents_sha256": "cc5bc0565634a6520426718c9577c6442a68899efaa5a4a1bd364f89fedbc285"
+    },
+    {
+      "name": "hooks-disabled",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "-s",
+          "workspace-write",
+          "--dangerously-bypass-hook-trust",
+          "--disable",
+          "hooks",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "e6141cf29c9a5be3520db653fdc047c84cd6a1310ecd4e637d0a444afb986ebc"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "b77cc2b6254e469a95a511cad12ffb5f51606c4768d3c53fdc9999b17bd24c27",
+        "stderr_sha256": "1aa26269eb1cc57f86b235a03cda53c004edb5b1e9fc99d4da4f00843293d721",
+        "stdout_bytes": 1597,
+        "stderr_bytes": 39
+      },
+      "observation_count": 0,
+      "observations": [],
+      "side_effect_exists": true,
+      "side_effect_sha256": "0dbcc4ebf4ad51df25257906f7e7ae8361ff2e9cc4939f38f67739b4eb2de5c5"
+    },
+    {
+      "name": "resume-deny",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "resume",
+          "<session-id>",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-hook-trust",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "95a21e83a9152b0bf968921019acd7c4c971259ffe577eafb2bd89a159a8335c"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "3755e723dd51a2674a5df42a3c20d7315ed8f88993b6e22b42d2d5d74aef4fc2",
+        "stderr_sha256": "5daacb47bb3886c945d6e5f8e6b5235ed01432b544cf3eb7fed6e968bdbda78e",
+        "stdout_bytes": 954,
+        "stderr_bytes": 336
+      },
+      "observation_count": 2,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "resume",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        },
+        {
+          "hook_event_name": "PreToolUse",
+          "session_start_source": null,
+          "tool_name": "Bash",
+          "marker": "deny",
+          "decision": "deny",
+          "session_id_present": true,
+          "turn_id_present": true,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": true,
+            "command": true,
+            "file_path": false
+          }
+        }
+      ],
+      "side_effect_exists": false,
+      "side_effect_sha256": null
+    },
+    {
+      "name": "compaction-attempt",
+      "invocation": {
+        "executable": "codex",
+        "arguments": [
+          "exec",
+          "resume",
+          "<session-id>",
+          "--json",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-hook-trust",
+          "<fixed-probe-prompt>"
+        ],
+        "cwd": "<scratch-workspace>",
+        "prompt_sha256": "52e657bd1470bb75a808df9dbe93b8f82606f0b614db4d82e9a09dd291bf3f74"
+      },
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "d16d04bb170a5b386d161c4d4c568eb9d76bcd1ab53cef6616c79bb2f027fc6c",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 725,
+        "stderr_bytes": 0
+      },
+      "observation_count": 1,
+      "observations": [
+        {
+          "hook_event_name": "SessionStart",
+          "session_start_source": "resume",
+          "tool_name": null,
+          "marker": "none",
+          "decision": "observe",
+          "session_id_present": true,
+          "turn_id_present": false,
+          "cwd_present": true,
+          "cwd_matches_workspace": true,
+          "plugin_root_present": true,
+          "plugin_data_present": true,
+          "plugin_data_writable": true,
+          "plugin_data_reason": null,
+          "plugin_data_directory_created_for_probe": true,
+          "plugin_data_created_directory_count": 2,
+          "tool_input_shape": {
+            "object": false,
+            "command": false,
+            "file_path": false
+          }
+        }
+      ]
+    }
+  ],
+  "criteria": {
+    "discovery": "proven",
+    "untrusted_hook": "likely",
+    "trusted_hook": "unknown",
+    "shell_denial": "proven",
+    "patch_denial": "proven",
+    "rewrite_schema_and_effect": "proven",
+    "metadata": "proven",
+    "resume": "proven",
+    "compaction": "unknown",
+    "disabled_hooks": "likely",
+    "lifecycle_cleanup": "proven",
+    "scratch_cleanup": "proven",
+    "execution_completed": "proven"
+  },
+  "cleanup": [
+    {
+      "name": "plugin-remove",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "35989102efac735503a38b54608ce3e1943a0c833dfb017af88dd7be9954044b",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 153,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "marketplace-remove",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "7180f3d84cc9e24a32dbad13aa15bcc0a133a2e221349c66f53a27901d79ed81",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 76,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "plugin-cleanup-verification",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "28f395c9472e66085264bf4779fba123071e905a1c3991005ef3f32e68493acb",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 5039,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "marketplace-cleanup-verification",
+      "process": {
+        "status": 0,
+        "signal": null,
+        "timed_out": false,
+        "overflowed": false,
+        "error_code": null,
+        "stdout_sha256": "3c6b3021f007eff0964ca187af63c78d79198432bc3f25c2b8bfa0e370f84324",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_bytes": 737,
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "name": "scratch-remove",
+      "removed": true
+    }
+  ],
+  "disposition": "no-go"
+}

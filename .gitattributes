@@ -4,10 +4,19 @@
 *.js text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+*.mjs text eol=lf
 *.ps1 text eol=lf
 *.sh text eol=lf
+*.txt text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
 
-# Bash wrappers have no extension.
+# Generated Bash wrappers have no extension.
+runtime/bin/kanon-dispatch text eol=lf
 skills/kanon/scripts/kanon-* text eol=lf
+skills/aswitch/scripts/kanon-aswitch text eol=lf
+skills/orient/scripts/kanon-orient text eol=lf
+skills/resume/scripts/kanon-resume text eol=lf
+skills/status/scripts/kanon-status text eol=lf
+skills/steer/scripts/kanon-steer text eol=lf
+skills/verify/scripts/kanon-verify text eol=lf

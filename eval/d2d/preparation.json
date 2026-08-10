@@ -1,0 +1,21 @@
+{
+  "schema_version": "kanon-d2d-preparation-v1",
+  "starting_head": "7fdf7d75e071e9bcfa9679de8290e19a1fb2c78e",
+  "production_artifact_sha256": "89923d2d6727445a86ba831331c4b6bdc031c399f81ce2d98e3f42815b3b3f6a",
+  "d2a_report": "eval/results/development-0.4.0-rc.1-d2a-74208b9a.json",
+  "d2a_report_sha256": "747b4f1590eda9787c87aae2e25853b8e1e8fa04893e2359eedf7a6050b7acb3",
+  "development_corpus": "eval/corpus.json",
+  "development_corpus_sha256": "4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92",
+  "prior_review_result": "eval/results/d2c-unblind-838ebccc/review-result.json",
+  "prior_review_result_sha256": "838ebcccccc7ae9a8df24e631a5ecd48718fa150d75d6e1648434b5308bd4c66",
+  "prior_unblinded_analysis": "eval/results/d2c-unblind-838ebccc/unblinded-analysis.json",
+  "prior_unblinded_analysis_sha256": "2a2db5e02af6ac6fd815f5cc54fa9fc6130535119ede72caa07bdfa0e1df95c7",
+  "comparative_result": "eval/results/d2c-comparative-unblind-f8b1e7a6/comparative-result.json",
+  "comparative_result_sha256": "f8b1e7a612e505e7ef3aa3d815f80e0ed85f53bb203608882af3286364fd5def",
+  "comparative_analysis": "eval/results/d2c-comparative-unblind-f8b1e7a6/unblinded-analysis.json",
+  "comparative_analysis_sha256": "de311bbef99ed43eca4ef71aa6eafc2f41317ad1ce13b5d09dedc52593e9fbac",
+  "comparative_packet_manifest_sha256": "fc559d607c3facd39b6a4801005335dd98c47131573951bdd7f4a979ea792621",
+  "comparative_packet_sha256": "2850b73d1095fb6dd58e4430eaf0a961a97d1441dfad491a5374f8393dbd222a",
+  "comparative_snapshot_tree_sha256": "0368ca4cbc6abd1679d6cabece7c34719edd07964479efa6e28a5c5d0cbdd82e",
+  "preparation_seed": "a43d0312d0e9f1095779aca0d2d8d11c78435b9f725c9b0f0287ed74105bf01f"
+}

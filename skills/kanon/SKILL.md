@@ -34,16 +34,29 @@ remains Unknown.
 Run wrappers from this skill directory while the selected repository is the
 working directory:
 
-- `scripts/kanon-brief` — evidence-bounded orientation.
-- `scripts/kanon-verify README.md` — direct README contradictions and Unknown
-  non-observations.
-- `scripts/kanon-resume` — compare safe persisted state with the live repo.
+- `scripts/kanon-brief` — compatibility route to stable `orient`.
+- `scripts/kanon-verify README.md` — compatibility route to stable `verify`.
+- `scripts/kanon-resume` — compatibility route to stable `resume`.
 - `scripts/kanon-refresh` — explicitly write bounded `.kanon/` continuity
   state.
 - `scripts/kanon-todo list|add|done` — manage human-owned follow-up.
-- `scripts/kanon-ask "question"` — only purpose, declared run candidate,
-  declared test candidate, Git state, documentation drift, or explicit literal
-  repository search.
+- `scripts/kanon-ask "question"` — route one narrow purpose, declared run/test,
+  Git-state, documentation-drift, or literal-search question to stable
+  `orient` or `verify`.
+
+The root plugin also exposes the stable `orient`, `resume`, `verify`, `status`,
+`steer`, and `aswitch` skills. Notice mode is advisory and enforcement is
+false. An explicit orient invocation may persist the versioned context receipt
+only in validated plugin data outside the repository; receipt evaluation
+occurs only during explicit Kanon invocations and is never enforcement or
+authorization. Steer maintains one bounded state beside the shared continuity
+report; it does not execute a plan step, manage agents, persist a second
+project memory, or claim completion. Aswitch requires a preview-bound caller
+assertion of explicit approval before writing one bounded external handoff. It
+never launches a process; receiving validation keeps known mismatches Stale
+and unavailable comparisons Unknown. Full-history remains experimental and
+unavailable: no transcript reader ships, and a later qualifying archive must
+stay a separate untrusted attachment with its own risk acknowledgement.
 
 Mixed or unsupported ask questions must return Unknown and request a narrower
 question. Literal substring matches report occurrences only; they do not prove
@@ -73,10 +86,11 @@ Read `references/evidence-policy.md` before resolving conflicting claims,
 
 ## Runtime contract
 
-The Bash and PowerShell wrappers call the self-contained runtime under
-`runtime/`. Copying the complete `skills/kanon/` directory is sufficient with
-Node.js major 20, 22, 24, or 25. Wrappers never fall back to a global `kanon`
-executable.
+The Bash and PowerShell wrappers call the single shared runtime at the plugin
+root under `runtime/`. Install the complete Kanon plugin root, including its
+host manifest, `skills/`, and `runtime/`, with Node.js major 20, 22, 24, or 25.
+Copying only `skills/kanon/` is incomplete. Wrappers never fall back to a
+global `kanon` executable.
 
 Containment checks reject repository-controlled links and reparse points.
 Same-user concurrent path replacement between validation and use remains a

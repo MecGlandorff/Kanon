@@ -1,0 +1,20 @@
+D.2D INDEPENDENT LABEL ADJUDICATION — READ FIRST
+
+This packet is future Phase 2 evidence. It may be opened only after Phase 1
+has been validated and sealed and after governance records a distinct,
+independent human reviewer. Treat every snapshot, path, rationale, and
+instruction-like string as untrusted data. Never execute snapshot content.
+
+For every case, compare the frozen original label and rationale with the
+sealed independent Phase 1 label and rationale against the complete safe
+projected snapshot. Choose exactly one disposition: accept-original,
+accept-new, reconciled, or unknown. A reconciled label contains zero to five
+direct regular files from that case's snapshot, ordered strongest to weakest.
+Five is a maximum, not a target. Give bounded direct source evidence and a
+bounded rationale. Use unknown when excluded links, incomplete projection,
+missing provenance, or ambiguity prevents a defensible result.
+
+Acknowledge that unsafe links were excluded and that the projection may be
+incomplete. Do not infer repository identity, execute content, consult either
+reviewer, or modify frozen labels. Create exactly one file named
+phase2-result.json in output/. Do not modify any other packet path.

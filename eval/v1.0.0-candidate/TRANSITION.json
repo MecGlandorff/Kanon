@@ -1,0 +1,200 @@
+{
+  "schema": "kanon-v1.0.0-candidate-transition-v1",
+  "version": 1,
+  "status": "frozen-before-candidate-transition",
+  "starting_bindings": {
+    "branch": "release/v.1.0.0",
+    "head": "134c6d268784e285a96cb445889c40573ff846d0",
+    "upstream": "origin/release/v.1.0.0",
+    "ahead": 0,
+    "behind": 0,
+    "initial_worktree": {
+      "tracked": "clean",
+      "untracked_drafts": [
+        "eval/v1.0.0-candidate/TRANSITION.json",
+        "eval/v1.0.0-candidate/lib/validator.js",
+        "test/v1-release-candidate-transition.test.js"
+      ]
+    },
+    "package_version": "0.4.0-rc.1",
+    "runtime_dependency_count": 0,
+    "optional_dependency_count": 0,
+    "peer_dependency_count": 0,
+    "signed_waiver_sha256": "9d0770ce609479eca5f7b27dcb92dad69a287913ed62a236afc4ed5ae499a2a6",
+    "maintainer_protocol_sha256": "635a08e4058407624fdb1779f1b4127a9e8d821dc50386dbae61fd39b2844092",
+    "risk_ledger_sha256": "838351cad051c13c0316f169ee30630d131292cf8061de0a25234376894167e7",
+    "documentation_transition_sha256": "629f4e3c7644f0756b2ce5c11f6d7fcb60a2c2f946249d6971c1a0fc042fa7c6",
+    "maintainer_certification_sha256": "017bca4aa2aff3d461a71acde5634b3fccb99b385a24e2500af31813f8f46415",
+    "certification_run_record_sha256": "4c2a67166eb35b75b2530ee154fd8d9aa40e452fdf71d717952dc71c2933a468",
+    "certification_evidence_tree_sha256": "49b1ee409f32eabaa6558f794c1199f3d3595635d1252ab6600ace375ecd9de8",
+    "production_artifact_sha256": "0f87af4dfd851c268891c96237accf20b5089b0e0b95e10ac1417efebcca83a9",
+    "public_capabilities_sha256": "bfc00d445cc480389559fd8c115a6ae2607dd6b7241dd0e256565bde5f0256cf",
+    "behaviorally_certified_source_commit": "7d35c81742ca7cbcd26207f3cf7b18fc09804041"
+  },
+  "interruption": {
+    "status": "acknowledged-pre-freeze-draft-failure",
+    "cause": "human-maintainer-authorized-git-push-updated-upstream",
+    "previous_draft_transition_sha256": "16a4eb0e851531cb0b9d73fa9c6ae724b6ffeb798f2f4abe93d5b46eaed1298b",
+    "previous_relation_was_current": false,
+    "draft_was_committed": false,
+    "release_authority_consumed": false,
+    "corpus_authority_consumed": false,
+    "evaluation_authority_consumed": false,
+    "publication_authority_consumed": false,
+    "npm_content_published": false,
+    "tag_created": false,
+    "github_release_created": false,
+    "remote_ci_dispatched": false
+  },
+  "permitted_changes": {
+    "authority": [
+      "eval/v1.0.0-candidate/TRANSITION.json",
+      "eval/v1.0.0-candidate/lib/validator.js",
+      "test/v1-release-candidate-transition.test.js"
+    ],
+    "release_hardening": [
+      ".github/workflows/ci.yml",
+      "CHANGELOG.md",
+      "README.md",
+      "RELEASING.md",
+      "SECURITY.md",
+      "docs/releases/v1.0.0.md",
+      "eval/v1.0.0-candidate/lib/evidence-validator.js",
+      "package.json",
+      "packaging/README.md",
+      "scripts/build-package.js",
+      "scripts/check-candidate.js",
+      "scripts/lib/maintainer-stable-release.js",
+      "scripts/release-bind.js",
+      "scripts/sync-version.js",
+      "test/v1-plugin.test.js",
+      "test/v1-release-candidate-evidence.test.js",
+      "test/v1-release-hardening.test.js"
+    ],
+    "version_transition": [
+      ".claude-plugin/plugin.json",
+      ".codex-plugin/plugin.json",
+      "package-lock.json",
+      "package.json",
+      "runtime/build-metadata.json",
+      "runtime/src/version.js",
+      "src/v1/build-metadata.json",
+      "src/version.js",
+      "test/d2e-analysis-authority.test.js",
+      "test/eval.test.js",
+      "test/kanon.test.js",
+      "test/v1-maintainer-assurance.test.js",
+      "test/v1-aswitch.test.js",
+      "test/v1-maintainer-certification.test.js",
+      "test/v1-maintainer-documentation-transition.test.js",
+      "test/v1-receipts.test.js",
+      "test/v1-skills-adversarial.test.js",
+      "test/v1-skills.test.js",
+      "test/v1-steer.test.js"
+    ],
+    "candidate_evidence": [
+      "eval/v1.0.0-candidate/evidence-sha256-<semantic-sha256>/candidate.json",
+      "eval/v1.0.0-candidate/evidence-sha256-<semantic-sha256>/complete-tree-commitment.json"
+    ]
+  },
+  "forbidden_changes": [
+    "production-behavior-other-than-canonical-version-metadata",
+    "public-capability-change",
+    "runtime-optional-or-peer-dependency-introduction",
+    "corpus-trace-holdout-or-evaluation-rerun",
+    "ranking-scanning-curation-selection-scoring-policy-threshold-label-or-configuration-change",
+    "historical-evidence-deletion-rewrite-relabel-or-supersession",
+    "withdrawn-package-declarations-correction-revival",
+    "evidence-strict-stable-lane-weakening-renaming-bypass-or-reinterpretation",
+    "remote-fetch-pull-push-merge-tag-release-publish-dispatch-or-configuration-mutation",
+    "credential-token-tarball-temporary-path-or-machine-specific-data-commit"
+  ],
+  "forbidden_claims": [
+    "evidence-strict-release-support",
+    "independent-validation",
+    "independence-established",
+    "blinded-review",
+    "causal-improvement",
+    "holdout-performance-established",
+    "official-holdout-result",
+    "generalization",
+    "six-person-simulation-as-real-review",
+    "accepted-risk-resolution",
+    "prospective-protocol-activation"
+  ],
+  "validation_gates": [
+    "transition-authority-and-maintainer-certification-focused-tests",
+    "maintainer-stable-lane-separation-and-failure-path-tests",
+    "complete-npm-validate",
+    "strict-checked-javascript-type-validation",
+    "generated-synchronization-and-subsequent-exact-check",
+    "javascript-syntax-and-json-parsing",
+    "git-diff-check",
+    "offline-package-metadata-and-exact-inventory",
+    "two-isolated-deterministic-production-builds-and-packs",
+    "byte-for-byte-tarball-equality",
+    "exact-tarball-installation-in-new-path-containing-spaces",
+    "installed-artifact-conformance",
+    "offline-exact-tarball-publish-dry-run",
+    "behavior-source-version-only-delta-proof",
+    "public-capability-normalized-byte-equivalence",
+    "zero-runtime-optional-and-peer-dependencies",
+    "protected-historical-tree-preservation",
+    "withdrawn-package-declarations-correction-remains-withdrawn",
+    "no-p0-or-p1-introduced",
+    "clean-final-worktree"
+  ],
+  "expected_effects": {
+    "old_version": "0.4.0-rc.1",
+    "new_version": "1.0.0",
+    "version_only_source_files": [
+      "src/v1/build-metadata.json",
+      "src/version.js"
+    ],
+    "version_only_generated_runtime_files": [
+      "runtime/build-metadata.json",
+      "runtime/src/version.js"
+    ],
+    "package_only_changes": [
+      "add-package-security-document",
+      "replace-packaged-release-documentation",
+      "update-package-and-host-manifest-version-fields",
+      "update-version-derived-sbom-and-manifest-hashes"
+    ],
+    "old_package_inventory_count": 128,
+    "new_package_inventory_count": 129,
+    "artifact_sha256_must_differ": true,
+    "behavior_must_be_equivalent_apart_from_version_metadata": true,
+    "public_capabilities_must_be_identical": true
+  },
+  "candidate_conclusions": {
+    "success": "v1.0.0-candidate-prepared-awaiting-remote-validation",
+    "failure": "v1.0.0-candidate-preparation-blocked",
+    "uncertain": "v1.0.0-candidate-preparation-inconclusive"
+  },
+  "boundaries": {
+    "publication_authorized": false,
+    "release_action_occurred": false,
+    "evidence_strict_release_supported": false,
+    "independence_established": false,
+    "holdout_performance_established": false,
+    "accepted_risks_remain_open": true,
+    "prospective_protocol_active": false,
+    "six_person_simulation_scope": "simulated-development-only"
+  },
+  "hard_stops": [
+    "starting-state-or-commitment-mismatch",
+    "dirty-or-unexpected-repository-state",
+    "unexplained-production-behavior-change",
+    "public-capability-drift",
+    "dependency-introduction",
+    "historical-evidence-mutation",
+    "nondeterministic-packs",
+    "package-inventory-discrepancy",
+    "artifact-conformance-failure",
+    "validation-failure",
+    "ambiguous-publication-authority",
+    "need-to-weaken-a-gate"
+  ],
+  "next_permissible_action_after_success": "separately-authorized-push-and-validate-only-remote-ci-for-the-frozen-v1.0.0-candidate"
+}

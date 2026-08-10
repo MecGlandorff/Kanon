@@ -17,6 +17,7 @@ export {
   addKanonTodo,
   completeKanonTodo,
   inspectKanonTodos,
+  inspectPreviousHandoff,
   inspectPreviousState,
   parseKanonTodoMarkdown,
   readKanonTodos,
@@ -24,6 +25,10 @@ export {
   validatePersistedState,
   writeKanonOutputs
 } from "./persist.js";
+export {
+  buildContinuityArtifactMetadata,
+  buildContinuityReport
+} from "./continuity/engine.js";
 export {
   renderAsk,
   renderBrief,

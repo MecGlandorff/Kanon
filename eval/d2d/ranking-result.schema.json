@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kanon.invalid/eval/d2d/ranking-result.schema.json",
+  "title": "Kanon D.2D generic ranking hypothesis result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_commitment",
+    "outcome",
+    "hypotheses"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kanon-d2d-ranking-result-v1"
+    },
+    "packet_commitment": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "no-generic-hypothesis",
+        "generic-hypotheses"
+      ]
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "no-generic-hypothesis"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "hypotheses": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "hypotheses": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "safe_text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f\\u061c\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]+$"
+    },
+    "case_ids_multiple": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 28,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^case-[0-9a-f]{20}$"
+      }
+    },
+    "case_ids_one_or_more": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 28,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^case-[0-9a-f]{20}$"
+      }
+    },
+    "direction": {
+      "enum": [
+        "increase",
+        "decrease",
+        "no-clear-direction",
+        "unknown"
+      ]
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "generic_mechanism",
+        "production_signal",
+        "selection_stage",
+        "supporting_case_ids",
+        "counterexample_case_ids",
+        "control_case_ids",
+        "falsifying_evidence",
+        "expected_direction",
+        "regression_risks",
+        "smallest_generic_experiment",
+        "unknowns"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "pattern": "^hypothesis-[1-3]$"
+        },
+        "generic_mechanism": {
+          "$ref": "#/$defs/safe_text"
+        },
+        "production_signal": {
+          "enum": [
+            "base-contract-score",
+            "manifest-declaration-signal",
+            "entrypoint-syntax-signal",
+            "local-import-fan-in",
+            "literal-local-reference",
+            "path-depth-penalty",
+            "low-value-path-penalty",
+            "test-path-penalty",
+            "workflow-path-penalty",
+            "unknown-unavailable"
+          ]
+        },
+        "selection_stage": {
+          "enum": [
+            "rank-score-aggregation",
+            "rank-sort-tiebreak",
+            "curation-contract-selection",
+            "curation-declaration-selection",
+            "curation-entrypoint-selection",
+            "curation-fan-in-selection",
+            "curation-reference-selection",
+            "final-five-truncation",
+            "unknown-unavailable"
+          ]
+        },
+        "supporting_case_ids": {
+          "$ref": "#/$defs/case_ids_multiple"
+        },
+        "counterexample_case_ids": {
+          "$ref": "#/$defs/case_ids_one_or_more"
+        },
+        "control_case_ids": {
+          "$ref": "#/$defs/case_ids_multiple"
+        },
+        "falsifying_evidence": {
+          "$ref": "#/$defs/safe_text"
+        },
+        "expected_direction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "precision",
+            "recall"
+          ],
+          "properties": {
+            "precision": {
+              "$ref": "#/$defs/direction"
+            },
+            "recall": {
+              "$ref": "#/$defs/direction"
+            }
+          }
+        },
+        "regression_risks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safe_text"
+          }
+        },
+        "smallest_generic_experiment": {
+          "$ref": "#/$defs/safe_text"
+        },
+        "unknowns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/safe_text"
+          }
+        }
+      }
+    }
+  }
+}

@@ -72,6 +72,12 @@ The corpus runner reports every miss, false positive, abstention, error, and
 uncertainty interval. A release evaluation must use a separately frozen
 manifest with `evaluation_role: "release"` and `--require-role release`.
 
-The planned paired Codex experiment is defined in
-[`PAIRED_ABLATION.md`](PAIRED_ABLATION.md). It is a separate protocol: these
-standalone analyzer results are not evidence that Kanon improves Codex.
+The paired Codex experiment is defined in
+[`PAIRED_ABLATION.md`](PAIRED_ABLATION.md). Its deterministic rehearsal
+configuration is committed in
+[`paired-ablation.config.json`](paired-ablation.config.json), and
+`npm run eval:paired:rehearse -- ...` exercises the complete synthetic
+180-record schedule without calling a model. The real paired experiment has
+not run and remains blocked when any frozen control is unenforceable or
+Unknown. Neither standalone analyzer results nor synthetic rehearsal results
+are evidence that Kanon improves Codex.

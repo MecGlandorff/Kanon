@@ -1,26 +1,20 @@
 $ErrorActionPreference = "Stop"
 
-$KanonCommand = "ask"
-$LocalKanon = Join-Path $PSScriptRoot "../runtime/bin/kanon.js"
-
-if (-not (Test-Path -LiteralPath $LocalKanon -PathType Leaf)) {
-  [Console]::Error.WriteLine("Kanon skill runtime is incomplete: expected $LocalKanon.")
-  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon skill.")
+$PluginRoot = (Microsoft.PowerShell.Management\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\Join-Path $PSScriptRoot "../../..") -ErrorAction Stop).Path.TrimEnd(
+  [System.IO.Path]::DirectorySeparatorChar,
+  [System.IO.Path]::AltDirectorySeparatorChar
+)
+$Dispatch = Microsoft.PowerShell.Management\Join-Path $PluginRoot "runtime/bin/kanon-dispatch.ps1"
+if (-not (Microsoft.PowerShell.Management\Test-Path -LiteralPath $Dispatch -PathType Leaf)) {
+  [Console]::Error.WriteLine("Kanon shared dispatch runtime is unavailable or unsafe.")
+  [Console]::Error.WriteLine("Reinstall the complete self-contained Kanon plugin.")
+  exit 127
+}
+$DispatchItem = Microsoft.PowerShell.Management\Get-Item -LiteralPath $Dispatch -ErrorAction Stop
+if ($DispatchItem.LinkType) {
+  [Console]::Error.WriteLine("Kanon shared dispatch runtime is unavailable or unsafe.")
   exit 127
 }
 
-$Node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $Node) {
-  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
-  exit 127
-}
-
-$NodeMajor = [int](& $Node.Source -p 'process.versions.node.split(".")[0]')
-if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
-  $NodeVersion = & $Node.Source --version
-  [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
-  exit 127
-}
-
-& $Node.Source $LocalKanon $KanonCommand @args
+& $Dispatch "ask" @args
 exit $LASTEXITCODE
