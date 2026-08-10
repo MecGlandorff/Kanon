@@ -1,0 +1,11 @@
+{
+  "files": [
+    {
+      "path": "candidate.json",
+      "sha256": "4b89f02f6a85810cd5f85750360abaa965a7b53d00d9ef6175efd86d6312c00f"
+    }
+  ],
+  "schema": "kanon-v1.0.0-candidate-corrected-evidence-tree-v1",
+  "semantic_sha256": "2734c521ee9d640e27b0908077e0c393b08605f2297dff83029fb913d8fdacff",
+  "version": 1
+}
