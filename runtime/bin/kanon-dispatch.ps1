@@ -1,14 +1,96 @@
 $ErrorActionPreference = "Stop"
 
+function Resolve-KanonDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$LiteralPath,
+    [int]$LinkDepth = 0
+  )
+
+  if ($LinkDepth -gt 64) {
+    throw "Kanon refused an excessive directory-link chain."
+  }
+
+  $ResolvedPath = (Microsoft.PowerShell.Management\Resolve-Path -LiteralPath $LiteralPath -ErrorAction Stop).Path
+  $PathRoot = [System.IO.Path]::GetPathRoot($ResolvedPath)
+  if ([string]::IsNullOrWhiteSpace($PathRoot)) {
+    throw "Kanon could not safely resolve a directory root."
+  }
+  $CurrentItem = [System.IO.DirectoryInfo]::new($PathRoot)
+  $CurrentItem.Refresh()
+  if (
+    -not $CurrentItem.Exists -or
+    ($CurrentItem.Attributes -band [System.IO.FileAttributes]::Directory) -eq 0
+  ) {
+    throw "Kanon expected a directory root while resolving a trusted path."
+  }
+  $CurrentPath = $CurrentItem.FullName
+  $RelativePath = $ResolvedPath.Substring($PathRoot.Length)
+  $PathComponents = $RelativePath.Split(
+    [char[]]@(
+      [System.IO.Path]::DirectorySeparatorChar,
+      [System.IO.Path]::AltDirectorySeparatorChar
+    ),
+    [System.StringSplitOptions]::RemoveEmptyEntries
+  )
+  foreach ($PathComponent in $PathComponents) {
+    $NextPath = [System.IO.Path]::Combine($CurrentPath, $PathComponent)
+    $Item = [System.IO.DirectoryInfo]::new($NextPath)
+    $Item.Refresh()
+    if (
+      -not $Item.Exists -or
+      ($Item.Attributes -band [System.IO.FileAttributes]::Directory) -eq 0
+    ) {
+      throw "Kanon expected a directory while resolving a trusted path."
+    }
+    if (
+      ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+    ) {
+      $ResolveLinkTarget = $Item.PSObject.Methods["ResolveLinkTarget"]
+      if ($null -eq $ResolveLinkTarget) {
+        throw "Kanon could not safely resolve a directory link."
+      }
+      $Item = $Item.ResolveLinkTarget($true)
+      if (
+        $null -eq $Item -or
+        -not $Item.Exists -or
+        ($Item.Attributes -band [System.IO.FileAttributes]::Directory) -eq 0 -or
+        ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+      ) {
+        throw "Kanon could not safely resolve a directory link."
+      }
+      $CurrentPath = Resolve-KanonDirectory -LiteralPath $Item.FullName -LinkDepth ($LinkDepth + 1)
+    } else {
+      $CurrentPath = $Item.FullName
+    }
+  }
+
+  $FullName = [System.IO.Path]::GetFullPath($CurrentPath)
+  if (
+    [string]::IsNullOrWhiteSpace($FullName) -or
+    -not [System.IO.Path]::IsPathRooted($FullName) -or
+    $FullName.Contains([char]10) -or
+    $FullName.Contains([char]13)
+  ) {
+    throw "Kanon could not safely resolve a directory."
+  }
+  $FullNameRoot = [System.IO.Path]::GetPathRoot($FullName)
+  if ($FullName.Length -gt $FullNameRoot.Length) {
+    $FullName = $FullName.TrimEnd(
+      [System.IO.Path]::DirectorySeparatorChar,
+      [System.IO.Path]::AltDirectorySeparatorChar
+    )
+  }
+  return $FullName
+}
+
 if ($args.Count -lt 1) {
   [Console]::Error.WriteLine("Kanon requires a fixed supported command.")
   exit 127
 }
 $KanonCommand = [string]$args[0]
-$KanonArguments = if ($args.Count -gt 1) {
-  @($args[1..($args.Count - 1)])
-} else {
-  @()
+[string[]]$KanonArguments = @()
+if ($args.Count -gt 1) {
+  $KanonArguments = [string[]]$args[1..($args.Count - 1)]
 }
 $StableCommands = @("ask", "aswitch", "brief", "orient", "resume", "status", "steer", "verify")
 $WriteCommands = @("refresh", "todo")
@@ -21,9 +103,8 @@ if ($StableCommands -ccontains $KanonCommand) {
   exit 127
 }
 
-$PluginRoot = (Microsoft.PowerShell.Management\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\Join-Path $PSScriptRoot "../..") -ErrorAction Stop).Path.TrimEnd(
-  [System.IO.Path]::DirectorySeparatorChar,
-  [System.IO.Path]::AltDirectorySeparatorChar
+$PluginRoot = Resolve-KanonDirectory (
+  Microsoft.PowerShell.Management\Join-Path $PSScriptRoot "../.."
 )
 $PluginPrefix = $PluginRoot + [System.IO.Path]::DirectorySeparatorChar
 $LocalKanon = Microsoft.PowerShell.Management\Join-Path $PSScriptRoot $RuntimeName
@@ -42,9 +123,8 @@ if ($null -eq $PathValue -or $PathValue.Length -gt 32768) {
   exit 127
 }
 
-$RepositoryRoot = (Microsoft.PowerShell.Management\Resolve-Path -LiteralPath (Microsoft.PowerShell.Management\Get-Location).Path -ErrorAction Stop).Path.TrimEnd(
-  [System.IO.Path]::DirectorySeparatorChar,
-  [System.IO.Path]::AltDirectorySeparatorChar
+$RepositoryRoot = Resolve-KanonDirectory (
+  (Microsoft.PowerShell.Management\Get-Location).Path
 )
 $RepositoryPrefix = $RepositoryRoot + [System.IO.Path]::DirectorySeparatorChar
 $SafePathEntries = @()
@@ -53,7 +133,7 @@ foreach ($PathEntry in $PathValue.Split([System.IO.Path]::PathSeparator)) {
     continue
   }
   try {
-    $PathDirectory = (Microsoft.PowerShell.Management\Resolve-Path -LiteralPath $PathEntry -ErrorAction Stop).Path
+    $PathDirectory = Resolve-KanonDirectory $PathEntry
   } catch {
     continue
   }
@@ -98,6 +178,11 @@ if ($null -eq $NodeCandidate) {
 }
 
 $NodeItem = Microsoft.PowerShell.Management\Get-Item -LiteralPath $NodeCandidate -ErrorAction Stop
+$NodePath = $null
+if ($NodeItem.PSIsContainer) {
+  [Console]::Error.WriteLine("Kanon could not safely resolve the Node.js executable.")
+  exit 127
+}
 $NodePath = $NodeItem.FullName
 if ($NodeItem.LinkType) {
   $ResolveLinkTarget = $NodeItem.PSObject.Methods["ResolveLinkTarget"]
@@ -105,7 +190,22 @@ if ($NodeItem.LinkType) {
     [Console]::Error.WriteLine("Kanon could not safely resolve the Node.js executable.")
     exit 127
   }
-  $NodePath = $NodeItem.ResolveLinkTarget($true).FullName
+  $NodeItem = $NodeItem.ResolveLinkTarget($true)
+  if ($null -eq $NodeItem -or $NodeItem.PSIsContainer -or $NodeItem.LinkType) {
+    [Console]::Error.WriteLine("Kanon could not safely resolve the Node.js executable.")
+    exit 127
+  }
+  $NodePath = $NodeItem.FullName
+}
+if (
+  [string]::IsNullOrWhiteSpace($NodePath) -or
+  -not [System.IO.Path]::IsPathRooted($NodePath) -or
+  -not [System.IO.File]::Exists($NodePath) -or
+  $NodePath.Contains([char]10) -or
+  $NodePath.Contains([char]13)
+) {
+  [Console]::Error.WriteLine("Kanon could not safely resolve the Node.js executable.")
+  exit 127
 }
 if (
   $NodePath.Equals($RepositoryRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
@@ -148,10 +248,14 @@ foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
 $KanonExitCode = 127
 try {
   $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
-  $NodeMajor = [int](& $NodePath -p 'process.versions.node.split(".")[0]')
-  if (@(20, 22, 24, 25) -notcontains $NodeMajor) {
-    $NodeVersion = & $NodePath --version
-    [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25; found $NodeVersion.")
+  $NodeProbe = @(& $NodePath -p 'process.versions.node.split(".")[0]')
+  $NodeProbeExitCode = $LASTEXITCODE
+  if (
+    $NodeProbeExitCode -ne 0 -or
+    $NodeProbe.Count -ne 1 -or
+    ([string]$NodeProbe[0]) -notmatch '^(20|22|24|25)$'
+  ) {
+    [Console]::Error.WriteLine("Kanon requires Node.js major 20, 22, 24, or 25.")
     exit 127
   }
 

@@ -33,6 +33,18 @@ export const SHARED_WRAPPER_ARTIFACTS = Object.freeze([
   "runtime/bin/kanon-dispatch.ps1"
 ]);
 
+export function generatedExtensionlessWrappers() {
+  return [
+    SHARED_WRAPPER_ARTIFACTS[0],
+    ...PUBLIC_COMMANDS.map(
+      (command) => `skills/kanon/scripts/kanon-${command}`
+    ),
+    ...IMPLEMENTED_STABLE_SKILLS.map(
+      (skill) => `skills/${skill}/scripts/kanon-${skill}`
+    )
+  ].sort();
+}
+
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
   ["src/v1/adapters/codex.js", "runtime/adapters/codex.js"],

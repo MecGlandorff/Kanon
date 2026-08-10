@@ -9,8 +9,11 @@ import { safeJsonStringify } from "../src/trust.js";
 import { validateDevelopmentReport } from "./lib/development-report.js";
 import {
   releasePolicyFromEnvironment,
+  validateMaintainerStableEvidenceBinding,
   validateReleasePolicy
 } from "./lib/maintainer-stable-release.js";
+import { canonicalBytes } from
+  "../eval/v1.0.0-maintainer/lib/validator.js";
 
 const options = parseArgs(process.argv.slice(2));
 const bundle = canonicalDirectory(options.bundle);
@@ -44,15 +47,53 @@ for (const report of conformance) {
   }
 }
 
-const development = readNamedReport(
+const development = optionalNamedReport(bundle, "development-eval.json");
+const maintainerEvidence = optionalNamedReport(
   bundle,
-  "development-eval.json"
+  "maintainer-evidence-binding.json"
 );
-const developmentValidation = validateDevelopmentReport(development.value, {
-  candidateCommit: options.candidateCommit,
-  candidateVersion: options.candidateVersion,
-  requireThresholdPass: options.releaseKind !== "prerelease"
-});
+let developmentValidation;
+let developmentCorpusSha256;
+if (options.releaseKind === "maintainer-stable") {
+  if (development || !maintainerEvidence) {
+    throw new Error(
+      "Maintainer-stable requires only the frozen development evidence binding."
+    );
+  }
+  const expected = validateMaintainerStableEvidenceBinding(
+    process.cwd(),
+    maintainerEvidence.value
+  );
+  const expectedSha256 = crypto
+    .createHash("sha256")
+    .update(canonicalBytes(expected))
+    .digest("hex");
+  if (maintainerEvidence.sha256 !== expectedSha256) {
+    throw new Error("Maintainer-stable evidence binding is not canonical.");
+  }
+  developmentValidation = {
+    execution_complete: true,
+    thresholds_passed: false,
+    analysis_error_count:
+      expected.frozen_development.analysis_error_count,
+    incomplete_scan_count:
+      expected.frozen_development.incomplete_scan_count,
+    failures: [...expected.frozen_development.threshold_failures]
+  };
+  developmentCorpusSha256 = expected.frozen_development.corpus_sha256;
+} else {
+  if (!development || maintainerEvidence) {
+    throw new Error(
+      "Prerelease and stable lanes require only the workflow development report."
+    );
+  }
+  developmentValidation = validateDevelopmentReport(development.value, {
+    candidateCommit: options.candidateCommit,
+    candidateVersion: options.candidateVersion,
+    requireThresholdPass: options.releaseKind === "stable"
+  });
+  developmentCorpusSha256 = development.value.corpus.manifest_sha256;
+}
 const release = optionalNamedReport(bundle, "release-eval.json");
 if (options.releaseKind === "stable") {
   if (options.candidateVersion.includes("-")) {
@@ -84,8 +125,7 @@ const manifest = {
   tag: `v${options.candidateVersion}`,
   artifact_sha256: artifactSha256,
   artifact_file: path.basename(tarball.path),
-  development_corpus_sha256:
-    development.value.corpus.manifest_sha256,
+  development_corpus_sha256: developmentCorpusSha256,
   development_execution_complete:
     developmentValidation.execution_complete,
   development_thresholds_passed:
@@ -96,11 +136,22 @@ const manifest = {
     developmentValidation.incomplete_scan_count,
   development_threshold_failures:
     developmentValidation.failures,
+  development_evidence_source:
+    options.releaseKind === "maintainer-stable"
+      ? "frozen-historical-visible-development"
+      : "workflow-development-corpus",
+  development_corpus_executed_in_workflow:
+    options.releaseKind !== "maintainer-stable",
+  holdout_corpus_executed_in_workflow:
+    options.releaseKind === "stable",
+  accepted_risks_remain_open:
+    options.releaseKind === "maintainer-stable" ? true : null,
   release_corpus_sha256:
     release?.value.corpus.manifest_sha256 || null,
   reports: [
     ...conformance,
-    development,
+    ...(development ? [development] : []),
+    ...(maintainerEvidence ? [maintainerEvidence] : []),
     ...(release ? [release] : [])
   ].map((report) => ({
     path: path.basename(report.path),

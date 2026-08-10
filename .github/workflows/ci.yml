@@ -79,6 +79,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.CANDIDATE_REF }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node
@@ -237,7 +238,9 @@ jobs:
 
   development-eval:
     name: Complete visible development corpus
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_kind != 'maintainer-stable'
     needs: pack-candidate
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -293,6 +296,45 @@ jobs:
           path: development-eval.json
           if-no-files-found: error
           retention-days: 30
+
+  maintainer-stable-evidence:
+    name: Bind frozen maintainer-stable evidence
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_kind == 'maintainer-stable'
+    needs: pack-candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact candidate with frozen history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate exact frozen evidence without corpus execution
+        run: >-
+          node scripts/check-maintainer-evidence.js
+          --output maintainer-evidence-binding.json
+
+      - name: Upload exact frozen evidence binding
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: kanon-maintainer-evidence-${{ inputs.candidate_commit }}
+          path: maintainer-evidence-binding.json
+          if-no-files-found: error
+          retention-days: 90
 
   release-eval:
     name: One-shot sealed holdout
@@ -367,7 +409,10 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       needs.pack-candidate.result == 'success' &&
       needs.cross-platform-conformance.result == 'success' &&
-      needs.development-eval.result == 'success' &&
+      (
+        ((inputs.release_kind == 'prerelease' || inputs.release_kind == 'stable') && needs.development-eval.result == 'success' && needs.maintainer-stable-evidence.result == 'skipped') ||
+        (inputs.release_kind == 'maintainer-stable' && needs.development-eval.result == 'skipped' && needs.maintainer-stable-evidence.result == 'success')
+      ) &&
       (
         ((inputs.release_kind == 'prerelease' || inputs.release_kind == 'maintainer-stable') && needs.release-eval.result == 'skipped') ||
         (inputs.release_kind == 'stable' && needs.release-eval.result == 'success')
@@ -376,6 +421,7 @@ jobs:
       - pack-candidate
       - cross-platform-conformance
       - development-eval
+      - maintainer-stable-evidence
       - release-eval
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -385,6 +431,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node
@@ -412,9 +459,17 @@ jobs:
           path: release-bundle
 
       - name: Download development report
+        if: inputs.release_kind != 'maintainer-stable'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: kanon-development-eval
+          path: release-bundle
+
+      - name: Download frozen maintainer evidence binding
+        if: inputs.release_kind == 'maintainer-stable'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: kanon-maintainer-evidence-${{ inputs.candidate_commit }}
           path: release-bundle
 
       - name: Download held-out report
@@ -467,6 +522,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.candidate_commit }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node and npm trusted publishing

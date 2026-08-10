@@ -34,7 +34,10 @@ test("candidate transition revalidates certified inputs without disclosure", () 
 });
 
 test("candidate transition permits only its frozen file scope", () => {
-  const changed = validateCandidateDiffScope(repoRoot);
+  const changed = validateCandidateDiffScope(
+    repoRoot,
+    "9ce62c66bab27acbc1695799e8ef15c54c0ea577"
+  );
   assert.equal(Array.isArray(changed), true);
   assert.equal(
     changed.length === 0 ||
