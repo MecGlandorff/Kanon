@@ -17,6 +17,7 @@ import {
   inspectPersistedContinuity
 } from "../src/v1/repository/inspect.js";
 import {
+  canonicalRealpath,
   executableScript,
   fileIdentity,
   initializeGit,
@@ -613,7 +614,7 @@ test("malformed, overbroad, and cross-root receipts remain Unknown or Stale", as
 test("hostile Git runner output cannot create an observed-success claim", () => {
   const root = makeFixture({ "README.md": "# Fixture\n" });
   let calls = 0;
-  const git = observeRepositoryGit(fs.realpathSync(root), {
+  const git = observeRepositoryGit(canonicalRealpath(root), {
     runner: (_selectedRoot, args) => {
       calls += 1;
       if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") {
@@ -649,7 +650,7 @@ test("hostile Git runner output cannot create an observed-success claim", () => 
 
 test("invalid structured Git paths prevent completeness and absence claims", () => {
   const root = makeFixture({ "README.md": "# Fixture\n" });
-  const git = observeRepositoryGit(fs.realpathSync(root), {
+  const git = observeRepositoryGit(canonicalRealpath(root), {
     runner: (_selectedRoot, args) => {
       if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") {
         return gitSuccess("true\n");
@@ -694,7 +695,7 @@ test("oversized host executable search state fails Git closed", () => {
       { length: 129 },
       () => hostBin
     ).join(path.delimiter);
-    const git = observeRepositoryGit(fs.realpathSync(root));
+    const git = observeRepositoryGit(canonicalRealpath(root));
     assert.equal(git.found, false);
     assert.equal(git.observation_complete, false);
     assert.match(git.diagnostics.join(" "), /trusted Git executable/);
@@ -725,7 +726,7 @@ test("Git executable resolution ignores a repository-local poisoned PATH entry",
   const originalPath = process.env.PATH;
   try {
     process.env.PATH = `${root}${path.delimiter}${originalPath || ""}`;
-    const git = observeRepositoryGit(fs.realpathSync(root));
+    const git = observeRepositoryGit(canonicalRealpath(root));
     assert.equal(git.found, true, git.diagnostics.join("\n"));
     assert.equal(git.observation_complete, true, git.diagnostics.join("\n"));
     assert.equal(fs.existsSync(marker), false);
@@ -760,7 +761,7 @@ test("real Git inspection disables repository-controlled fsmonitor and index wri
   const index = path.join(root, ".git", "index");
   const before = fileIdentity(index);
 
-  const git = observeRepositoryGit(fs.realpathSync(root));
+  const git = observeRepositoryGit(canonicalRealpath(root));
 
   assert.equal(git.observation_complete, true, git.diagnostics.join("\n"));
   assert.equal(git.dirty, true);
@@ -783,7 +784,7 @@ test("malformed persisted continuity is ignored without mutation", async () => {
     path.join(root, ".kanon", "STATE.json"),
     "utf8"
   );
-  const inspected = inspectPersistedContinuity(fs.realpathSync(root));
+  const inspected = inspectPersistedContinuity(canonicalRealpath(root));
   const resumed = await invokeClaudeSkill(
     invocation("resume", root, { task: "continue" }),
     stableContext()

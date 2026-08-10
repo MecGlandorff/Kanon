@@ -7,7 +7,11 @@ import { invokeClaudeSkill } from "../src/v1/adapters/claude.js";
 import { invokeCodexSkill } from "../src/v1/adapters/codex.js";
 import { runStableCli } from "../src/v1/cli.js";
 import { isContextReceipt } from "../src/v1/core/receipt.js";
-import { captureCli, makeFixture } from "./helpers.js";
+import {
+  canonicalRealpath,
+  captureCli,
+  makeFixture
+} from "./helpers.js";
 
 const NOW = Date.parse("2026-07-28T08:00:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
@@ -191,7 +195,7 @@ test("resume uses the shared continuity engine and leaves the repository unchang
   });
   const oldText = "# Prior purpose\n";
   const previous = {
-    repo: { root: fs.realpathSync(root) },
+    repo: { root: canonicalRealpath(root) },
     generated_at: "2026-07-27T08:00:00.000Z",
     files: {
       fingerprints: [

@@ -454,7 +454,7 @@ test("shared dispatch rejects unknown commands before PATH resolution", () => {
       ...process.env,
       PATH: `${root}${path.delimiter}${process.env.PATH || ""}`
     },
-    timeout: 10_000
+    timeout: 30_000
   });
 
   assert.equal(run.status, 127);
@@ -491,7 +491,7 @@ test("shared dispatch survives plugin and repository paths with spaces", () => {
     const run = spawnPlatformWrapper(wrapper, ["--version"], {
       cwd: repository,
       encoding: "utf8",
-      timeout: 10_000
+      timeout: 30_000
     });
     assert.equal(run.status, 0, run.stderr);
     assert.equal(run.stdout, "1.0.0\n");

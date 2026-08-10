@@ -742,7 +742,9 @@ function canonicalBytes(value) {
 
 function containedDirectory(root, relativePath) {
   const selected = path.join(root, relativePath);
-  const canonical = fs.realpathSync(selected);
+  const canonical = fs.realpathSync.native
+    ? fs.realpathSync.native(selected)
+    : fs.realpathSync(selected);
   const relative = path.relative(root, canonical);
   const stat = fs.lstatSync(canonical);
   if (

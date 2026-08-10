@@ -31,6 +31,7 @@ import {
   repositoryCacheName
 } from "../scripts/lib/eval-corpus/checkout.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
+import { canonicalRealpath } from "./helpers.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -133,7 +134,7 @@ test("two full packets, including a side-swapped build, are commitment-identical
       packetRoot: firstRoot
     }),
     {
-      packet_root: fs.realpathSync(firstRoot),
+      packet_root: canonicalRealpath(firstRoot),
       packet_hash: first.packet_hash,
       case_count: 2,
       candidate_count: 12,
@@ -383,24 +384,27 @@ test("unsafe candidate paths, source links, hard links, special files, and hosti
   const firstRoot = path.join(sourceCases, firstCase);
   fs.chmodSync(sourceCases, 0o700);
   fs.chmodSync(firstRoot, 0o700);
+  let sourceLinkCreated = false;
   try {
     fs.symlinkSync(
       path.join(firstRoot, "a.txt"),
       path.join(firstRoot, "source-link")
     );
+    sourceLinkCreated = true;
   } catch {
-    t.skip("Symbolic links are unavailable.");
-    return;
+    t.diagnostic("Symbolic-link assertion unavailable on this platform.");
   }
-  fs.chmodSync(firstRoot, 0o500);
-  fs.chmodSync(sourceCases, 0o500);
-  assert.throws(
-    () => buildFixtureComparative(
-      linkFixture,
-      path.join(linkFixture.root, "link-rejected")
-    ),
-    /link/
-  );
+  if (sourceLinkCreated) {
+    fs.chmodSync(firstRoot, 0o500);
+    fs.chmodSync(sourceCases, 0o500);
+    assert.throws(
+      () => buildFixtureComparative(
+        linkFixture,
+        path.join(linkFixture.root, "link-rejected")
+      ),
+      /link/
+    );
+  }
 
   const hardFixture = makeFixture();
   const hardCases = path.join(hardFixture.sourcePacketRoot, "cases");
@@ -408,25 +412,28 @@ test("unsafe candidate paths, source links, hard links, special files, and hosti
   fs.chmodSync(hardCases, 0o700);
   fs.chmodSync(hardCase, 0o700);
   fs.chmodSync(path.join(hardCase, "a.txt"), 0o600);
+  let sourceHardLinkCreated = false;
   try {
     fs.linkSync(
       path.join(hardCase, "a.txt"),
       path.join(hardCase, "source-hard-link")
     );
+    sourceHardLinkCreated = true;
   } catch {
-    t.skip("Hard links are unavailable.");
-    return;
+    t.diagnostic("Hard-link assertion unavailable on this platform.");
   }
-  fs.chmodSync(path.join(hardCase, "a.txt"), 0o400);
-  fs.chmodSync(hardCase, 0o500);
-  fs.chmodSync(hardCases, 0o500);
-  assert.throws(
-    () => buildFixtureComparative(
-      hardFixture,
-      path.join(hardFixture.root, "hard-link-rejected")
-    ),
-    /hard-linked/
-  );
+  if (sourceHardLinkCreated) {
+    fs.chmodSync(path.join(hardCase, "a.txt"), 0o400);
+    fs.chmodSync(hardCase, 0o500);
+    fs.chmodSync(hardCases, 0o500);
+    assert.throws(
+      () => buildFixtureComparative(
+        hardFixture,
+        path.join(hardFixture.root, "hard-link-rejected")
+      ),
+      /hard-linked/
+    );
+  }
 
   if (process.platform !== "win32") {
     const specialFixture = makeFixture();
@@ -465,18 +472,40 @@ test("unsafe candidate paths, source links, hard links, special files, and hosti
   );
   fs.chmodSync(hostileCases, 0o700);
   fs.chmodSync(hostileCase, 0o700);
-  fs.writeFileSync(path.join(hostileCase, "unsafe\u001bname"), "x");
-  updateSourceSnapshotCommitment(hostileFixture);
-  fs.chmodSync(path.join(hostileCase, "unsafe\u001bname"), 0o400);
-  fs.chmodSync(hostileCase, 0o500);
-  fs.chmodSync(hostileCases, 0o500);
-  assert.throws(
-    () => buildFixtureComparative(
-      hostileFixture,
-      path.join(hostileFixture.root, "hostile-name-rejected")
-    ),
-    /Unsafe repository-relative path/
+  const hostileName = path.join(
+    hostileCase,
+    ["unsafe", "name"].join(String.fromCharCode(27))
   );
+  let hostileNameCreated = false;
+  try {
+    fs.writeFileSync(hostileName, "x");
+    hostileNameCreated = true;
+  } catch (error) {
+    if (
+      process.platform !== "win32" ||
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      !["ENOENT", "EINVAL"].includes(error.code)
+    ) {
+      throw error;
+    }
+    t.diagnostic(
+      "Control-character filenames are unavailable on this platform."
+    );
+  }
+  if (hostileNameCreated) {
+    updateSourceSnapshotCommitment(hostileFixture);
+    fs.chmodSync(hostileName, 0o400);
+    fs.chmodSync(hostileCase, 0o500);
+    fs.chmodSync(hostileCases, 0o500);
+    assert.throws(
+      () => buildFixtureComparative(
+        hostileFixture,
+        path.join(hostileFixture.root, "hostile-name-rejected")
+      ),
+      /Unsafe repository-relative path/
+    );
+  }
 });
 
 test("resource limits, timeout, destination refusal, and interrupted cleanup preserve adjacent state", () => {
@@ -613,8 +642,10 @@ test("comparative evaluation tooling stays outside the production artifact", () 
 });
 
 function makeFixture() {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-d2c-comparative-test-")
+  const root = canonicalRealpath(
+    fs.mkdtempSync(
+      path.join(os.tmpdir(), "kanon-d2c-comparative-test-")
+    )
   );
   const repoRoot = path.join(root, "repo");
   const cacheRoot = path.join(root, "cache");

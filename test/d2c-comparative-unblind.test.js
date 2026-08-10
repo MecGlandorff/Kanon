@@ -34,6 +34,7 @@ import {
   repositoryCacheName
 } from "../scripts/lib/eval-corpus/checkout.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
+import { canonicalRealpath } from "./helpers.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -451,8 +452,10 @@ test("frozen D.2C evidence remains exact and comparative tooling stays outside t
 });
 
 function makeFixture() {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-d2c-compare-unblind-test-")
+  const root = canonicalRealpath(
+    fs.mkdtempSync(
+      path.join(os.tmpdir(), "kanon-d2c-compare-unblind-test-")
+    )
   );
   const repoRoot = path.join(root, "repo");
   const cacheRoot = path.join(root, "cache");
@@ -740,7 +743,7 @@ function makeFixture() {
     expected
   };
   const staticAudit = {
-    packet_root: fs.realpathSync(packetRoot),
+    packet_root: canonicalRealpath(packetRoot),
     packet_hash: built.packet_hash,
     case_count: 8,
     candidate_count: 48,

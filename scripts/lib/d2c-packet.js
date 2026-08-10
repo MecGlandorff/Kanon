@@ -1688,7 +1688,9 @@ function makeTreeWritable(root) {
 
 export function canonicalDirectory(value, label) {
   const resolved = path.resolve(String(value));
-  const canonical = fs.realpathSync(resolved);
+  const canonical = fs.realpathSync.native
+    ? fs.realpathSync.native(resolved)
+    : fs.realpathSync(resolved);
   const stat = fs.lstatSync(canonical);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
     throw new Error(`${label} is not a canonical direct directory.`);

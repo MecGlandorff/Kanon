@@ -20,7 +20,7 @@ import {
   REGISTRY_ORIGIN,
   REGISTRY_TIMEOUT_MS
 } from "../src/v1/registry/transport.js";
-import { canSymlink } from "./helpers.js";
+import { canSymlink, canonicalRealpath } from "./helpers.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -508,7 +508,7 @@ test("checker always requests only the embedded exact version at fixed bounds", 
 });
 
 function makeChecker(responses) {
-  const pluginData = fs.realpathSync(
+  const pluginData = canonicalRealpath(
     fs.mkdtempSync(
       path.join(os.tmpdir(), "kanon-deprecation-")
     )

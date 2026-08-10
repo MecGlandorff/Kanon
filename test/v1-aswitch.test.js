@@ -10,6 +10,7 @@ import { invokeCodexSkill } from "../src/v1/adapters/codex.js";
 import { runStableCli } from "../src/v1/cli.js";
 import {
   canSymlink,
+  canonicalRealpath,
   captureCli,
   makeFixture
 } from "./helpers.js";
@@ -933,7 +934,7 @@ function privateDirectory(prefix) {
   if (process.platform !== "win32") {
     fs.chmodSync(directory, 0o700);
   }
-  return fs.realpathSync(directory);
+  return canonicalRealpath(directory);
 }
 
 /**

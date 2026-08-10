@@ -6,12 +6,18 @@ import { spawnSync } from "node:child_process";
 import { Writable } from "node:stream";
 import { hardenedGitEnvironment } from "../src/git-runner.js";
 
+export function canonicalRealpath(value) {
+  return fs.realpathSync.native
+    ? fs.realpathSync.native(value)
+    : fs.realpathSync(value);
+}
+
 export function makeFixture(files = {}, prefix = "kanon-test-") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   for (const [relative, contents] of Object.entries(files)) {
     writeFixtureFile(root, relative, contents);
   }
-  return root;
+  return canonicalRealpath(root);
 }
 
 export function writeFixtureFile(root, relative, contents) {
@@ -23,7 +29,15 @@ export function writeFixtureFile(root, relative, contents) {
 
 export function runGitFixture(root, args, options = {}) {
   const { env: extraEnv = {}, ...spawnOptions } = options;
-  const result = spawnSync("git", ["-C", root, ...args], {
+  const result = spawnSync("git", [
+    "-c",
+    "maintenance.auto=false",
+    "-c",
+    "gc.auto=0",
+    "-C",
+    root,
+    ...args
+  ], {
     encoding: "utf8",
     env: hardenedGitEnvironment(extraEnv),
     maxBuffer: 16 * 1024 * 1024,

@@ -23,6 +23,7 @@ import {
   repositoryCacheName
 } from "../scripts/lib/eval-corpus/checkout.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
+import { canonicalRealpath } from "./helpers.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -172,7 +173,7 @@ test("two packets are byte-commitment deterministic and structurally masked", ()
       packetRoot: firstRoot
     }),
     {
-      packet_root: fs.realpathSync(firstRoot),
+      packet_root: canonicalRealpath(firstRoot),
       packet_hash: first.packet_hash,
       case_count: 1,
       item_count: 2,
@@ -488,8 +489,8 @@ test("packet tooling and evidence stay outside the production artifact", () => {
 });
 
 function makeBuildFixture() {
-  const root = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-d2c-test-")
+  const root = canonicalRealpath(
+    fs.mkdtempSync(path.join(os.tmpdir(), "kanon-d2c-test-"))
   );
   const repoRoot = path.join(root, "repo");
   const cacheRoot = path.join(root, "cache");

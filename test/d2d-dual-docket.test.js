@@ -30,7 +30,7 @@ import {
   sha256
 } from "../scripts/lib/d2c-packet.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
-import { canSymlink } from "./helpers.js";
+import { canSymlink, canonicalRealpath } from "./helpers.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -952,7 +952,7 @@ function fileHash(file) {
 }
 
 function ownedTempRoot(prefix) {
-  const root = fs.realpathSync(fs.mkdtempSync(prefix));
+  const root = canonicalRealpath(fs.mkdtempSync(prefix));
   ownedTemporaryRoots.push(root);
   return root;
 }

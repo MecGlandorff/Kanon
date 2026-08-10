@@ -15,7 +15,7 @@ import {
 import {
   readContextReceiptStore
 } from "../src/v1/core/receipt-store.js";
-import { makeFixture } from "./helpers.js";
+import { canonicalRealpath, makeFixture } from "./helpers.js";
 
 const NOW = Date.parse("2026-07-28T10:00:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
@@ -226,7 +226,7 @@ test("receipt store enforces record and retention bounds", async () => {
 
   const expired = readContextReceiptStore(
     pluginData,
-    fs.realpathSync(roots[8]),
+    canonicalRealpath(roots[8]),
     NOW + 8 + RECEIPT_RETENTION_MS + 1
   );
   assert.equal(expired.ok, true);
@@ -421,7 +421,7 @@ function makeRepository(description) {
  * @returns {string}
  */
 function makePluginData() {
-  return fs.realpathSync(
+  return canonicalRealpath(
     fs.mkdtempSync(path.join(os.tmpdir(), "kanon-receipt-data-"))
   );
 }

@@ -13,7 +13,7 @@ import {
   validateRankingResultBytes
 } from "../scripts/lib/d2d-ranking-result.js";
 import { canonicalJson } from "../scripts/lib/d2c-packet.js";
-import { canSymlink } from "./helpers.js";
+import { canSymlink, canonicalRealpath } from "./helpers.js";
 
 const temporaryRoots = [];
 
@@ -399,7 +399,9 @@ function digest(bytes) {
 }
 
 function temporaryRoot(prefix) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
+  const root = canonicalRealpath(
+    fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  );
   temporaryRoots.push(root);
   return root;
 }
