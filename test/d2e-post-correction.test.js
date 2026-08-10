@@ -33,6 +33,7 @@ import {
   aggregateScores,
   scoreCase
 } from "../scripts/lib/eval-corpus/scoring.js";
+import { canSymlink } from "./helpers.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -491,7 +492,7 @@ test("failure preservation is additive, byte-exact, bounded, and terminal-safe",
   );
 });
 
-test("attempt validation rejects missing inventory and tree hashing rejects links", () => {
+test("attempt validation rejects missing inventory and tree hashing rejects links", (t) => {
   const incomplete = fs.mkdtempSync(
     path.join(os.tmpdir(), "kanon-post-correction-incomplete-")
   );
@@ -503,14 +504,18 @@ test("attempt validation rejects missing inventory and tree hashing rejects link
     path.join(os.tmpdir(), "kanon-post-correction-linked-")
   );
   fs.writeFileSync(path.join(linked, "regular.json"), "{}\n");
-  fs.symlinkSync(
-    path.join(linked, "regular.json"),
-    path.join(linked, "linked.json")
-  );
-  assert.throws(
-    () => completeTreeCommitment(linked),
-    /tree-link-linked\.json/
-  );
+  if (canSymlink()) {
+    fs.symlinkSync(
+      path.join(linked, "regular.json"),
+      path.join(linked, "linked.json")
+    );
+    assert.throws(
+      () => completeTreeCommitment(linked),
+      /tree-link-linked\.json/
+    );
+  } else {
+    t.diagnostic("Symbolic links are unavailable.");
+  }
 });
 
 test("post-correction core serialization is exclusive and path-fixed", () => {

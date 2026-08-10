@@ -30,6 +30,7 @@ import {
   sha256
 } from "../scripts/lib/d2c-packet.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
+import { canSymlink } from "./helpers.js";
 
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -510,7 +511,7 @@ test("future Phase-2 materialization and adjudication are deterministic on synth
   }), /case decision is invalid/);
 });
 
-test("review output roots are isolated and exact single-output enforcement fails closed", () => {
+test("review output roots are isolated and exact single-output enforcement fails closed", (t) => {
   assert.equal(
     assertIsolatedOutputRoots("/tmp/labeler", "/tmp/reviewer"),
     true
@@ -550,19 +551,23 @@ test("review output roots are isolated and exact single-output enforcement fails
   );
   fs.unlinkSync(path.join(root, "output", "extra.json"));
   fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
-  fs.symlinkSync(
-    path.join(root, "outside-result.json"),
-    path.join(root, "output", "ranking-result.json")
-  );
-  assert.throws(
-    () => validateDocketOutput(
-      root,
-      ["ranking-result.json"],
-      "ranking-result.json"
-    ),
-    /indirect or special/
-  );
-  fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
+  if (canSymlink()) {
+    fs.symlinkSync(
+      path.join(root, "outside-result.json"),
+      path.join(root, "output", "ranking-result.json")
+    );
+    assert.throws(
+      () => validateDocketOutput(
+        root,
+        ["ranking-result.json"],
+        "ranking-result.json"
+      ),
+      /indirect or special/
+    );
+    fs.unlinkSync(path.join(root, "output", "ranking-result.json"));
+  } else {
+    t.diagnostic("Symbolic links are unavailable.");
+  }
   fs.writeFileSync(path.join(root, "hard-source.json"), "{}\n");
   fs.linkSync(
     path.join(root, "hard-source.json"),
@@ -598,10 +603,15 @@ test("reused D.2C copier excludes links and rejects hard links, special files, h
   const source = path.join(root, "source");
   fs.mkdirSync(source);
   fs.writeFileSync(path.join(source, "safe.txt"), "safe\n");
-  fs.symlinkSync(
-    path.join(root, "outside"),
-    path.join(source, "excluded-link")
-  );
+  const symlinkAvailable = canSymlink();
+  if (symlinkAvailable) {
+    fs.symlinkSync(
+      path.join(root, "outside"),
+      path.join(source, "excluded-link")
+    );
+  } else {
+    t.diagnostic("Symbolic links are unavailable.");
+  }
   const state = newCopyState(D2D_LIMITS, Date.now());
   copySnapshot(
     source,
@@ -609,7 +619,7 @@ test("reused D.2C copier excludes links and rejects hard links, special files, h
     state,
     "synthetic"
   );
-  assert.equal(state.rejectedLinks, 1);
+  assert.equal(state.rejectedLinks, symlinkAvailable ? 1 : 0);
   assert.deepEqual(fs.readdirSync(path.join(root, "copy")), ["safe.txt"]);
 
   const hardSource = path.join(root, "hard-source");
@@ -631,16 +641,24 @@ test("reused D.2C copier excludes links and rejects hard links, special files, h
 
   const hostileSource = path.join(root, "hostile-source");
   fs.mkdirSync(hostileSource);
-  fs.writeFileSync(path.join(hostileSource, "bad\u001bname"), "x");
-  assert.throws(
-    () => copySnapshot(
-      hostileSource,
-      path.join(root, "hostile-copy"),
-      newCopyState(D2D_LIMITS, Date.now()),
-      "hostile"
-    ),
-    /Unsafe repository-relative path/
-  );
+  let hostileNameAvailable = true;
+  try {
+    fs.writeFileSync(path.join(hostileSource, "bad\u001bname"), "x");
+  } catch {
+    hostileNameAvailable = false;
+    t.diagnostic("The filesystem rejected control characters in filenames.");
+  }
+  if (hostileNameAvailable) {
+    assert.throws(
+      () => copySnapshot(
+        hostileSource,
+        path.join(root, "hostile-copy"),
+        newCopyState(D2D_LIMITS, Date.now()),
+        "hostile"
+      ),
+      /Unsafe repository-relative path/
+    );
+  }
 
   const fifoSource = path.join(root, "fifo-source");
   fs.mkdirSync(fifoSource);

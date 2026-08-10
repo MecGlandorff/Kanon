@@ -217,7 +217,7 @@ export function runBoundedGit(root, args) {
       "-c",
       "core.fsmonitor=false",
       "-c",
-      `core.hooksPath=${os.devNull}`,
+      `core.hooksPath=${getEmptyConfigPath()}`,
       "-c",
       "pager.branch=false",
       "-c",
@@ -619,7 +619,7 @@ function invalidGitResult() {
  * @returns {string}
  */
 function getEmptyConfigPath() {
-  return os.devNull;
+  return process.platform === "win32" ? "NUL" : os.devNull;
 }
 
 /**

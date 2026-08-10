@@ -248,7 +248,7 @@ foreach ($NodeEnvironmentName in $NodeEnvironmentNames) {
 $KanonExitCode = 127
 try {
   $env:PATH = [string]::Join([System.IO.Path]::PathSeparator, $SafePathEntries)
-  $NodeProbe = @(& $NodePath -p 'process.versions.node.split(".")[0]')
+  $NodeProbe = @(& $NodePath -p 'process.versions.node.split(String.fromCharCode(46))[0]')
   $NodeProbeExitCode = $LASTEXITCODE
   if (
     $NodeProbeExitCode -ne 0 -or

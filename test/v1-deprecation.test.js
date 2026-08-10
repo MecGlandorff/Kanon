@@ -20,6 +20,7 @@ import {
   REGISTRY_ORIGIN,
   REGISTRY_TIMEOUT_MS
 } from "../src/v1/registry/transport.js";
+import { canSymlink } from "./helpers.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -288,8 +289,8 @@ test("cache keys isolate sessions and explicit session end removes the entry", a
   assert.equal(fixture.calls.length, 3);
 });
 
-test("malformed, oversized, and linked cache files warn and recover safely", async () => {
-  for (const prepare of [
+test("malformed, oversized, and linked cache files warn and recover safely", async (t) => {
+  const preparations = [
     (root) => fs.writeFileSync(
       path.join(root, "deprecation-status-v1.json"),
       "{malformed"
@@ -297,16 +298,21 @@ test("malformed, oversized, and linked cache files warn and recover safely", asy
     (root) => fs.writeFileSync(
       path.join(root, "deprecation-status-v1.json"),
       "x".repeat(8 * 1024 + 1)
-    ),
-    (root) => {
+    )
+  ];
+  if (canSymlink()) {
+    preparations.push((root) => {
       const outside = path.join(root, "outside.json");
       fs.writeFileSync(outside, "outside-marker");
       fs.symlinkSync(
         outside,
         path.join(root, "deprecation-status-v1.json")
       );
-    }
-  ]) {
+    });
+  } else {
+    t.diagnostic("Symbolic links are unavailable.");
+  }
+  for (const prepare of preparations) {
     const fixture = makeChecker([
       registryResponse({
         name: metadata.package_name,

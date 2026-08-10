@@ -185,9 +185,12 @@ test("two full packets, including a side-swapped build, are commitment-identical
     true
   );
   assert.deepEqual(fs.readdirSync(path.join(firstRoot, "output")), []);
+  const packetPath = "/tmp/packet with ' quote";
+  const quotedPacketPath =
+    "'" + path.resolve(packetPath).replaceAll("'", "'\"'\"'") + "'";
   assert.equal(
-    comparativeReviewerCommand("/tmp/packet with ' quote"),
-    "cd '/tmp/packet with '\"'\"' quote' && codex exec " +
+    comparativeReviewerCommand(packetPath),
+    "cd " + quotedPacketPath + " && codex exec " +
       "--skip-git-repo-check --ephemeral --model gpt-5.6-sol " +
       "--sandbox workspace-write -c 'approval_policy=\"never\"' " +
       "-c 'model_reasoning_effort=\"high\"' - < README-FIRST.txt"
@@ -265,7 +268,21 @@ test("result validation enforces exact cases, zero-to-five selections, Unknown, 
   );
 
   const crossCase = structuredClone(valid);
-  crossCase.cases[0].selections[0].source_paths = ["only-second.txt"];
+  const firstCaseRoot = path.join(
+    packetRoot,
+    ...review.cases[0].snapshot_root.split("/")
+  );
+  const secondCaseRoot = path.join(
+    packetRoot,
+    ...review.cases[1].snapshot_root.split("/")
+  );
+  const crossCaseSourcePath = ["only-first.txt", "only-second.txt"].find(
+    (candidate) =>
+      !fs.existsSync(path.join(firstCaseRoot, candidate)) &&
+      fs.existsSync(path.join(secondCaseRoot, candidate))
+  );
+  assert.ok(crossCaseSourcePath);
+  crossCase.cases[0].selections[0].source_paths = [crossCaseSourcePath];
   assert.throws(
     () => validateComparativeResult(crossCase, review, { packetRoot }),
     /outside its case/
@@ -519,6 +536,8 @@ test("Windows source junctions are rejected as comparative reparse points", (t) 
     path.join(caseRoot, "junction"),
     "junction"
   );
+  fs.chmodSync(caseRoot, 0o500);
+  fs.chmodSync(casesRoot, 0o500);
   assert.throws(
     () => buildFixtureComparative(
       fixture,

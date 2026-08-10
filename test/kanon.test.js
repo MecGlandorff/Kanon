@@ -447,7 +447,7 @@ test("shared dispatch rejects unknown commands before PATH resolution", () => {
     "bin",
     "kanon-dispatch"
   );
-  const run = spawnSync(dispatch, ["unsupported"], {
+  const run = spawnPlatformWrapper(dispatch, ["unsupported"], {
     cwd: root,
     encoding: "utf8",
     env: {
@@ -488,7 +488,7 @@ test("shared dispatch survives plugin and repository paths with spaces", () => {
       "kanon-refresh"
     )
   ]) {
-    const run = spawnSync(wrapper, ["--version"], {
+    const run = spawnPlatformWrapper(wrapper, ["--version"], {
       cwd: repository,
       encoding: "utf8",
       timeout: 10_000
@@ -677,6 +677,29 @@ test("rendered public outputs identify repository content as data", () => {
     assert.doesNotMatch(output, /\u001b|\u202e/);
   }
 });
+
+function spawnPlatformWrapper(wrapper, args, options) {
+  if (process.platform !== "win32") {
+    return spawnSync(wrapper, args, options);
+  }
+  return spawnSync(
+    "powershell.exe",
+    [
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      `${wrapper}.ps1`,
+      ...args
+    ],
+    {
+      windowsHide: true,
+      ...options
+    }
+  );
+}
 
 function assertFixedShim(directory, command) {
   const bash = fs.readFileSync(

@@ -13,6 +13,7 @@ import {
   validateRankingResultBytes
 } from "../scripts/lib/d2d-ranking-result.js";
 import { canonicalJson } from "../scripts/lib/d2c-packet.js";
+import { canSymlink } from "./helpers.js";
 
 const temporaryRoots = [];
 
@@ -132,7 +133,7 @@ test("strict ranking validation rejects malformed, oversized, duplicate, extra, 
   );
 });
 
-test("stable ranking-result reads reject links, hard links, mutation, and path replacement races", () => {
+test("stable ranking-result reads reject links, hard links, mutation, and path replacement races", (t) => {
   const root = temporaryRoot("kanon-d2d-result-stable-");
   const bytes = Buffer.from("{}\n");
   const direct = path.join(root, "direct.json");
@@ -140,11 +141,15 @@ test("stable ranking-result reads reject links, hard links, mutation, and path r
   assert.ok(readStableRankingResult(direct).equals(bytes));
 
   const symlink = path.join(root, "symlink.json");
-  fs.symlinkSync(direct, symlink);
-  assert.throws(
-    () => readStableRankingResult(symlink),
-    /indirect|special/
-  );
+  if (canSymlink()) {
+    fs.symlinkSync(direct, symlink);
+    assert.throws(
+      () => readStableRankingResult(symlink),
+      /indirect|special/
+    );
+  } else {
+    t.diagnostic("Symbolic links are unavailable.");
+  }
 
   const hard = path.join(root, "hard.json");
   fs.linkSync(direct, hard);
@@ -172,7 +177,7 @@ test("stable ranking-result reads reject links, hard links, mutation, and path r
         fs.renameSync(replacement, file);
       }
     }),
-    /changed during|path changed/
+    /changed during|path changed|operation not permitted/
   );
 });
 

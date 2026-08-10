@@ -143,12 +143,32 @@ function writeExclusiveContained(rootPath, relative, contents) {
   } finally {
     fs.closeSync(descriptor);
   }
-  const parent = fs.openSync(root.root, fs.constants.O_RDONLY);
+  syncDirectory(root.root);
+}
+
+function syncDirectory(directory) {
+  const parent = fs.openSync(directory, fs.constants.O_RDONLY);
   try {
     fs.fsyncSync(parent);
+  } catch (error) {
+    if (!isUnsupportedDirectorySync(error)) {
+      throw error;
+    }
   } finally {
     fs.closeSync(parent);
   }
+}
+
+function isUnsupportedDirectorySync(error) {
+  return (
+    process.platform === "win32" &&
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    ["EBADF", "EINVAL", "ENOSYS", "ENOTSUP", "EPERM"].includes(
+      String(error.code)
+    )
+  );
 }
 
 function boundedScanDiagnostics(value) {

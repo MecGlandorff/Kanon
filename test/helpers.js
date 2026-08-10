@@ -103,12 +103,16 @@ export function canSymlink() {
   const target = path.join(root, "target");
   const link = path.join(root, "link");
   fs.writeFileSync(target, "x");
+  let available = false;
   try {
     fs.symlinkSync(target, link);
-    return true;
+    available = true;
   } catch {
-    return false;
+    available = false;
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
+  return available;
 }
 
 export function readJson(file) {

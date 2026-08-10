@@ -981,9 +981,25 @@ function syncDirectory(directory) {
   const descriptor = fs.openSync(directory, fs.constants.O_RDONLY);
   try {
     fs.fsyncSync(descriptor);
+  } catch (error) {
+    if (!isUnsupportedDirectorySync(error)) {
+      throw error;
+    }
   } finally {
     fs.closeSync(descriptor);
   }
+}
+
+function isUnsupportedDirectorySync(error) {
+  return (
+    process.platform === "win32" &&
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    ["EBADF", "EINVAL", "ENOSYS", "ENOTSUP", "EPERM"].includes(
+      String(error.code)
+    )
+  );
 }
 
 function requireBefore(index, before, after) {

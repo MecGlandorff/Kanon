@@ -133,7 +133,7 @@ test("steer is equivalent across hosts and reuses live continuity read-only", as
       }
     }),
     ".kanon/STATE.json": JSON.stringify({
-      repo: { root: "/different/repository" },
+      repo: { root: path.resolve("/different/repository") },
       generated_at: "2026-07-27T12:00:00.000Z",
       files: { fingerprints: [] },
       scan: { complete: true, budgets_reached: [] },
