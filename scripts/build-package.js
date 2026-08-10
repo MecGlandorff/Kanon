@@ -118,16 +118,20 @@ function prepareEmptyOutput(output) {
   const lexicalTempRoot = path.resolve(os.tmpdir());
   const usingDefault = output === defaultOutput;
   const base = usingDefault ? repoRoot : tempRootResult.root;
-  const relative = path
-    .relative(usingDefault ? repoRoot : lexicalTempRoot, output)
-    .replaceAll("\\", "/");
-  if (
-    !relative ||
-    relative === "." ||
-    relative === ".." ||
-    relative.startsWith("../") ||
-    path.isAbsolute(relative)
-  ) {
+  // Runners may expose the temporary root through a filesystem alias.
+  const candidateRoots = usingDefault
+    ? [repoRoot]
+    : [lexicalTempRoot, tempRootResult.root];
+  const relative = candidateRoots
+    .map((root) => path.relative(root, output).replaceAll("\\", "/"))
+    .find((candidate) =>
+      candidate &&
+      candidate !== "." &&
+      candidate !== ".." &&
+      !candidate.startsWith("../") &&
+      !path.isAbsolute(candidate)
+    );
+  if (relative === undefined) {
     throw new Error(
       "Package output must be dist/npm or a child of the temporary directory."
     );

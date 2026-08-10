@@ -664,7 +664,11 @@ test("reused D.2C copier excludes links and rejects hard links, special files, h
   fs.mkdirSync(fifoSource);
   const fifo = path.join(fifoSource, "pipe");
   const made = spawnSync("mkfifo", [fifo]);
-  if (made.status === 0) {
+  const fifoAvailable =
+    made.status === 0 &&
+    fs.existsSync(fifo) &&
+    fs.lstatSync(fifo).isFIFO();
+  if (fifoAvailable) {
     assert.throws(
       () => copySnapshot(
         fifoSource,
