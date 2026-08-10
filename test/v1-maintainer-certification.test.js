@@ -155,13 +155,18 @@ test("prior certification evidence remains exact and content-addressed", () => {
   );
 });
 
-test("candidate transition owns current release hardening without rewriting history", () => {
+test("candidate transition owns frozen release hardening without rewriting history", () => {
   const transition = validateCandidateTransitionAuthority(repoRoot);
   const certified = validateCertifiedCandidateInputs(repoRoot);
   assert.equal(transition.transition.boundaries.publication_authorized, false);
   assert.equal(transition.transition.boundaries.release_action_occurred, false);
   assert.equal(certified.approval, "authenticated-proceed");
-  assert.doesNotThrow(() => validateCandidateDiffScope(repoRoot));
+  assert.doesNotThrow(() =>
+    validateCandidateDiffScope(
+      repoRoot,
+      "9ce62c66bab27acbc1695799e8ef15c54c0ea577"
+    )
+  );
 });
 
 test("historical test-responsibility record remains historical and unchanged", () => {

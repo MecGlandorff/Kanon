@@ -3,9 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import {
-  validateCandidateTransitionAuthority,
   validateFrozenSignedWaiver
 } from "../../eval/v1.0.0-candidate/lib/validator.js";
+import {
+  validateCorrectedCandidateTransitionAuthority
+} from "../../eval/v1.0.0-candidate-corrected/lib/validator.js";
 import {
   loadCanonicalJson,
   validateRiskLedger,
@@ -109,7 +111,7 @@ export function validateReleasePolicy(repoRoot, input) {
     maintainerCertificationSha256 === MAINTAINER_CERTIFICATION_SHA256,
     "maintainer-certification-commitment"
   );
-  const authority = validateCandidateTransitionAuthority(root);
+  const authority = validateCorrectedCandidateTransitionAuthority(root);
   const frozenEvidence = validateMaintainerStableEvidence(root);
   expect(
     authority.transition.boundaries.publication_authorized === false &&
