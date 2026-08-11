@@ -462,6 +462,27 @@ test("shared dispatch rejects unknown commands before PATH resolution", () => {
   assert.equal(fs.existsSync(marker), false);
 });
 
+test("public wrappers return exit 1 for runtime argument rejection", () => {
+  const root = makeFixture({ "README.md": "# Wrapper exit fixture\n" });
+  for (const relative of [
+    ["skills", "orient", "scripts", "kanon-orient"],
+    ["skills", "kanon", "scripts", "kanon-refresh"]
+  ]) {
+    const wrapper = path.join(repoRoot, ...relative);
+    const run = spawnPlatformWrapper(wrapper, ["--not-a-kanon-option"], {
+      cwd: root,
+      encoding: "utf8",
+      env: process.env,
+      timeout: 30_000,
+      windowsHide: true
+    });
+
+    assert.equal(run.status, 1, run.stderr || run.stdout);
+    assert.equal(run.stdout, "");
+    assert.match(run.stderr, /Unknown option: --not-a-kanon-option/);
+  }
+});
+
 test("shared dispatch survives plugin and repository paths with spaces", () => {
   const parent = fs.mkdtempSync(
     path.join(os.tmpdir(), "kanon plugin relocation ")
