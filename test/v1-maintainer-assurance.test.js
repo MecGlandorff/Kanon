@@ -97,8 +97,11 @@ test("maintainer namespace is separate and excluded from production", () => {
 test("archive-only evidence retains its exact frozen bindings", () => {
   const d2bTaxonomy =
     "eval/results/d2b-predeclared-taxonomy.json";
+  const d2dRankingManifest =
+    "eval/results/d2d-ranking-1f2ba552/evidence-manifest.json";
   const archived = [
     d2bTaxonomy,
+    d2dRankingManifest,
     "eval/results/development-0.4.0-rc.1-d2b-7da293a5.json",
     "eval/results/post-correction-evidence-sha256-" +
       "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
@@ -121,6 +124,13 @@ test("archive-only evidence retains its exact frozen bindings", () => {
       repoRoot,
       d2bTaxonomy,
       "c266146f2282d777bd87d2ba5beaa30fecf6281b5618dc77074101e091fd2c33"
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2dRankingManifest,
+      "4dbb12cca8020fd17020cb22c274d7b544242767ac81c10a4c381e0f2818e401"
     )
   );
   assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));

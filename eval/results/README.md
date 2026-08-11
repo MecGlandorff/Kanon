@@ -15,7 +15,7 @@ git archive --format=tar v1.0.0 -- eval/results eval/v1.0.0-simulation/evidence-
 The v1.1 tree retains only compact records still used as characterization
 fixtures or exact release-policy bindings, together with the deterministic
 simulation definitions and synthetic fixtures. In particular, the following
-raw payloads are archive-only:
+raw payloads and frozen evidence records are archive-only:
 
 - six D.2A schedule, score, mapping, injection, and raw-record files;
 - the D.2E analysis admission and evidence manifest;
@@ -27,11 +27,13 @@ raw payloads are archive-only:
 - the candidate-level post-correction comparison and evaluation payloads;
 - the failed D.2B raw development report and its case/path predeclared
   taxonomy;
+- the D.2D ranking evidence manifest (the compact ranking result remains for
+  active analysis tooling);
 - the all-candidate D.2E mechanism-analysis payload; and
 - the 84-file synthetic tabletop evidence packet, including its access
   ledgers, handoffs, predictions, traces, and frozen result records.
 
-This removal covers 201 files, 112,979,354 tracked bytes, and 29,626 physical
+This removal covers 202 files, 112,981,222 tracked bytes, and 29,627 physical
 lines as measured from the pre-removal working trees. It does not alter the
 active development corpus, runtime, published package, compact frozen
 summaries, or simulation characterization fixtures that current tests use.
