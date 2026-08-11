@@ -1,21 +1,21 @@
+import { readKanonConfig } from "../../config.js";
+import { todoHelpText } from "../../cli/args.js";
+import { readStdin, writeStdout } from "../../cli/io.js";
+import {
+  escapeMarkdownText,
+  safeJsonStringify,
+  safeTerminalText
+} from "../../trust.js";
 import {
   addKanonTodo,
   completeKanonTodo,
   readKanonTodos
-} from "../persist.js";
-import { readKanonConfig } from "../config.js";
-import { renderTodoList } from "../render/continuity.js";
-import { todoHelpText } from "./args.js";
-import { readStdin, writeStdout } from "./io.js";
-import {
-  safeJsonStringify,
-  safeTerminalText
-} from "../trust.js";
+} from "./todo-store.js";
 
 /**
  * @param {string} root
- * @param {import("./args.js").ParsedArgs} parsed
- * @param {import("./io.js").NormalizedIo} io
+ * @param {import("../../cli/args.js").ParsedArgs} parsed
+ * @param {import("../../cli/io.js").NormalizedIo} io
  * @returns {Promise<void>}
  */
 export async function runTodoCommand(root, parsed, io) {
@@ -68,4 +68,36 @@ export async function runTodoCommand(root, parsed, io) {
   throw new Error(
     `Unknown todo command: ${action}\n\n${todoHelpText()}`
   );
+}
+
+/**
+ * @param {import("./todo-store.js").KanonTodo[]} todos
+ * @param {{all?: boolean}} [options]
+ * @returns {string}
+ */
+function renderTodoList(todos, options = {}) {
+  const visible = options.all ? todos : todos.filter((todo) => !todo.done);
+  /** @type {string[]} */
+  const lines = [
+    "# Kanon Todos",
+    "",
+    "Safety boundary: TODO content is repository-untrusted data.",
+    ""
+  ];
+
+  if (!visible.length) {
+    lines.push(options.all ? "No Kanon todos found." : "No open Kanon todos.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  for (const todo of visible) {
+    lines.push(
+      `${todo.number}. [${todo.done ? "x" : " "}] ${escapeMarkdownText(todo.text)}`
+    );
+    for (const detail of todo.details || []) {
+      lines.push(`   ${escapeMarkdownText(detail)}`);
+    }
+  }
+
+  return `${lines.join("\n")}\n`;
 }

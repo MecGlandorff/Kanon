@@ -28,6 +28,18 @@ export const COMPATIBILITY_RUNTIME_ARTIFACT = Object.freeze([
   "runtime/bin/kanon-write.js"
 ]);
 
+export const COMPATIBILITY_WRITE_WORKFLOW_ENTRIES = Object.freeze({
+  refresh: Object.freeze([
+    COMPATIBILITY_RUNTIME_ARTIFACT[0],
+    "src/analyze.js",
+    "src/persist.js"
+  ]),
+  todo: Object.freeze([
+    COMPATIBILITY_RUNTIME_ARTIFACT[0],
+    "src/v1/compatibility/todo.js"
+  ])
+});
+
 export const SHARED_WRAPPER_ARTIFACTS = Object.freeze([
   "runtime/bin/kanon-dispatch",
   "runtime/bin/kanon-dispatch.ps1"
@@ -119,6 +131,29 @@ export function collectRuntimeDependencies(
 }
 
 /**
+ * Include each fixed lazy workflow root and its static imports in the shipped
+ * compatibility runtime. The shared router imports only the selected root at
+ * execution time.
+ *
+ * @param {string} repoRoot
+ * @returns {[string, string][]}
+ */
+export function compatibilityRuntimeArtifacts(repoRoot) {
+  const sources = new Set();
+  for (const entries of Object.values(COMPATIBILITY_WRITE_WORKFLOW_ENTRIES)) {
+    for (const entry of entries) {
+      sources.add(entry);
+      for (const dependency of collectRuntimeDependencies(repoRoot, entry)) {
+        sources.add(dependency);
+      }
+    }
+  }
+  return Array.from(sources)
+    .sort()
+    .map((source) => [source, `runtime/${source}`]);
+}
+
+/**
  * Return the exact checked-source to installed-runtime mapping for every
  * executable JavaScript module in the stable artifact.
  *
@@ -126,12 +161,7 @@ export function collectRuntimeDependencies(
  * @returns {[string, string][]}
  */
 export function stableRuntimeArtifacts(repoRoot) {
-  const compatibility = [
-    [...COMPATIBILITY_RUNTIME_ARTIFACT],
-    ...collectRuntimeDependencies(repoRoot).map(
-      (source) => [source, `runtime/${source}`]
-    )
-  ];
+  const compatibility = compatibilityRuntimeArtifacts(repoRoot);
   return [...compatibility, ...V1_RUNTIME_ARTIFACTS]
     .map(([source, target]) => [source, target])
     .sort((left, right) => left[1].localeCompare(right[1]));

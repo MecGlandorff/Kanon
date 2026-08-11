@@ -4,9 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  COMPATIBILITY_RUNTIME_ARTIFACT,
   COMPATIBILITY_WRITE_COMMANDS,
-  collectRuntimeDependencies,
+  compatibilityRuntimeArtifacts,
   embeddedBuildMetadata,
   IMPLEMENTED_STABLE_SKILLS,
   PUBLIC_COMMANDS,
@@ -20,12 +19,12 @@ const checkOnly = process.argv.includes("--check");
 const commands = PUBLIC_COMMANDS;
 const artifacts = [];
 
-artifacts.push(copyArtifact(...COMPATIBILITY_RUNTIME_ARTIFACT, 0o755));
-for (const sourceRelative of collectRuntimeDependencies(root)) {
+for (const [sourceRelative, targetRelative] of compatibilityRuntimeArtifacts(root)) {
   artifacts.push(
     copyArtifact(
       sourceRelative,
-      `runtime/${sourceRelative}`
+      targetRelative,
+      sourceRelative === "bin/kanon-write.js" ? 0o755 : 0o644
     )
   );
 }

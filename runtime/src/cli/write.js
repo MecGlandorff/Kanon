@@ -1,12 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { analyzeRepo } from "../analyze.js";
-import { writeKanonOutputs } from "../persist.js";
 import { safeTerminalText } from "../trust.js";
 import { VERSION } from "../version.js";
 import { helpText, parseArgs } from "./args.js";
 import { normalizeIo, writeStdout } from "./io.js";
-import { runTodoCommand } from "./todo.js";
 
 /**
  * Run only the two approved compatibility write workflows.
@@ -39,7 +36,7 @@ export async function runWriteCli(argv = [], ioOptions = {}) {
 }
 
 /**
- * Share the exact refresh and TODO implementations with the development CLI.
+ * Load only the selected compatibility write workflow.
  *
  * @param {string} root
  * @param {import("./args.js").ParsedArgs} parsed
@@ -48,6 +45,9 @@ export async function runWriteCli(argv = [], ioOptions = {}) {
  */
 export async function runWriteCommand(root, parsed, io) {
   if (parsed.command === "todo") {
+    const { runTodoCommand } = await import(
+      "../v1/compatibility/todo.js"
+    );
     await runTodoCommand(root, parsed, io);
     return;
   }
@@ -55,6 +55,10 @@ export async function runWriteCommand(root, parsed, io) {
     throw new Error("Compatibility write command was unavailable.");
   }
 
+  const [{ analyzeRepo }, { writeKanonOutputs }] = await Promise.all([
+    import("../analyze.js"),
+    import("../persist.js")
+  ]);
   const analysis = analyzeRepo(root);
   const result = writeKanonOutputs(analysis, {
     deep: parsed.flags.deep

@@ -217,7 +217,7 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   assert.equal(Object.keys(packageJson.dependencies || {}).length, 0);
   assert.equal(Object.keys(packageJson.optionalDependencies || {}).length, 0);
   assert.equal(Object.keys(packageJson.peerDependencies || {}).length, 0);
-  assert.equal(publicSkillFiles(repoRoot).length + 6, 129);
+  assert.equal(publicSkillFiles(repoRoot).length + 6, 131);
   const builder = read("scripts/build-package.js");
   assert.match(builder, /\["SECURITY\.md", "SECURITY\.md"\]/u);
   assert.match(builder, /publishConfig: source\.publishConfig/u);

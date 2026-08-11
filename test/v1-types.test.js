@@ -6,7 +6,9 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  compatibilityRuntimeArtifacts,
   COMPATIBILITY_WRITE_COMMANDS,
+  COMPATIBILITY_WRITE_WORKFLOW_ENTRIES,
   collectRuntimeDependencies,
   IMPLEMENTED_STABLE_SKILLS,
   PUBLIC_COMMANDS,
@@ -105,9 +107,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 81);
-  assert.equal(sources.length, 81);
-  assert.equal(new Set(targets).size, 81);
+  assert.equal(mappings.length, 83);
+  assert.equal(sources.length, 83);
+  assert.equal(new Set(targets).size, 83);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -189,12 +191,26 @@ test("typed compatibility routes retain the approved public surface", () => {
   }
 });
 
-test("shipped compatibility closure contains only explicit write consumers", () => {
-  const closure = new Set([
-    "bin/kanon-write.js",
-    ...collectRuntimeDependencies(repoRoot)
+test("shipped compatibility runtime isolates the compact todo workflow", () => {
+  const routerClosure = collectEntrypointClosure([
+    COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.todo[0]
   ]);
-  assert.equal(closure.size, 54);
+  const refreshClosure = collectEntrypointClosure(
+    COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.refresh
+  );
+  const todoClosure = collectEntrypointClosure(
+    COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.todo
+  );
+  const shipped = compatibilityRuntimeArtifacts(repoRoot)
+    .map(([source]) => source)
+    .sort();
+  assert.equal(routerClosure.length, 6);
+  assert.equal(todoClosure.length, 11);
+  assert.equal(refreshClosure.length, 55);
+  assert.deepEqual(
+    Array.from(new Set([...refreshClosure, ...todoClosure])).sort(),
+    shipped
+  );
   if (process.platform !== "win32") {
     assert.notEqual(
       fs.statSync(path.join(repoRoot, "bin", "kanon-write.js")).mode & 0o111,
@@ -204,46 +220,76 @@ test("shipped compatibility closure contains only explicit write consumers", () 
   }
   for (const required of [
     "bin/kanon-write.js",
-    "src/analyze.js",
     "src/cli/write.js",
-    "src/cli/todo.js",
-    "src/persist.js"
+    "src/config.js",
+    "src/path-security.js",
+    "src/trust.js",
+    "src/v1/compatibility/todo.js",
+    "src/v1/compatibility/todo-store.js",
+    "src/v1/compatibility/write-fs.js"
   ]) {
-    assert.equal(closure.has(required), true, required);
+    assert.equal(todoClosure.includes(required), true, required);
   }
-  for (const removed of [
-    "bin/kanon.js",
-    "src/ask.js",
-    "src/ask/intent.js",
-    "src/cli.js",
-    "src/cli/index.js",
-    "src/render.js",
-    "src/render/ask.js"
+  for (const forbidden of [
+    "src/analyze.js",
+    "src/code-intel.js",
+    "src/git-runner.js",
+    "src/git.js",
+    "src/persist.js",
+    "src/readme.js",
+    "src/render/brief.js",
+    "src/render/continuity.js",
+    "src/scanner.js",
+    "src/verify.js"
   ]) {
-    assert.equal(closure.has(removed), false, removed);
+    assert.equal(todoClosure.includes(forbidden), false, forbidden);
   }
+  assert.equal(
+    todoClosure.some((source) =>
+      /^(?:src\/analyze|src\/code-intel|src\/scanner|src\/verify)\//.test(source)
+    ),
+    false
+  );
+  assert.equal(routerClosure.includes("src/analyze.js"), false);
+  assert.equal(routerClosure.includes("src/persist.js"), false);
+  assert.equal(refreshClosure.includes("src/analyze.js"), true);
+  assert.equal(refreshClosure.includes("src/persist.js"), true);
+  assert.deepEqual(lazyImportTargets("src/cli/write.js"), [
+    "src/analyze.js",
+    "src/persist.js",
+    "src/v1/compatibility/todo.js"
+  ]);
 });
 
-test("public workflows have two exact shipped runtime closures", () => {
+test("public workflows have isolated stable, refresh, and todo closures", () => {
   const stableEntrypoint = "src/v1/bin/kanon.js";
   const continuityImport = packageManifest.imports?.["#kanon-continuity"];
   assert.equal(continuityImport, "./src/continuity/engine.js");
   const continuityEntrypoint = continuityImport.slice(2);
-  const writeEntrypoint = "bin/kanon-write.js";
   const stableClosure = collectEntrypointClosure([
     stableEntrypoint,
     continuityEntrypoint
   ]);
-  const writeClosure = collectEntrypointClosure([writeEntrypoint]);
+  const refreshClosure = collectEntrypointClosure(
+    COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.refresh
+  );
+  const todoClosure = collectEntrypointClosure(
+    COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.todo
+  );
 
   assert.equal(stableClosure.length, 28);
-  assert.equal(writeClosure.length, 54);
   assert.deepEqual(
-    stableClosure.filter((source) => writeClosure.includes(source)),
+    stableClosure.filter((source) => refreshClosure.includes(source)),
     ["src/continuity/engine.js"]
   );
   assert.deepEqual(
-    Array.from(new Set([...stableClosure, ...writeClosure])).sort(),
+    stableClosure.filter((source) => todoClosure.includes(source)),
+    []
+  );
+  assert.deepEqual(
+    Array.from(
+      new Set([...stableClosure, ...refreshClosure, ...todoClosure])
+    ).sort(),
     stableRuntimeCanonicalSources(repoRoot)
   );
 
@@ -254,9 +300,11 @@ test("public workflows have two exact shipped runtime closures", () => {
     ]),
     ...PUBLIC_COMMANDS.map((command) => [
       `compatibility/${command}`,
-      COMPATIBILITY_WRITE_COMMANDS.includes(command)
-        ? writeClosure
-        : stableClosure
+      command === "refresh"
+        ? refreshClosure
+        : command === "todo"
+          ? todoClosure
+          : stableClosure
     ])
   ]);
   assert.deepEqual(Array.from(workflowClosures.keys()), [
@@ -275,12 +323,14 @@ test("public workflows have two exact shipped runtime closures", () => {
   ]);
   for (const [workflow, closure] of workflowClosures) {
     const expected =
-      workflow === "compatibility/refresh" ||
-      workflow === "compatibility/todo"
-        ? writeClosure
-        : stableClosure;
+      workflow === "compatibility/refresh"
+        ? refreshClosure
+        : workflow === "compatibility/todo"
+          ? todoClosure
+          : stableClosure;
     assert.deepEqual(closure, expected, workflow);
   }
+  assert.deepEqual(COMPATIBILITY_WRITE_COMMANDS, ["refresh", "todo"]);
 });
 
 test("release allowlist excludes type tooling and development metadata", () => {
@@ -338,6 +388,18 @@ function collectEntrypointClosure(entries) {
         ...collectRuntimeDependencies(repoRoot, entry)
       ])
     )
+  ).sort();
+}
+
+function lazyImportTargets(relative) {
+  const source = fs
+    .readFileSync(path.join(repoRoot, relative), "utf8")
+    .replace(/\/\*\*[\s\S]*?\*\//g, "");
+  return Array.from(
+    source.matchAll(/import\(\s*["'](\.[^"']+)["']\s*\)/g),
+    (match) => path
+      .normalize(path.join(path.dirname(relative), match[1]))
+      .replaceAll("\\", "/")
   ).sort();
 }
 

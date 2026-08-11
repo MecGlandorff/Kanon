@@ -1,5 +1,5 @@
-import { readTextResult } from "./scanner.js";
 import { CONFIG_SCHEMA_VERSION } from "./version.js";
+import { readContainedText } from "./v1/compatibility/write-fs.js";
 
 const MAX_CONFIG_BYTES = 64 * 1024;
 
@@ -134,10 +134,12 @@ export function readKanonConfig(root) {
  * @param {string} root
  */
 export function inspectKanonConfig(root) {
-  const read = readTextResult(root, ".kanon/config.json", {
-    limit: MAX_CONFIG_BYTES + 1,
-    optional: true
-  });
+  const read = readContainedText(
+    root,
+    ".kanon/config.json",
+    MAX_CONFIG_BYTES,
+    { optional: true }
+  );
   if (!read.ok && read.status === "missing") {
     return {
       config: cloneDefaults(),
@@ -147,6 +149,13 @@ export function inspectKanonConfig(root) {
       invalid_field: null,
       source_status: "missing"
     };
+  }
+  if (!read.ok && read.status === "budget-exceeded") {
+    return invalidConfig(
+      ".kanon/config.json",
+      `It exceeds the ${MAX_CONFIG_BYTES}-byte configuration input limit.`,
+      "size-limit"
+    );
   }
   if (!read.ok) {
     return invalidConfig(
