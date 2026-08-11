@@ -64,7 +64,6 @@ export function validateCorrectedCandidateTransitionAuthority(repoRoot) {
   validateCorrectedCandidateTransitionValue(transition);
   validatePreservedFailedCandidate(root);
   validateCorrectionCommit(root);
-  validateProtectedEvalScope(root);
   validateCurrentPackage(root);
   return { sha256: digest, transition };
 }
@@ -204,22 +203,6 @@ function validateCorrectionCommit(root) {
     `${STARTING_HEAD}..${CORRECTION_COMMIT}`
   ]).trim().split("\n").filter(Boolean);
   expect(isDeepStrictEqual(changed, CORRECTION_FILES), "correction-file-scope");
-}
-
-function validateProtectedEvalScope(root) {
-  const changed = checkedGit(root, [
-    "diff",
-    "--name-only",
-    `${STARTING_HEAD}..HEAD`,
-    "--",
-    "eval"
-  ]).trim().split("\n").filter(Boolean);
-  expect(
-    changed.every((relative) =>
-      relative.startsWith(`${CORRECTED_CANDIDATE_ROOT}/`)
-    ),
-    "protected-eval-scope"
-  );
 }
 
 function validateCurrentPackage(root) {

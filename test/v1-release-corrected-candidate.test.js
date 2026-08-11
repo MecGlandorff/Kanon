@@ -18,7 +18,7 @@ import {
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("corrective transition is exact and preserves both remote failures", () => {
+test("corrective transition stays exact after result archival", () => {
   const authority = validateCorrectedCandidateTransitionAuthority(repoRoot);
   assert.equal(authority.sha256, CORRECTED_TRANSITION_SHA256);
   assert.equal(

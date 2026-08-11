@@ -93,6 +93,15 @@ test("maintainer namespace is separate and excluded from production", () => {
   );
 });
 
+test("archive-only comparison retains its exact frozen binding", () => {
+  const archived =
+    "eval/results/post-correction-evidence-sha256-" +
+    "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
+    "comparison.json";
+  assert.equal(fs.existsSync(path.join(repoRoot, archived)), false);
+  assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));
+});
+
 test("prospective and simulation authorities retain exact frozen bytes", () => {
   const exact = {
     "6-people-sim.md":

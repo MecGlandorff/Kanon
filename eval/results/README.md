@@ -22,9 +22,10 @@ payloads are archive-only:
   reports and intermediate manifests;
 - the original standalone development report;
 - 30 post-correction traces, the paired raw reports, and their intermediate
-  manifests.
+  manifests;
+- the candidate-level post-correction comparison payload.
 
-This removal covers 112 files, 105,745,394 tracked bytes, and 22,147 physical
+This removal covers 113 files, 112,225,733 tracked bytes, and 22,148 physical
 lines as measured from the pre-removal working tree. It does not alter the
 active development corpus, runtime, published package, or the compact frozen
 summaries that current tests still characterize.

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { runGit } from "../../../src/git-runner.js";
 import {
   canonicalJson,
   sha256
@@ -20,6 +21,8 @@ export const PRODUCTION_ARTIFACT_SHA256 =
 export const PUBLIC_CAPABILITIES_SHA256 =
   "bfc00d445cc480389559fd8c115a6ae2607dd6b7241dd0e256565bde5f0256cf";
 export const PACKAGE_VERSION = "0.4.0-rc.1";
+
+const ARCHIVED_EVIDENCE_MAX_BYTES = 8 * 1024 * 1024;
 
 export const CONCLUSIONS = Object.freeze([
   "maintainer-certification-ready",
@@ -537,7 +540,7 @@ function validateEvidenceBindings(bindings, repoRoot) {
         binding.classification.length > 0,
       `evidence-binding-${id}`
     );
-    assertContainedFile(repoRoot, relative, digest);
+    assertArchivedEvidenceFile(repoRoot, relative, digest);
     if (id === "simulation-evidence-tree") {
       expect(
         binding.semantic_sha256 ===
@@ -590,6 +593,46 @@ function assertContainedFile(repoRoot, relative, digest) {
       !fs.lstatSync(resolved).isSymbolicLink() &&
       sha256(fs.readFileSync(resolved)) === digest,
     `exact-evidence-${relative}`
+  );
+}
+
+function assertArchivedEvidenceFile(repoRoot, relative, digest) {
+  expect(
+    typeof relative === "string" &&
+      relative.length > 0 &&
+      relative.length <= 512 &&
+      !path.isAbsolute(relative) &&
+      !relative.includes("\\") &&
+      !relative.split("/").includes(".."),
+    "archived-evidence-path"
+  );
+  const tree = runGit(
+    repoRoot,
+    ["ls-tree", "-z", "--full-tree", CANDIDATE_SOURCE_COMMIT, "--", relative],
+    {
+      maxOutputBytes: 64 * 1024,
+      noLazyFetch: true,
+      timeoutMs: 10_000
+    }
+  );
+  expect(tree.ok, "archived-evidence-tree");
+  const match = tree.stdout.match(
+    /^(100644|100755) blob ([0-9a-f]{40})\t([^\0]+)\0$/u
+  );
+  expect(
+    match && match[3] === relative,
+    `archived-evidence-tree-entry-${relative}`
+  );
+  const blob = runGit(repoRoot, ["cat-file", "blob", match[2]], {
+    encoding: "latin1",
+    maxOutputBytes: ARCHIVED_EVIDENCE_MAX_BYTES,
+    noLazyFetch: true,
+    timeoutMs: 10_000
+  });
+  expect(blob.ok, `archived-evidence-blob-${relative}`);
+  expect(
+    sha256(Buffer.from(blob.stdout, "latin1")) === digest,
+    `exact-archived-evidence-${relative}`
   );
 }
 
