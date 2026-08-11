@@ -12,6 +12,7 @@ import {
   validateEmbeddedBuildMetadata
 } from "../runtime/core/build-metadata.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
+import { npmInvocation } from "../scripts/lib/npm-runner.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -271,7 +272,9 @@ test("runtime remains ESM when copied below a CommonJS package boundary", () => 
   assert.equal(execution.status, 0, execution.stderr);
 });
 
-test("package builder uses an exact production allowlist", () => {
+test("package builder uses an exact production allowlist", {
+  timeout: 180_000
+}, () => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-package-"));
   const built = spawnSync(
     process.execPath,
@@ -339,13 +342,118 @@ test("package builder uses an exact production allowlist", () => {
     provenance: true,
     registry: "https://registry.npmjs.org"
   });
-  const conformanceSource = fs.readFileSync(
-    path.join(repoRoot, "scripts", "conform-artifact.js"),
-    "utf8"
+  const packed = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-plugin-pack-"));
+  const packInvocation = npmInvocation([
+    "pack",
+    output,
+    "--pack-destination",
+    packed
+  ]);
+  const pack = spawnSync(packInvocation.command, packInvocation.args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 60_000,
+    windowsHide: true
+  });
+  assert.equal(pack.status, 0, pack.stderr || pack.stdout);
+  const tarballs = fs.readdirSync(packed)
+    .filter((file) => file.endsWith(".tgz"));
+  assert.equal(tarballs.length, 1);
+  const tarballName = tarballs[0];
+  assert.ok(tarballName);
+  const tarball = path.join(packed, tarballName);
+  const installParent = fs.mkdtempSync(
+    path.join(os.tmpdir(), "kanon-plugin-install-")
   );
-  assert.match(conformanceSource, /kanon-aswitch-report-v1/);
-  assert.match(conformanceSource, /AwaitingTarget/);
-  assert.match(conformanceSource, /last-plan.*compacted.*full-history/s);
+  const reportPath = path.join(packed, "conformance.json");
+  const conform = spawnSync(
+    process.execPath,
+    [
+      path.join(repoRoot, "scripts", "conform-artifact.js"),
+      "--tarball",
+      tarball,
+      "--install-root",
+      path.join(installParent, "installed"),
+      "--output",
+      reportPath,
+      "--candidate-commit",
+      "a".repeat(40),
+      "--candidate-version",
+      publicManifest.version
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+        npm_config_ignore_scripts: "true",
+        npm_config_userconfig: os.devNull
+      },
+      maxBuffer: 16 * 1024 * 1024,
+      timeout: 120_000,
+      windowsHide: true
+    }
+  );
+  assert.equal(conform.status, 0, conform.stderr || conform.stdout);
+  const conformance = /** @type {{
+   *   schema: string,
+   *   passed: boolean,
+   *   reasons: string[],
+   *   checks: {name: string, passed: boolean, reason: string}[]
+   * }} */ (JSON.parse(fs.readFileSync(reportPath, "utf8")));
+  assert.deepEqual(JSON.parse(conform.stdout), conformance);
+  assert.equal(conformance.schema, "kanon-artifact-conformance-v1");
+  assert.equal(conformance.passed, true, conformance.reasons.join("\n"));
+  const aswitch = conformance.checks.find((check) =>
+    /wrapper aswitch$/.test(check.name)
+  );
+  assert.equal(aswitch?.passed, true);
+  assert.match(aswitch?.reason || "", /validated consent-gated aswitch result/);
+
+  const invalidTarball = path.join(packed, "invalid.tgz");
+  fs.writeFileSync(invalidTarball, "not a package archive\n");
+  const failureParent = fs.mkdtempSync(
+    path.join(os.tmpdir(), "kanon-plugin-failure-")
+  );
+  const failureReportPath = path.join(packed, "failure.json");
+  const failedConformance = spawnSync(
+    process.execPath,
+    [
+      path.join(repoRoot, "scripts", "conform-artifact.js"),
+      "--tarball",
+      invalidTarball,
+      "--install-root",
+      path.join(failureParent, "installed"),
+      "--output",
+      failureReportPath,
+      "--candidate-commit",
+      "b".repeat(40),
+      "--candidate-version",
+      publicManifest.version
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        npm_config_audit: "false",
+        npm_config_fund: "false",
+        npm_config_ignore_scripts: "true",
+        npm_config_userconfig: os.devNull
+      },
+      maxBuffer: 8 * 1024 * 1024,
+      timeout: 60_000,
+      windowsHide: true
+    }
+  );
+  assert.equal(failedConformance.status, 1);
+  const failure = /** @type {{passed: boolean, reasons: string[]}} */ (
+    JSON.parse(fs.readFileSync(failureReportPath, "utf8"))
+  );
+  assert.equal(failure.passed, false);
+  assert.match(failure.reasons.join("\n"), /npm install failed/);
   assert.equal(
     actual.some((file) =>
       /^(?:docs|eval|src|test|spikes|node_modules)\//.test(file)

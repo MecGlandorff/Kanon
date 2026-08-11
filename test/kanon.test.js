@@ -11,6 +11,7 @@ import {
   analyzeRepo,
   answerRepoQuestion,
   completeKanonTodo,
+  DEFAULT_CONFIG,
   inspectKanonConfig,
   inspectPreviousState,
   readKanonTodos,
@@ -23,6 +24,7 @@ import {
 } from "../src/index.js";
 import { runCli } from "../src/cli.js";
 import { runWriteCli } from "../src/v1/compatibility/cli.js";
+import { inspectRepository } from "../src/v1/repository/inspect.js";
 import {
   captureCli,
   fileIdentity,
@@ -411,6 +413,124 @@ test("compatibility refresh preserves its successful output and artifact manifes
     readJson(path.join(root, ".kanon", "STATE.json"))
   );
   assert.equal(fs.existsSync(path.join(root, ".kanon", "TODO.md")), false);
+});
+
+test("compatibility refresh applies scan policy and persists bounded observations", async (t) => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.scan.respect_git_ignore = true;
+  config.scan.max_total_text_bytes = 1_024;
+  const root = makeFixture({
+    "README.md": "# Demo\n",
+    ".gitignore": "ignored.js\n",
+    ".kanon/config.json": `${JSON.stringify(config)}\n`,
+    "package.json": JSON.stringify({
+      name: "demo",
+      main: "src/entry.js",
+      scripts: {
+        test: "node --test",
+        build: "node build.js",
+        dev: "node src/entry.js"
+      }
+    }),
+    "src/entry.js": "import './dep.js';\n// TODO: verify projection\n",
+    "src/dep.js": "export const value = 1;\n",
+    "ignored.js": "export const ignored = true;\n"
+  });
+  let linked = false;
+  try {
+    fs.symlinkSync("src/dep.js", path.join(root, "linked.js"), "file");
+    linked = true;
+  } catch {
+    t.diagnostic("Symbolic links are unavailable; symlink accounting was skipped.");
+  }
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+  const fingerprints = state.files.fingerprints.map((file) => file.path);
+
+  assert.equal(state.scan.strategy, "git");
+  assert.equal(state.scan.max_files, config.scan.max_files);
+  assert.equal(
+    state.scan.max_total_text_bytes,
+    config.scan.max_total_text_bytes
+  );
+  assert.equal(
+    state.scan.total_text_bytes_read <= config.scan.max_total_text_bytes,
+    true
+  );
+  assert.equal(state.scan.max_elapsed_ms, config.scan.max_elapsed_ms);
+  assert.equal(state.scan.elapsed_ms > 0, true);
+  assert.equal(state.scan.total_text_bytes_read > 0, true);
+  assert.equal(fingerprints.includes("ignored.js"), false);
+  assert.deepEqual(state.commands.test.map((item) => item.command), [
+    "npm test"
+  ]);
+  assert.deepEqual(state.commands.build.map((item) => item.command), [
+    "npm run build"
+  ]);
+  assert.deepEqual(state.commands.dev.map((item) => item.command), [
+    "npm run dev"
+  ]);
+  assert.deepEqual(state.code_intelligence, {
+    files_with_inbound_imports: null,
+    entrypoints: null,
+    top_fan_in: null
+  });
+  assert.equal(state.todos, null);
+  assert.equal(
+    state.current_state.unknown.some((item) =>
+      /Code-intelligence and TODO observations are Unknown/.test(item.claim)
+    ),
+    true
+  );
+  if (linked) {
+    assert.equal(state.scan.symlinks_skipped, 1);
+  }
+  const brief = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8");
+  assert.match(brief, /declared candidate: `npm test`/);
+  assert.match(brief, /declared candidate: `npm run build`/);
+  assert.doesNotMatch(brief, /no command declaration found/);
+});
+
+test("compatibility refresh enforces configured file limits", async () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.scan.max_files = 1;
+  config.scan.respect_git_ignore = false;
+  const root = makeFixture({
+    ".kanon/config.json": `${JSON.stringify(config)}\n`,
+    "a.js": "export const a = 1;\n",
+    "b.js": "export const b = 2;\n"
+  });
+
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+
+  assert.equal(state.scan.max_files, 1);
+  assert.equal(state.repo.files_scanned, 1);
+  assert.equal(state.files.fingerprints.length, 1);
+  assert.equal(state.scan.budgets_reached.includes("max_files"), true);
+});
+
+test("repository inspection exposes compatibility filesystem-root policy", () => {
+  const filesystemRoot = path.parse(repoRoot).root;
+  const rejected = inspectRepository(filesystemRoot, "inspect root policy", {
+    profile: "resume"
+  });
+  const accepted = inspectRepository(filesystemRoot, "inspect root policy", {
+    profile: "resume",
+    allow_filesystem_root: true,
+    scan: {
+      maxFiles: 1,
+      maxEntries: 1,
+      maxElapsedMs: 100,
+      useGitIgnore: false
+    }
+  });
+
+  assert.equal(rejected.ok, false);
+  assert.equal(accepted.ok, true);
 });
 
 test("compatibility todo preserves its successful result and markdown contract", async () => {

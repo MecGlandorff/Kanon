@@ -9,7 +9,10 @@ import {
   repositoryValue,
   sanitizeDisplayText
 } from "../core/trust.js";
-import { observeRepositoryGit } from "./git.js";
+import {
+  listGitVisibleFiles,
+  observeRepositoryGit
+} from "./git.js";
 import {
   canonicalizeRepositoryRoot,
   isSafeRelativePath,
@@ -118,11 +121,20 @@ const BASELINE_PATHS = new Map([
  * @typedef {{
  *   complete: boolean,
  *   instruction_complete: boolean,
+ *   strategy: "filesystem" | "git",
  *   entries_visited: number,
  *   files_observed: number,
+ *   total_bytes_hashed: number,
+ *   total_text_bytes_read: number,
+ *   elapsed_ms: number,
  *   fixed_directories_excluded: number,
  *   ignore_entries_excluded: number,
  *   sensitive_files_excluded: number,
+ *   symlinks_skipped: number,
+ *   outside_root_paths: number,
+ *   missing_tracked_files: number,
+ *   git_ignore_observation_failed: boolean,
+ *   git_ignore_diagnostic: string | null,
  *   rejected_paths: number,
  *   unreadable_paths: number,
  *   rejected_path_samples: string[],
@@ -134,7 +146,9 @@ const BASELINE_PATHS = new Map([
  *     max_entries: number,
  *     max_file_bytes: number,
  *     max_hash_bytes: number,
+ *     max_total_text_bytes: number,
  *     max_scan_ms: number,
+ *     max_ignore_bytes: number,
  *     max_ignore_match_work: number,
  *     max_evidence_items: number,
  *     max_evidence_bytes: number
@@ -167,8 +181,33 @@ const BASELINE_PATHS = new Map([
  * @typedef {{
  *   profile?: InspectionProfile,
  *   target?: string,
- *   git_runner?: import("./git.js").GitRunner
+ *   git_runner?: import("./git.js").GitRunner,
+ *   allow_filesystem_root?: boolean,
+ *   scan?: {
+ *     maxFiles?: number,
+ *     maxEntries?: number,
+ *     maxFileBytes?: number,
+ *     maxTotalHashBytes?: number,
+ *     maxTotalTextBytes?: number,
+ *     maxElapsedMs?: number,
+ *     maxIgnoreBytes?: number,
+ *     gitTimeoutMs?: number,
+ *     gitMaxOutputBytes?: number,
+ *     useGitIgnore?: boolean
+ *   }
  * }} InspectOptions
+ * @typedef {{
+ *   max_files: number,
+ *   max_entries: number,
+ *   max_file_bytes: number,
+ *   max_hash_bytes: number,
+ *   max_total_text_bytes: number,
+ *   max_scan_ms: number,
+ *   max_ignore_bytes: number,
+ *   git_timeout_ms: number,
+ *   git_max_output_bytes: number,
+ *   use_git_ignore: boolean
+ * }} InspectionLimits
  * @typedef {{
  *   previous: unknown | null,
  *   previous_warning: string | null,
@@ -221,6 +260,7 @@ const BASELINE_PATHS = new Map([
  */
 export function inspectRepository(rootInput, taskInput, options = {}) {
   const profile = options.profile || "orient";
+  const limits = inspectionLimits(options.scan);
   if (
     !["orient", "resume", "steer", "verify"].includes(profile) ||
     !isBoundedString(taskInput, 2_048)
@@ -235,12 +275,15 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
       "Repository inspection task was unavailable or invalid."
     );
   }
-  const root = canonicalizeRepositoryRoot(rootInput);
+  const root = canonicalizeRepositoryRoot(
+    rootInput,
+    options.allow_filesystem_root === true
+  );
   if (!root.ok) {
     return invalidInspection(root.diagnostic);
   }
 
-  const coverage = createCoverage();
+  const coverage = createCoverage(limits);
   const explicitPaths = extractTaskPaths(task);
   const target =
     options.target !== undefined && isSafeRelativePath(options.target)
@@ -258,11 +301,18 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     instructionPaths,
     coverage
   );
-  const scan = scanRepository(root.root, coverage);
+  const scan = scanRepository(
+    root.root,
+    coverage,
+    limits,
+    options.git_runner
+  );
   const git = observeRepositoryGit(root.root, {
     ...(options.git_runner === undefined
       ? {}
-      : { runner: options.git_runner })
+      : { runner: options.git_runner }),
+    timeout_ms: limits.git_timeout_ms,
+    max_output_bytes: limits.git_max_output_bytes
   });
   const selected = selectEvidencePaths(
     scan.files,
@@ -506,10 +556,17 @@ function readApplicableInstructions(root, explicitPaths, coverage) {
       noteBudget(coverage, "max_instruction_items");
       break;
     }
+    const remaining =
+      coverage.limits.max_evidence_bytes - coverage.total_text_bytes_read;
+    if (remaining < 1) {
+      noteBudget(coverage, "max_total_text_bytes");
+      break;
+    }
+    const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
     const read = readBoundedRepositoryFile(
       root,
       candidate,
-      MAX_EXCERPT_BYTES,
+      maximum,
       { truncate: true }
     );
     if (!read.ok) {
@@ -519,12 +576,13 @@ function readApplicableInstructions(root, explicitPaths, coverage) {
       }
       continue;
     }
+    coverage.total_text_bytes_read += read.bytes.length;
     const rawContent = read.bytes.toString("utf8");
     const sanitizationTruncated =
-      Buffer.byteLength(rawContent, "utf8") > MAX_EXCERPT_BYTES;
+      Buffer.byteLength(rawContent, "utf8") > maximum;
     const content = sanitizeDisplayText(
       rawContent,
-      MAX_EXCERPT_BYTES,
+      maximum,
       { multiline: true }
     );
     instructions.push({
@@ -547,13 +605,16 @@ function readApplicableInstructions(root, explicitPaths, coverage) {
 /**
  * @param {string} root
  * @param {InspectionCoverage} coverage
+ * @param {InspectionLimits} limits
+ * @param {import("./git.js").GitRunner | undefined} gitRunner
  * @returns {{files: InspectedFile[]}}
  */
-function scanRepository(root, coverage) {
-  const started = Date.now();
-  const deadline = started + MAX_SCAN_MS;
-  const ignore = loadIgnoreRules(root, coverage);
+function scanRepository(root, coverage, limits, gitRunner) {
+  const started = process.hrtime.bigint();
+  const deadline = Date.now() + limits.max_scan_ms;
+  const ignore = loadIgnoreRules(root, coverage, limits.max_ignore_bytes);
   if (!ignore.complete) {
+    coverage.elapsed_ms = elapsedMilliseconds(started);
     return { files: [] };
   }
   const ignoreRules = ignore.rules;
@@ -563,11 +624,55 @@ function scanRepository(root, coverage) {
     deadline,
     exhausted: false
   };
-  /** @type {{absolute: string, relative: string}[]} */
-  const pending = [{ absolute: root, relative: "" }];
   /** @type {InspectedFile[]} */
   const files = [];
   let hashedBytes = 0;
+
+  if (limits.use_git_ignore) {
+    const listing = listGitVisibleFiles(root, {
+      ...(gitRunner === undefined ? {} : { runner: gitRunner }),
+      timeout_ms: limits.git_timeout_ms,
+      max_output_bytes: limits.git_max_output_bytes
+    });
+    if (listing.ok) {
+      coverage.strategy = "git";
+      for (const relative of listing.files) {
+        if (!visitEntryBudget()) {
+          break;
+        }
+        if (hasFixedExcludedDirectory(relative)) {
+          coverage.fixed_directories_excluded += 1;
+          continue;
+        }
+        const ignored = matchesIgnore(
+          relative,
+          false,
+          ignoreRules,
+          ignoreMatchBudget,
+          coverage
+        );
+        if (ignoreMatchBudget.exhausted) {
+          break;
+        }
+        if (ignored) {
+          coverage.ignore_entries_excluded += 1;
+          continue;
+        }
+        if (!addFile(relative)) {
+          break;
+        }
+      }
+      return finish();
+    }
+    const diagnostic = listing.diagnostic ||
+      "Git file-list output was unavailable or invalid.";
+    coverage.git_ignore_observation_failed = true;
+    coverage.git_ignore_diagnostic = diagnostic;
+    coverage.diagnostics.push(diagnostic);
+  }
+
+  /** @type {{absolute: string, relative: string}[]} */
+  const pending = [{ absolute: root, relative: "" }];
   while (pending.length > 0 && !terminalBudgetReached(coverage)) {
     if (Date.now() > deadline) {
       noteBudget(coverage, "max_scan_ms");
@@ -579,7 +684,7 @@ function scanRepository(root, coverage) {
     }
     const read = readBoundedDirectory(
       directory.absolute,
-      MAX_ENTRIES - coverage.entries_visited,
+      limits.max_entries - coverage.entries_visited,
       deadline
     );
     if (!read.ok) {
@@ -608,7 +713,7 @@ function scanRepository(root, coverage) {
         continue;
       }
       coverage.entries_visited += 1;
-      if (coverage.entries_visited > MAX_ENTRIES) {
+      if (coverage.entries_visited > limits.max_entries) {
         noteBudget(coverage, "max_entries");
         break;
       }
@@ -621,6 +726,7 @@ function scanRepository(root, coverage) {
         continue;
       }
       if (entry.isSymbolicLink()) {
+        coverage.symlinks_skipped += 1;
         coverage.rejected_paths += 1;
         samplePath(coverage.rejected_path_samples, relative);
         continue;
@@ -675,56 +781,93 @@ function scanRepository(root, coverage) {
         coverage.sensitive_files_excluded += 1;
         continue;
       }
-      if (files.length >= MAX_FILES) {
-        noteBudget(coverage, "max_files");
+      if (!addFile(relative)) {
         break;
       }
-      const selected = resolveRepositoryPath(root, relative, "file");
-      if (!selected.ok) {
-        recordReadFailure(coverage, selected);
-        continue;
-      }
-      let digest = null;
-      let text = isTextPath(relative);
-      let observedSize = selected.stat.size;
-      let observedMtime =
-        Number.isFinite(selected.stat.mtimeMs) &&
-        selected.stat.mtimeMs >= 0
-          ? Math.floor(selected.stat.mtimeMs)
-          : null;
-      if (selected.stat.size > MAX_FILE_BYTES) {
-        noteNonterminalBudget(coverage, "max_file_bytes");
-      } else if (hashedBytes + selected.stat.size > MAX_HASH_BYTES) {
-        noteNonterminalBudget(coverage, "max_hash_bytes");
-      } else {
-        const read = readBoundedRepositoryFile(
-          root,
-          relative,
-          MAX_FILE_BYTES
-        );
-        if (read.ok) {
-          digest = sha256(read.bytes);
-          hashedBytes += read.bytes.length;
-          observedSize = read.size;
-          observedMtime = read.mtime_ms;
-          if (read.bytes.subarray(0, 8_192).includes(0)) {
-            text = false;
-          }
-        } else {
-          recordReadFailure(coverage, read);
-        }
-      }
-      files.push({
-        path: relative,
-        size: observedSize,
-        mtime_ms: observedMtime,
-        text,
-        sha256: digest
-      });
     }
   }
-  files.sort((left, right) => compareText(left.path, right.path));
-  return { files };
+  return finish();
+
+  /** @returns {boolean} */
+  function visitEntryBudget() {
+    if (Date.now() > deadline) {
+      noteBudget(coverage, "max_scan_ms");
+      return false;
+    }
+    coverage.entries_visited += 1;
+    if (coverage.entries_visited > limits.max_entries) {
+      noteBudget(coverage, "max_entries");
+      return false;
+    }
+    return true;
+  }
+
+  /** @param {string} relative @returns {boolean} */
+  function addFile(relative) {
+    if (isSensitiveRepositoryPath(relative)) {
+      coverage.sensitive_files_excluded += 1;
+      return true;
+    }
+    if (files.length >= limits.max_files) {
+      noteBudget(coverage, "max_files");
+      return false;
+    }
+    const selected = resolveRepositoryPath(root, relative, "file");
+    if (!selected.ok) {
+      if (coverage.strategy === "git" && selected.status === "missing") {
+        coverage.missing_tracked_files += 1;
+      } else {
+        recordReadFailure(coverage, selected);
+      }
+      return true;
+    }
+    let digest = null;
+    let text = isTextPath(relative);
+    let observedSize = selected.stat.size;
+    let observedMtime =
+      Number.isFinite(selected.stat.mtimeMs) &&
+      selected.stat.mtimeMs >= 0
+        ? Math.floor(selected.stat.mtimeMs)
+        : null;
+    if (selected.stat.size > limits.max_file_bytes) {
+      noteNonterminalBudget(coverage, "max_file_bytes");
+    } else if (hashedBytes + selected.stat.size > limits.max_hash_bytes) {
+      noteNonterminalBudget(coverage, "max_hash_bytes");
+    } else {
+      const read = readBoundedRepositoryFile(
+        root,
+        relative,
+        limits.max_file_bytes
+      );
+      if (read.ok) {
+        digest = sha256(read.bytes);
+        hashedBytes += read.bytes.length;
+        observedSize = read.size;
+        observedMtime = read.mtime_ms;
+        if (read.bytes.subarray(0, 8_192).includes(0)) {
+          text = false;
+        }
+      } else {
+        recordReadFailure(coverage, read);
+      }
+    }
+    files.push({
+      path: relative,
+      size: observedSize,
+      mtime_ms: observedMtime,
+      text,
+      sha256: digest
+    });
+    return true;
+  }
+
+  /** @returns {{files: InspectedFile[]}} */
+  function finish() {
+    coverage.total_bytes_hashed = hashedBytes;
+    coverage.elapsed_ms = elapsedMilliseconds(started);
+    files.sort((left, right) => compareText(left.path, right.path));
+    return { files };
+  }
 }
 
 /**
@@ -802,13 +945,14 @@ function readBoundedDirectory(directory, maximumEntries, deadline) {
 /**
  * @param {string} root
  * @param {InspectionCoverage} coverage
+ * @param {number} maximumBytes
  * @returns {IgnoreLoadResult}
  */
-function loadIgnoreRules(root, coverage) {
+function loadIgnoreRules(root, coverage, maximumBytes) {
   const read = readBoundedRepositoryFile(
     root,
     ".kanonignore",
-    MAX_IGNORE_BYTES
+    maximumBytes
   );
   if (!read.ok) {
     if (read.status === "missing") {
@@ -1154,10 +1298,6 @@ function readSelectedEvidence(
   const byPath = new Map(files.map((file) => [file.path, file]));
   /** @type {RepositoryEvidence[]} */
   const evidence = [];
-  let retainedBytes = instructions.reduce(
-    (total, item) => total + Buffer.byteLength(item.content),
-    0
-  );
   for (const selectedPath of selectedPaths) {
     if (instructionPaths.has(selectedPath)) {
       continue;
@@ -1166,14 +1306,19 @@ function readSelectedEvidence(
     if (!file) {
       continue;
     }
-    const remaining = MAX_EVIDENCE_BYTES - retainedBytes;
+    const remaining =
+      coverage.limits.max_evidence_bytes - coverage.total_text_bytes_read;
     if (remaining < 1) {
-      noteBudget(coverage, "max_evidence_bytes");
+      noteBudget(coverage, "max_total_text_bytes");
       break;
+    }
+    if (file.sha256 !== null && file.size > remaining) {
+      noteNonterminalBudget(coverage, "max_total_text_bytes");
+      continue;
     }
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
     const readMaximum =
-      file.sha256 === null ? maximum : MAX_FILE_BYTES;
+      file.sha256 === null ? maximum : coverage.limits.max_file_bytes;
     const read = readBoundedRepositoryFile(
       root,
       selectedPath,
@@ -1184,6 +1329,7 @@ function readSelectedEvidence(
       recordReadFailure(coverage, read);
       continue;
     }
+    coverage.total_text_bytes_read += read.bytes.length;
     const currentDigest = sha256(read.bytes);
     if (
       read.size !== file.size ||
@@ -1208,7 +1354,6 @@ function readSelectedEvidence(
       maximum,
       { multiline: true }
     );
-    retainedBytes += Buffer.byteLength(content, "utf8");
     evidence.push({
       kind: evidenceKind(selectedPath),
       path: selectedPath,
@@ -1269,11 +1414,19 @@ function fingerprintEvidence(
     coverage: {
       complete: coverage.complete,
       instruction_complete: coverage.instruction_complete,
+      strategy: coverage.strategy,
       entries_visited: coverage.entries_visited,
       files_observed: coverage.files_observed,
+      total_bytes_hashed: coverage.total_bytes_hashed,
+      total_text_bytes_read: coverage.total_text_bytes_read,
       fixed_directories_excluded: coverage.fixed_directories_excluded,
       ignore_entries_excluded: coverage.ignore_entries_excluded,
       sensitive_files_excluded: coverage.sensitive_files_excluded,
+      symlinks_skipped: coverage.symlinks_skipped,
+      outside_root_paths: coverage.outside_root_paths,
+      missing_tracked_files: coverage.missing_tracked_files,
+      git_ignore_observation_failed:
+        coverage.git_ignore_observation_failed,
       rejected_paths: coverage.rejected_paths,
       unreadable_paths: coverage.unreadable_paths,
       rejected_path_samples: coverage.rejected_path_samples,
@@ -1564,17 +1717,27 @@ function publicCoverage(coverage) {
 }
 
 /**
+ * @param {InspectionLimits} limits
  * @returns {InspectionCoverage}
  */
-function createCoverage() {
+function createCoverage(limits) {
   return {
     complete: true,
     instruction_complete: true,
+    strategy: "filesystem",
     entries_visited: 0,
     files_observed: 0,
+    total_bytes_hashed: 0,
+    total_text_bytes_read: 0,
+    elapsed_ms: 0,
     fixed_directories_excluded: 0,
     ignore_entries_excluded: 0,
     sensitive_files_excluded: 0,
+    symlinks_skipped: 0,
+    outside_root_paths: 0,
+    missing_tracked_files: 0,
+    git_ignore_observation_failed: false,
+    git_ignore_diagnostic: null,
     rejected_paths: 0,
     unreadable_paths: 0,
     rejected_path_samples: [],
@@ -1582,14 +1745,19 @@ function createCoverage() {
     budgets_reached: [],
     diagnostics: [],
     limits: {
-      max_files: MAX_FILES,
-      max_entries: MAX_ENTRIES,
-      max_file_bytes: MAX_FILE_BYTES,
-      max_hash_bytes: MAX_HASH_BYTES,
-      max_scan_ms: MAX_SCAN_MS,
+      max_files: limits.max_files,
+      max_entries: limits.max_entries,
+      max_file_bytes: limits.max_file_bytes,
+      max_hash_bytes: limits.max_hash_bytes,
+      max_total_text_bytes: limits.max_total_text_bytes,
+      max_scan_ms: limits.max_scan_ms,
+      max_ignore_bytes: limits.max_ignore_bytes,
       max_ignore_match_work: MAX_IGNORE_MATCH_WORK,
       max_evidence_items: MAX_EVIDENCE_ITEMS,
-      max_evidence_bytes: MAX_EVIDENCE_BYTES
+      max_evidence_bytes: Math.min(
+        MAX_EVIDENCE_BYTES,
+        limits.max_total_text_bytes
+      )
     }
   };
 }
@@ -1615,6 +1783,7 @@ function finishCoverage(coverage, fileCount, git) {
     coverage.budgets_reached.length === 0 &&
     coverage.rejected_paths === 0 &&
     coverage.unreadable_paths === 0 &&
+    !coverage.git_ignore_observation_failed &&
     coverage.sensitive_files_excluded === 0 &&
     coverage.ignore_entries_excluded === 0;
 }
@@ -1663,12 +1832,72 @@ function terminalBudgetReached(coverage) {
 function recordReadFailure(coverage, result) {
   if (result.status === "rejected" || result.status === "outside-root") {
     coverage.rejected_paths += 1;
+    if (result.status === "outside-root") {
+      coverage.outside_root_paths += 1;
+    }
+    if (/\blink\b|junction|reparse point/i.test(result.diagnostic)) {
+      coverage.symlinks_skipped += 1;
+    }
     samplePath(coverage.rejected_path_samples, result.relative_path || "");
   } else {
     coverage.unreadable_paths += 1;
     samplePath(coverage.unreadable_path_samples, result.relative_path || "");
   }
   coverage.diagnostics.push(result.diagnostic);
+}
+
+/** @param {string} relativePath */
+function hasFixedExcludedDirectory(relativePath) {
+  return relativePath
+    .split("/")
+    .some((part) => FIXED_EXCLUDED_DIRECTORIES.has(part));
+}
+
+/** @param {bigint} started */
+function elapsedMilliseconds(started) {
+  const nanoseconds = process.hrtime.bigint() - started;
+  return Math.max(1, Math.ceil(Number(nanoseconds) / 1_000_000));
+}
+
+/** @param {InspectOptions["scan"]} input @returns {InspectionLimits} */
+function inspectionLimits(input = {}) {
+  return {
+    max_files: boundedInteger(input.maxFiles, MAX_FILES, 1, 25_000),
+    max_entries: boundedInteger(input.maxEntries, MAX_ENTRIES, 1, 100_000),
+    max_file_bytes: boundedInteger(
+      input.maxFileBytes, MAX_FILE_BYTES, 1_024, 2 * 1024 * 1024
+    ),
+    max_hash_bytes: boundedInteger(
+      input.maxTotalHashBytes, MAX_HASH_BYTES, 1_024, 128 * 1024 * 1024
+    ),
+    max_total_text_bytes: boundedInteger(
+      input.maxTotalTextBytes, 8 * 1024 * 1024, 1_024, 32 * 1024 * 1024
+    ),
+    max_scan_ms: boundedInteger(input.maxElapsedMs, MAX_SCAN_MS, 100, 30_000),
+    max_ignore_bytes: boundedInteger(
+      input.maxIgnoreBytes, MAX_IGNORE_BYTES, 1_024, 512 * 1024
+    ),
+    git_timeout_ms: boundedInteger(input.gitTimeoutMs, 2_000, 100, 60_000),
+    git_max_output_bytes: boundedInteger(
+      input.gitMaxOutputBytes, 8 * 1024 * 1024, 1_024, 32 * 1024 * 1024
+    ),
+    use_git_ignore: input.useGitIgnore === true
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ */
+function boundedInteger(value, fallback, minimum, maximum) {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+    ? value
+    : fallback;
 }
 
 /**

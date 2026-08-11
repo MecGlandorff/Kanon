@@ -37,7 +37,10 @@ const MAX_PATH_ENTRIES = 128;
  *   overflow: boolean,
  *   diagnostic: string
  * }} GitRunResult
- * @typedef {(root: string, args: string[]) => unknown} GitRunner
+ * @typedef {(root: string, args: string[], options?: {
+ *   timeout_ms?: number,
+ *   max_output_bytes?: number
+ * }) => unknown} GitRunner
  * @typedef {{
  *   found: boolean,
  *   branch: string | null,
@@ -67,13 +70,18 @@ const MAX_PATH_ENTRIES = 128;
 
 /**
  * @param {string} canonicalRoot
- * @param {{runner?: GitRunner}} [options]
+ * @param {{
+ *   runner?: GitRunner,
+ *   timeout_ms?: number,
+ *   max_output_bytes?: number
+ * }} [options]
  * @returns {GitObservation}
  */
 export function observeRepositoryGit(canonicalRoot, options = {}) {
   const runner = typeof options.runner === "function"
     ? options.runner
     : runBoundedGit;
+  const runOptions = gitRunOptions(options);
   /** @type {string[]} */
   const diagnostics = [];
   /**
@@ -83,11 +91,11 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
   const observe = (args) => {
     let raw;
     try {
-      raw = runner(canonicalRoot, args);
+      raw = runner(canonicalRoot, args, runOptions);
     } catch {
       raw = null;
     }
-    const result = validateGitResult(raw);
+    const result = validateGitResult(raw, runOptions.max_output_bytes);
     if (!result.ok) {
       diagnostics.push(result.diagnostic);
     }
@@ -193,11 +201,68 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
 }
 
 /**
+ * @param {string} canonicalRoot
+ * @param {{
+ *   runner?: GitRunner,
+ *   timeout_ms?: number,
+ *   max_output_bytes?: number
+ * }} [options]
+ */
+export function listGitVisibleFiles(canonicalRoot, options = {}) {
+  const runner = typeof options.runner === "function"
+    ? options.runner
+    : runBoundedGit;
+  const runOptions = gitRunOptions(options);
+  let raw;
+  try {
+    raw = runner(
+      canonicalRoot,
+      ["ls-files", "-co", "--exclude-standard", "-z"],
+      runOptions
+    );
+  } catch {
+    raw = null;
+  }
+  const result = validateGitResult(raw, runOptions.max_output_bytes);
+  if (!result.ok) {
+    return unavailableFileList(result.diagnostic);
+  }
+  if (result.stdout && !result.stdout.endsWith("\0")) {
+    return unavailableFileList();
+  }
+  const files = [];
+  for (const value of result.stdout.split("\0")) {
+    if (!value) {
+      continue;
+    }
+    const selected = value.replaceAll("\\", "/");
+    if (!isSafeRelativePath(selected)) {
+      return unavailableFileList();
+    }
+    files.push(selected);
+  }
+  return {
+    ok: true,
+    files: Array.from(new Set(files)).sort(),
+    diagnostic: null
+  };
+}
+
+/** @param {string} [diagnostic] */
+function unavailableFileList(
+  diagnostic = "Git file-list output was unavailable or invalid."
+) {
+  return { ok: false, files: /** @type {string[]} */ ([]), diagnostic };
+}
+
+/**
  * @param {string} root
  * @param {string[]} args
+ * @param {{timeout_ms?: number, max_output_bytes?: number}} [options]
  * @returns {GitRunResult}
  */
-export function runBoundedGit(root, args) {
+export function runBoundedGit(root, args, options = {}) {
+  const runOptions = gitRunOptions(options);
   const gitBinary = resolveGitBinary(root);
   if (gitBinary === null) {
     return {
@@ -234,9 +299,9 @@ export function runBoundedGit(root, args) {
       cwd: root,
       encoding: "buffer",
       env: hardenedGitEnvironment(root),
-      maxBuffer: GIT_OUTPUT_BYTES,
+      maxBuffer: runOptions.max_output_bytes,
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: GIT_TIMEOUT_MS,
+      timeout: runOptions.timeout_ms,
       windowsHide: true
     }
   );
@@ -248,12 +313,12 @@ export function runBoundedGit(root, args) {
     : Buffer.from(result.stderr || "");
   const overflow =
     errorCode(result.error) === "ENOBUFS" ||
-    stdoutBytes.length + stderrBytes.length > GIT_OUTPUT_BYTES;
+    stdoutBytes.length + stderrBytes.length > runOptions.max_output_bytes;
   const timeout =
     errorCode(result.error) === "ETIMEDOUT" ||
     (
       result.signal !== null &&
-      Date.now() - started >= GIT_TIMEOUT_MS
+      Date.now() - started >= runOptions.timeout_ms
     );
   const status = Number.isInteger(result.status) ? result.status : null;
   if (
@@ -372,7 +437,7 @@ function resolveGitBinary(root) {
  * @param {unknown} value
  * @returns {GitRunResult}
  */
-function validateGitResult(value) {
+function validateGitResult(value, maximumOutputBytes = GIT_OUTPUT_BYTES) {
   if (
     !isPlainRecord(value) ||
     typeof value.ok !== "boolean" ||
@@ -381,7 +446,7 @@ function validateGitResult(value) {
     typeof value.timeout !== "boolean" ||
     typeof value.overflow !== "boolean" ||
     Buffer.byteLength(value.stdout) + Buffer.byteLength(value.stderr) >
-      GIT_OUTPUT_BYTES
+      maximumOutputBytes
   ) {
     return invalidGitResult();
   }
@@ -441,6 +506,33 @@ function validateGitResult(value) {
     };
   }
   return invalidGitResult();
+}
+
+/**
+ * @param {{timeout_ms?: number, max_output_bytes?: number}} options
+ */
+function gitRunOptions(options) {
+  return {
+    timeout_ms: boundedInteger(options.timeout_ms, GIT_TIMEOUT_MS, 100, 60_000),
+    max_output_bytes: boundedInteger(
+      options.max_output_bytes, GIT_OUTPUT_BYTES, 1_024, 32 * 1024 * 1024
+    )
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ */
+function boundedInteger(value, fallback, minimum, maximum) {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+    ? value
+    : fallback;
 }
 
 /**

@@ -4,7 +4,11 @@ import {
   buildContinuityReport
 } from "#kanon-continuity";
 import { inspectRepository } from "#kanon-repository-inspect";
-import { DEFAULT_CONFIG, inspectKanonConfig } from "../../config.js";
+import {
+  DEFAULT_CONFIG,
+  inspectKanonConfig,
+  scanOptionsFromConfig
+} from "../../config.js";
 import {
   codeSpan,
   escapeMarkdownText,
@@ -70,7 +74,7 @@ const MAX_RENDERED_EXCERPT_BYTES = 240;
  * }} Command
  * @typedef {{run: Command[], test: Command[], build: Command[], dev: Command[]}}
  *   CommandGroups
- * @typedef {{path: string, reason: string, fan_in: number, evidence: string[]}}
+ * @typedef {{path: string, reason: string, fan_in: number | null, evidence: string[]}}
  *   ImportantFile
  * @typedef {{found: boolean, files: {path: string, evidence: string}[]}}
  *   ProjectSignal
@@ -92,15 +96,20 @@ const MAX_RENDERED_EXCERPT_BYTES = 240;
  * @param {{deep?: boolean}} [options]
  */
 export function refreshKanon(root, options = {}) {
+  const requestedRoot = path.resolve(root);
+  const configInspection = inspectKanonConfig(requestedRoot);
   const inspection = inspectRepository(
-    root,
+    requestedRoot,
     "refresh bounded repository continuity",
-    { profile: "resume" }
+    {
+      profile: "resume",
+      allow_filesystem_root: true,
+      scan: scanOptionsFromConfig(configInspection.config)
+    }
   );
   if (!inspection.ok) {
     throw new Error(inspection.diagnostic);
   }
-  const configInspection = inspectKanonConfig(inspection.root);
   const analysis = buildRefreshAnalysis(inspection, configInspection);
   return persistRefresh(analysis, configInspection.config, options);
 }
@@ -115,11 +124,12 @@ function buildRefreshAnalysis(inspection, configInspection) {
   const evidence = createEvidenceContext(inspection, runId);
   const packageInfo = readPackageEvidence(inspection);
   const purpose = projectPurpose(inspection, packageInfo, evidence);
-  const files = inspection.files.slice(0, 2_500);
+  const files = inspection.files;
   const testPaths = files
     .map((file) => file.path)
     .filter(isTestPath);
-  const packageTest = hasPackageTest(packageInfo);
+  const commands = projectCommands(packageInfo, inspection, evidence);
+  const packageTest = commands.test.length > 0;
   const tests = {
     found: testPaths.length > 0 || packageTest,
     files: testPaths.slice(0, 50),
@@ -132,7 +142,9 @@ function buildRefreshAnalysis(inspection, configInspection) {
           "test",
           `${testPaths.length} test-like file(s) found.`
         )]
-      : []
+      : packageTest
+        ? commands.test[0]?.evidence || []
+        : []
   };
   const ci = projectSignal(
     files.map((file) => file.path).filter(isCiPath),
@@ -185,8 +197,6 @@ function buildRefreshAnalysis(inspection, configInspection) {
     command_execution: configInspection.config.command_execution,
     evidence: configurationEvidence
   };
-  /** @type {CommandGroups} */
-  const commands = { run: [], test: [], build: [], dev: [] };
   const currentState = projectCurrentState({
     purpose,
     tests,
@@ -195,7 +205,8 @@ function buildRefreshAnalysis(inspection, configInspection) {
     release,
     importantFiles,
     inspection,
-    configuration
+    configuration,
+    commands
   });
   const stateValue = {
     version: VERSION,
@@ -213,15 +224,15 @@ function buildRefreshAnalysis(inspection, configInspection) {
     commands,
     important_files: importantFiles,
     code_intelligence: {
-      files_with_inbound_imports: 0,
-      entrypoints: [],
-      top_fan_in: []
+      files_with_inbound_imports: null,
+      entrypoints: null,
+      top_fan_in: null
     },
     tests,
     ci,
     deployment,
     release,
-    todos: [],
+    todos: null,
     current_state: currentState,
     verification,
     configuration,
@@ -395,12 +406,90 @@ function repositoryName(inspection, packageInfo) {
     : path.basename(inspection.root);
 }
 
-/** @param {Record<string, unknown> | null} packageInfo */
-function hasPackageTest(packageInfo) {
-  const scripts = packageInfo?.scripts;
-  return plainRecord(scripts) &&
-    typeof scripts.test === "string" &&
-    !/(?:no test specified|not implemented|exit\s+1)/i.test(scripts.test);
+/**
+ * @param {Record<string, unknown> | null} packageInfo
+ * @param {Inspection} inspection
+ * @param {EvidenceContext} evidence
+ * @returns {CommandGroups}
+ */
+function projectCommands(packageInfo, inspection, evidence) {
+  /** @type {CommandGroups} */
+  const commands = { run: [], test: [], build: [], dev: [] };
+  if (!packageInfo || !plainRecord(packageInfo.scripts)) {
+    return commands;
+  }
+  const scripts = packageInfo.scripts;
+  const declared = typeof packageInfo.packageManager === "string"
+    ? packageInfo.packageManager.split("@")[0] ?? ""
+    : "";
+  const files = new Set(inspection.files.map((file) => file.path));
+  const detected = files.has("pnpm-lock.yaml")
+    ? "pnpm"
+    : files.has("yarn.lock")
+      ? "yarn"
+      : files.has("bun.lock") || files.has("bun.lockb")
+        ? "bun"
+        : "npm";
+  const manager = /** @type {"npm" | "pnpm" | "yarn" | "bun"} */ (
+    ["npm", "pnpm", "yarn", "bun"].includes(declared) ? declared : detected
+  );
+  const evidenceId = evidenceFor(
+    evidence,
+    "package.json",
+    "command",
+    "Package command declarations were parsed from bounded metadata."
+  );
+  /** @type {[keyof CommandGroups, string[]][]} */
+  const groups = [
+    ["test", ["test"]],
+    ["build", ["build"]],
+    ["dev", ["dev", "watch"]],
+    ["run", ["start", "dev", "serve", "watch"]]
+  ];
+  for (const [group, names] of groups) {
+    const name = names.find((candidate) =>
+      typeof scripts[candidate] === "string"
+    );
+    const detail = name ? scripts[name] : null;
+    if (
+      !name ||
+      typeof detail !== "string" ||
+      (group === "test" &&
+        /(?:no test specified|not implemented|exit\s+1)/i.test(detail))
+    ) {
+      continue;
+    }
+    commands[group].push(packageCommand(manager, name, detail, evidenceId));
+  }
+  return commands;
+}
+
+/**
+ * @param {"npm" | "pnpm" | "yarn" | "bun"} manager
+ * @param {string} name
+ * @param {string} detail
+ * @param {string} evidenceId
+ * @returns {Command}
+ */
+function packageCommand(manager, name, detail, evidenceId) {
+  const command = manager === "bun"
+    ? `bun run ${name}`
+    : manager !== "npm"
+      ? `${manager} ${name}`
+      : name === "test"
+        ? "npm test"
+        : name === "start"
+          ? "npm start"
+          : `npm run ${name}`;
+  return {
+    command,
+    cwd: ".",
+    source: "package.json",
+    confidence: "known",
+    evidence: evidenceId ? [evidenceId] : [],
+    detail,
+    trust: "repository-untrusted"
+  };
 }
 
 /**
@@ -443,7 +532,7 @@ function projectImportantFiles(inspection, evidence) {
       kind === "instruction"
         ? "applicable repository instruction; content remains untrusted"
         : "selected by the bounded v1 repository inspector",
-    fan_in: 0,
+    fan_in: null,
     evidence: [evidenceFor(
       evidence,
       selectedPath,
@@ -510,38 +599,32 @@ function projectScan(inspection) {
   ].slice(0, 16);
   return {
     complete: coverage.complete,
-    strategy: "filesystem",
+    strategy: coverage.strategy,
     max_files: limits.max_files,
     max_entries: limits.max_entries,
     max_file_bytes: limits.max_file_bytes,
     max_total_hash_bytes: limits.max_hash_bytes,
-    max_total_text_bytes: limits.max_evidence_bytes,
+    max_total_text_bytes: limits.max_total_text_bytes,
     max_elapsed_ms: limits.max_scan_ms,
     entries_visited: coverage.entries_visited,
-    total_bytes_hashed: inspection.files.reduce(
-      (total, file) => total + (file.sha256 === null ? 0 : file.size),
-      0
-    ),
-    total_text_bytes_read: inspection.evidence.reduce(
-      (total, item) => total + Buffer.byteLength(item.content),
-      0
-    ),
-    elapsed_ms: 0,
+    total_bytes_hashed: coverage.total_bytes_hashed,
+    total_text_bytes_read: coverage.total_text_bytes_read,
+    elapsed_ms: coverage.elapsed_ms,
     truncated: !coverage.complete,
     unreadable_entries: coverage.unreadable_paths,
-    missing_tracked_files: 0,
+    missing_tracked_files: coverage.missing_tracked_files,
     ignored_directories: coverage.fixed_directories_excluded,
     kanon_ignored_entries: coverage.ignore_entries_excluded,
     sensitive_files_skipped: coverage.sensitive_files_excluded,
-    symlinks_skipped: 0,
+    symlinks_skipped: coverage.symlinks_skipped,
     rejected_paths: coverage.rejected_paths,
-    outside_root_paths: 0,
+    outside_root_paths: coverage.outside_root_paths,
     path_failures: pathFailures,
     path_failures_truncated:
       coverage.rejected_paths + coverage.unreadable_paths > pathFailures.length,
     budgets_reached: coverage.budgets_reached,
-    git_observation_failed: !inspection.git.observation_complete,
-    git_diagnostic: inspection.git.diagnostics[0] || null
+    git_observation_failed: coverage.git_ignore_observation_failed,
+    git_diagnostic: coverage.git_ignore_diagnostic
   };
 }
 
@@ -554,7 +637,8 @@ function projectScan(inspection) {
  *   release: ProjectSignal,
  *   importantFiles: ImportantFile[],
  *   inspection: Inspection,
- *   configuration: ConfigurationState
+ *   configuration: ConfigurationState,
+ *   commands: CommandGroups
  * }} input
  */
 function projectCurrentState(input) {
@@ -607,10 +691,28 @@ function projectCurrentState(input) {
         "Git observation did not complete."
     });
   }
+  const commandEntries = Object.entries(input.commands);
+  let commandCount = 0;
+  for (const [group, commands] of commandEntries) {
+    for (const command of commands) {
+      commandCount += 1;
+      const target = command.confidence === "known" ? known : likely;
+      target.push({
+        claim: `A ${group} command candidate is directly declared: ${command.command}.`,
+        evidence: command.evidence,
+        trust: "repository-untrusted"
+      });
+    }
+  }
+  if (commandCount === 0) {
+    unknown.push({
+      claim: "Repository command candidates are Unknown.",
+      reason: "No bounded command declaration was observed."
+    });
+  }
   unknown.push({
-    claim: "Repository command candidates are Unknown.",
-    reason:
-      "The compact refresh projection does not execute or curate repository commands."
+    claim: "Code-intelligence and TODO observations are Unknown.",
+    reason: "The compact refresh projection does not perform those analyses."
   });
   for (const [label, signal] of /** @type {[string, ProjectSignal][]} */ ([
     ["CI", input.ci],
@@ -914,7 +1016,7 @@ function renderBrief(analysis, options) {
 function appendCommandGroup(lines, label, commands, policy) {
   lines.push(`### ${label}`);
   if (!commands.length) {
-    lines.push("- Unknown: no command declaration found.");
+    lines.push("- Unknown: no command declaration was observed.");
     return;
   }
   for (const command of commands) {

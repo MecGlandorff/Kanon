@@ -32,7 +32,7 @@ import { readContainedText } from "./write-fs.js";
  *   "nullable-integer" |
  *   "nullable-nonnegative-integer" |
  *   "nullable-hash"} ScalarRule
- * @typedef {{kind: "array", item: FieldRule}} ArrayRule
+ * @typedef {{kind: "array", item: FieldRule, nullable?: boolean}} ArrayRule
  * @typedef {{
  *   kind: "record",
  *   required: Record<string, FieldRule>,
@@ -77,7 +77,7 @@ const CURRENT_FIELDS = new Set([
   "schema_version"
 ]);
 
-/** @type {[string, "string" | "object" | "array" | "integer"][]} */
+/** @type {[string, "string" | "object" | "array" | "nullable-array" | "integer"][]} */
 const REQUIRED_FIELDS = [
   ["version", "string"],
   ["run_id", "string"],
@@ -93,7 +93,7 @@ const REQUIRED_FIELDS = [
   ["ci", "object"],
   ["deployment", "object"],
   ["release", "object"],
-  ["todos", "array"],
+  ["todos", "nullable-array"],
   ["current_state", "object"],
   ["verification", "object"],
   ["configuration", "object"],
@@ -264,20 +264,20 @@ const CURRENT_FIELD_RULES = {
   important_files: arrayRule(recordRule({
     path: STRING,
     reason: STRING,
-    fan_in: NONNEGATIVE_INTEGER,
+    fan_in: NULLABLE_NONNEGATIVE_INTEGER,
     evidence: STRINGS
   }, { trust: STRING })),
   code_intelligence: recordRule({
-    files_with_inbound_imports: NONNEGATIVE_INTEGER,
+    files_with_inbound_imports: NULLABLE_NONNEGATIVE_INTEGER,
     entrypoints: arrayRule(recordRule({
       path: STRING,
       confidence: CONFIDENCE,
       reason: STRING
-    })),
+    }), true),
     top_fan_in: arrayRule(recordRule({
       path: STRING,
       fan_in: NONNEGATIVE_INTEGER
-    }))
+    }), true)
   }),
   tests: recordRule({
     found: BOOLEAN,
@@ -293,7 +293,7 @@ const CURRENT_FIELD_RULES = {
     path: STRING,
     line: POSITIVE_INTEGER,
     text: STRING
-  }, { trust: STRING })),
+  }, { trust: STRING }), true),
   current_state: recordRule({
     known: CLAIMS,
     likely: CLAIMS,
@@ -539,6 +539,9 @@ function validateField(value, field, rule) {
         );
   }
   if (rule.kind === "array") {
+    if (rule.nullable && value === null) {
+      return null;
+    }
     if (!Array.isArray(value)) {
       return invalid(field, "Expected an array.");
     }
@@ -651,10 +654,13 @@ function validateScalar(value, field, rule) {
 
 /**
  * @param {unknown} value
- * @param {"string" | "object" | "array" | "integer"} type
+ * @param {"string" | "object" | "array" | "nullable-array" | "integer"} type
  * @returns {boolean}
  */
 function hasType(value, type) {
+  if (type === "nullable-array") {
+    return value === null || Array.isArray(value);
+  }
   if (type === "array") {
     return Array.isArray(value);
   }
@@ -712,9 +718,9 @@ function inspectionLimit(options, fallback, maximum) {
     : null;
 }
 
-/** @param {FieldRule} item @returns {ArrayRule} */
-function arrayRule(item) {
-  return { kind: "array", item };
+/** @param {FieldRule} item @param {boolean} [nullable] @returns {ArrayRule} */
+function arrayRule(item, nullable = false) {
+  return { kind: "array", item, nullable };
 }
 
 /**

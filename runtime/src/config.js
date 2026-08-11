@@ -251,7 +251,7 @@ export function validateConfig(value) {
 
 /**
  * @param {KanonConfig | null | undefined} config
- * @param {import("./scanner/scan.js").ScanOptions} [overrides]
+ * @param {Partial<EffectiveScanOptions>} [overrides]
  * @returns {EffectiveScanOptions}
  */
 export function scanOptionsFromConfig(config, overrides = {}) {

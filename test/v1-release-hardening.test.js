@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -218,9 +220,30 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   assert.equal(Object.keys(packageJson.optionalDependencies || {}).length, 0);
   assert.equal(Object.keys(packageJson.peerDependencies || {}).length, 0);
   assert.equal(publicSkillFiles(repoRoot).length + 6, 86);
-  const builder = read("scripts/build-package.js");
-  assert.match(builder, /\["SECURITY\.md", "SECURITY\.md"\]/u);
-  assert.match(builder, /publishConfig: source\.publishConfig/u);
+  const output = fs.mkdtempSync(
+    path.join(os.tmpdir(), "kanon-release-inventory-")
+  );
+  const built = spawnSync(
+    process.execPath,
+    ["scripts/build-package.js", "--output", output],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 30_000,
+      windowsHide: true
+    }
+  );
+  assert.equal(built.status, 0, built.stderr || built.stdout);
+  assert.equal(
+    fs.readFileSync(path.join(output, "SECURITY.md"), "utf8"),
+    read("SECURITY.md")
+  );
+  const stagedManifest = JSON.parse(
+    fs.readFileSync(path.join(output, "package.json"), "utf8")
+  );
+  assert.deepEqual(stagedManifest.publishConfig, packageJson.publishConfig);
+  assert.equal(stagedManifest.scripts, undefined);
+  assert.equal(stagedManifest.dependencies, undefined);
 });
 
 function maintainerInput() {
