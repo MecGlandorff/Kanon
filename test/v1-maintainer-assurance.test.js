@@ -93,12 +93,18 @@ test("maintainer namespace is separate and excluded from production", () => {
   );
 });
 
-test("archive-only comparison retains its exact frozen binding", () => {
-  const archived =
+test("archive-only evidence retains its exact frozen bindings", () => {
+  const archived = [
     "eval/results/post-correction-evidence-sha256-" +
-    "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
-    "comparison.json";
-  assert.equal(fs.existsSync(path.join(repoRoot, archived)), false);
+      "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
+      "comparison.json",
+    "eval/v1.0.0-simulation/evidence-sha256-" +
+      "42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/" +
+      "complete-tree-commitment.json"
+  ];
+  for (const relative of archived) {
+    assert.equal(fs.existsSync(path.join(repoRoot, relative)), false, relative);
+  }
   assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));
 });
 
@@ -134,27 +140,6 @@ test("evidence classifications preserve absent human and holdout evidence", () =
     six_person_simulation: "simulated-process-assurance",
     unseen_holdout: "absent"
   });
-  const run = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/run-record.json"
-      ),
-      "utf8"
-    )
-  );
-  const conclusion = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/conclusion.json"
-      ),
-      "utf8"
-    )
-  );
-  assert.equal(run.human_independence, false);
-  assert.equal(run.release_authority, false);
-  assert.equal(conclusion.payload.release_supported_conclusion, false);
 });
 
 test("risk ledger is complete, exact, unaccepted, and unresolved", () => {
