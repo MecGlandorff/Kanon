@@ -2,6 +2,11 @@
 
 Date: 2026-07-30
 
+Archive status for v1.1: result paths in this frozen record describe the
+`v1.0.0` tree. Large raw payloads now live only at that immutable tag; see
+[`eval/results/README.md`](../eval/results/README.md) for the retained-fixture
+boundary and retrieval instructions.
+
 Status: hard-stopped at the strict semantic-equivalence gate. Offline
 attempt-level finalization and trace-completeness validation succeeded.
 Frozen D.2A does not contain two comparison inputs required by this recovery

@@ -2,6 +2,11 @@
 
 Date: 2026-07-30
 
+Archive status for v1.1: result paths in this frozen record describe the
+`v1.0.0` tree. Large raw payloads now live only at that immutable tag; see
+[`eval/results/README.md`](../eval/results/README.md) for the retained-fixture
+boundary and retrieval instructions.
+
 Status: hard-stopped after the one authorized corpus attempt failed during
 trace-manifest finalization. No retry, equivalence promotion, hypothesis
 analysis, or behavioral correction occurred.
