@@ -99,6 +99,9 @@ test("archive-only evidence retains its exact frozen bindings", () => {
     "eval/results/post-correction-evidence-sha256-" +
       "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
       "comparison.json",
+    "eval/results/d2e-analysis-" +
+      "b84a9706ebe948303c9e6bc67641fc0dcbef81c0a873098c1d65c2be2dfef81b/" +
+      "mechanism-analysis.json",
     "eval/v1.0.0-simulation/evidence-sha256-" +
       "42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/" +
       "complete-tree-commitment.json"
