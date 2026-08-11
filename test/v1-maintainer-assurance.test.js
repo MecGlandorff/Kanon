@@ -95,6 +95,7 @@ test("maintainer namespace is separate and excluded from production", () => {
 
 test("archive-only evidence retains its exact frozen bindings", () => {
   const archived = [
+    "eval/results/development-0.4.0-rc.1-d2b-7da293a5.json",
     "eval/results/post-correction-evidence-sha256-" +
       "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
       "comparison.json",

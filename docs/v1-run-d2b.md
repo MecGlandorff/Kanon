@@ -2,6 +2,12 @@
 
 Date: 2026-07-29
 
+Archive note for v1.1.0: the 218,211-byte raw report is no longer duplicated
+in the maintained tree. Its exact blob remains at
+`v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`; the compact
+rendering and the findings below remain current-tree records. See the
+[historical evaluation archive](../eval/results/README.md) for retrieval.
+
 Scope: one generic deterministic product correction followed by exactly one
 artifact-bound development-corpus evaluation. This record was started before
 production behavior changed. No live model call, network request, corpus code
@@ -163,7 +169,7 @@ regenerated into runtime mirrors only through `npm run build:skill`.
 | Corpus manifest SHA-256 | `4f768f151885d26de48fe0744cafc2402a27aca61f7f049aac166309891e0c92` |
 | Artifact SHA-256 | `b26c67cb8a94a07f832fb3a3d527e8da7247a150a29d5af2a68543ff727592b1` |
 | Installed conformance | passed, 43/43 checks |
-| Raw report | `eval/results/development-0.4.0-rc.1-d2b-7da293a5.json` |
+| Raw report | `v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json` (archive-only) |
 | Raw report SHA-256 | `e1c69f8f443e8dcd8ebf75abf7ce15e01029ed979d409ec356070c05afa0fbde` |
 | Raw report bytes | 218,211 |
 | Development executions in D.2B | exactly one |

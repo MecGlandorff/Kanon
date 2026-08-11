@@ -2,6 +2,11 @@
 
 **Date:** 2026-07-29
 
+Archive note for v1.1.0: the raw D.2B report referenced by this historical
+record now lives only in the immutable `v1.0.0` tag. Its exact path and digest
+remain recorded below; see the
+[historical evaluation archive](../eval/results/README.md) for retrieval.
+
 **Branch:** `release/v.1.0.0`
 
 **Recovery scope:** restore the pre-D.2B product without erasing the failed
@@ -80,7 +85,8 @@ The later evidence commit changed three evidence-only paths:
 
 - `docs/v1-run-d2b.md`;
 - `eval/RESULTS.md`; and
-- `eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`.
+- `v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`
+  (now archive-only).
 
 Those paths were not included in the inverse. No replacement ranking,
 command, scanner, budget, label, policy, threshold, or scoring hypothesis was
