@@ -99,6 +99,9 @@ test("archive-only evidence retains its exact frozen bindings", () => {
     "eval/results/post-correction-evidence-sha256-" +
       "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
       "comparison.json",
+    "eval/results/post-correction-evidence-sha256-" +
+      "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
+      "evaluation-record.json",
     "eval/results/d2e-analysis-" +
       "b84a9706ebe948303c9e6bc67641fc0dcbef81c0a873098c1d65c2be2dfef81b/" +
       "mechanism-analysis.json",
@@ -174,33 +177,31 @@ test("risk ledger is complete, exact, unaccepted, and unresolved", () => {
   assert.equal(documentation.waiver_eligible, false);
 });
 
-test("visible metrics, seven failures, nine incomplete scans, and zero correction benefit remain exact", () => {
-  const evaluation = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/results/post-correction-evidence-sha256-b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/evaluation-record.json"
-      ),
-      "utf8"
-    )
+test("compact risk ledger retains visible metrics and correction outcome", () => {
+  const risks = Object.fromEntries(
+    bundle.ledger.records.map((record) => [record.id, record.residual_risk])
   );
-  const scores = evaluation.aggregate.scores.all_frozen_score_fields.post;
-  assert.deepEqual(scores.totals, {
-    fn: 68,
-    fp: 46,
-    precision: 0.7486338797814208,
-    precision_interval: scores.totals.precision_interval,
-    recall: 0.6682926829268293,
-    recall_interval: scores.totals.recall_interval,
-    tp: 137,
-    weighted_error: 298,
-    weighted_error_per_case: 9.933333333333334
-  });
-  assert.equal(scores.failures.length, 7);
-  assert.equal(scores.incomplete_scan_count, 9);
-  assert.equal(evaluation.aggregate.counts.removed_public_false_positives, 7);
-  assert.equal(evaluation.aggregate.counts.new_public_false_positives, 7);
-  assert.equal(evaluation.aggregate.scores.all_frozen_score_fields.delta.totals.fp, 0);
+  assert.equal(
+    risks["RISK-VISIBLE-FP-FN"],
+    "Visible development evidence has TP 137, FP 46, FN 68, precision " +
+      "0.7486338797814208, recall 0.6682926829268293, and weighted error 298."
+  );
+  assert.equal(
+    risks["RISK-VISIBLE-PERFORMANCE-THRESHOLDS"],
+    "The seven failures are overall precision 0.7486338797814208 below 0.8, " +
+      "weighted error per case 9.933333333333334 above 4, important-file " +
+      "precision 0.6917808219178082 below 0.8, run-command recall 0.5 below " +
+      "0.6, and go-service, monorepo, and python-ml precision below 0.8."
+  );
+  assert.equal(
+    risks["RISK-NINE-INCOMPLETE-SCANS"],
+    "Nine visible development cases have incomplete scans."
+  );
+  assert.equal(
+    risks["RISK-WITHDRAWN-CORRECTION"],
+    "The attempted correction removed seven false positives but introduced " +
+      "seven others, producing zero aggregate benefit."
+  );
 });
 
 test("failed, accepted, resolved, and non-waivable states remain distinct", () => {

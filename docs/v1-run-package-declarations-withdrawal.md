@@ -1,5 +1,11 @@
 # v1 package-declarations correction withdrawal
 
+Archive note for v1.1.0: the 146,712-byte candidate-level evaluation record
+is preserved at
+`v1.0.0:eval/results/post-correction-evidence-sha256-b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/evaluation-record.json`
+rather than duplicated in the maintained tree. Its exact SHA-256 binding and
+the compact decision record below remain current-tree evidence.
+
 Date: 2026-07-30
 Branch: `release/v.1.0.0`
 Status: forward withdrawal complete; no corpus, trace, publication, or release action authorized
