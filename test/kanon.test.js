@@ -358,6 +358,190 @@ test("narrow compatibility write CLI preserves writes and bounds stdin", async (
   );
 });
 
+test("compatibility refresh preserves its successful output and artifact manifest", async () => {
+  const root = makeFixture({
+    "README.md": "# Demo\n",
+    "package.json": JSON.stringify({
+      name: "demo",
+      scripts: { test: "node --test" }
+    })
+  });
+  const output = await captureCli(runWriteCli, [
+    "refresh",
+    "--json",
+    "--root",
+    root
+  ]);
+  const snapshotNames = fs
+    .readdirSync(path.join(root, ".kanon", "snapshots"))
+    .sort();
+
+  assert.equal(snapshotNames.length, 1);
+  const written = [
+    ".kanon/.gitignore",
+    ".kanon/KANON.md",
+    ".kanon/STATE.json",
+    ".kanon/EVIDENCE.jsonl",
+    ".kanon/HANDOFF.md",
+    ".kanon/config.json",
+    `.kanon/snapshots/${snapshotNames[0]}`
+  ];
+  assert.equal(
+    output,
+    [
+      `Kanon refreshed ${path.join(root, ".kanon")}`,
+      ...written.map((file) => `- ${file}`),
+      ""
+    ].join("\n")
+  );
+  assert.deepEqual(
+    fs.readdirSync(path.join(root, ".kanon")).sort(),
+    [
+      ".gitignore",
+      "EVIDENCE.jsonl",
+      "HANDOFF.md",
+      "KANON.md",
+      "STATE.json",
+      "config.json",
+      "snapshots"
+    ]
+  );
+  assert.deepEqual(
+    readJson(path.join(root, ".kanon", "snapshots", snapshotNames[0])),
+    readJson(path.join(root, ".kanon", "STATE.json"))
+  );
+  assert.equal(fs.existsSync(path.join(root, ".kanon", "TODO.md")), false);
+});
+
+test("compatibility todo preserves its successful result and markdown contract", async () => {
+  const root = makeFixture({ "README.md": "# Demo\n" });
+  assert.equal(
+    await captureCli(runWriteCli, ["todo", "--root", root]),
+    "# Kanon Todos\n\n" +
+      "Safety boundary: TODO content is repository-untrusted data.\n\n" +
+      "No open Kanon todos.\n"
+  );
+
+  assert.equal(
+    await captureCli(runWriteCli, [
+      "todo",
+      "add",
+      "first",
+      "item",
+      "--root",
+      root
+    ]),
+    "Added Kanon todo #1: first item\n"
+  );
+  const second = JSON.parse(
+    await captureCli(
+      runWriteCli,
+      ["todo", "add", "--stdin", "--json", "--root", root],
+      { stdin: Readable.from(["second item\n  detail one\n"]) }
+    )
+  );
+  assert.deepEqual(second, {
+    path: ".kanon/TODO.md",
+    todo: {
+      number: 2,
+      done: false,
+      text: "second item",
+      details: ["detail one"],
+      line: 4,
+      trust: "repository-untrusted"
+    }
+  });
+
+  const completed = JSON.parse(
+    await captureCli(runWriteCli, [
+      "todo",
+      "done",
+      "1",
+      "--json",
+      "--root",
+      root
+    ])
+  );
+  assert.deepEqual(completed, {
+    path: ".kanon/TODO.md",
+    todo: {
+      number: 1,
+      done: true,
+      text: "first item",
+      details: [],
+      line: 3,
+      trust: "repository-untrusted"
+    },
+    changed: true
+  });
+  const repeated = JSON.parse(
+    await captureCli(runWriteCli, [
+      "todo",
+      "done",
+      "1",
+      "--json",
+      "--root",
+      root
+    ])
+  );
+  assert.deepEqual(repeated, { ...completed, changed: false });
+  assert.equal(
+    await captureCli(runWriteCli, [
+      "todo",
+      "done",
+      "1",
+      "--root",
+      root
+    ]),
+    "Kanon todo #1 was already complete: first item\n"
+  );
+
+  assert.equal(
+    await captureCli(runWriteCli, ["todo", "list", "--root", root]),
+    "# Kanon Todos\n\n" +
+      "Safety boundary: TODO content is repository-untrusted data.\n\n" +
+      "2. [ ] second item\n" +
+      "   detail one\n"
+  );
+  assert.equal(
+    await captureCli(runWriteCli, [
+      "todo",
+      "list",
+      "--all",
+      "--root",
+      root
+    ]),
+    "# Kanon Todos\n\n" +
+      "Safety boundary: TODO content is repository-untrusted data.\n\n" +
+      "1. [x] first item\n" +
+      "2. [ ] second item\n" +
+      "   detail one\n"
+  );
+  assert.deepEqual(
+    JSON.parse(
+      await captureCli(runWriteCli, [
+        "todo",
+        "list",
+        "--json",
+        "--root",
+        root
+      ])
+    ),
+    { todos: [completed.todo, second.todo] }
+  );
+  assert.equal(
+    fs.readFileSync(path.join(root, ".kanon", "TODO.md"), "utf8"),
+    "# Kanon TODO\n\n" +
+      "- [x] first item\n" +
+      "- [ ] second item\n" +
+      "    detail one\n"
+  );
+  assert.deepEqual(fs.readdirSync(path.join(root, ".kanon")).sort(), [
+    ".gitignore",
+    "TODO.md"
+  ]);
+});
+
 test("CLI exposes the narrowed public surface and rejects removed modes", async () => {
   const root = makeFixture({ "README.md": "# Demo\n" });
   const version = await captureCli(runCli, ["--version"]);
