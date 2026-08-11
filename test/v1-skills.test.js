@@ -196,6 +196,7 @@ test("resume uses the shared continuity engine and leaves the repository unchang
   const oldText = "# Prior purpose\n";
   const previous = {
     repo: { root: canonicalRealpath(root) },
+    historical_extension: { ignored_by_projection: true },
     generated_at: "2026-07-27T08:00:00.000Z",
     files: {
       fingerprints: [
@@ -246,6 +247,10 @@ test("resume uses the shared continuity engine and leaves the repository unchang
     "kanon-continuity-report-v1"
   );
   assert.equal(resumed.report.continuity.authority, "live");
+  assert.equal(
+    resumed.report.continuity.sources.checkpoint.status,
+    "Known"
+  );
   assert.ok(
     resumed.report.continuity.observations.changed.some(
       (item) => item.path === "README.md"

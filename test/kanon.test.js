@@ -243,6 +243,38 @@ test("malformed and partial configs use complete safe defaults", () => {
   );
 });
 
+test("legacy state schemas remain readable and normalize to version one", () => {
+  const root = makeFixture();
+  const states = [
+    {
+      repo: { root, historical_name: "versionless" },
+      historical_extension: { retained: true }
+    },
+    {
+      schema_version: 1,
+      repo: { root, historical_name: "explicit-version" },
+      historical_extension: ["retained"]
+    }
+  ];
+
+  for (const state of states) {
+    writeFixtureFile(
+      root,
+      ".kanon/STATE.json",
+      `${JSON.stringify(state)}\n`
+    );
+    const inspected = inspectPreviousState(root);
+
+    assert.equal(inspected.found, true);
+    assert.equal(inspected.valid, true);
+    assert.equal(inspected.warning, null);
+    assert.deepEqual(inspected.state, {
+      ...state,
+      schema_version: 1
+    });
+  }
+});
+
 test("malformed current-schema state warns and resume recovers", () => {
   const root = makeFixture({
     "README.md": "# Demo\n",
