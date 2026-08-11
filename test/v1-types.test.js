@@ -6,7 +6,10 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  COMPATIBILITY_WRITE_COMMANDS,
   collectRuntimeDependencies,
+  IMPLEMENTED_STABLE_SKILLS,
+  PUBLIC_COMMANDS,
   stableRuntimeArtifacts,
   stableRuntimeCanonicalSources
 } from "../scripts/lib/artifact-files.js";
@@ -221,6 +224,65 @@ test("shipped compatibility closure contains only explicit write consumers", () 
   }
 });
 
+test("public workflows have two exact shipped runtime closures", () => {
+  const stableEntrypoint = "src/v1/bin/kanon.js";
+  const continuityImport = packageManifest.imports?.["#kanon-continuity"];
+  assert.equal(continuityImport, "./src/continuity/engine.js");
+  const continuityEntrypoint = continuityImport.slice(2);
+  const writeEntrypoint = "bin/kanon-write.js";
+  const stableClosure = collectEntrypointClosure([
+    stableEntrypoint,
+    continuityEntrypoint
+  ]);
+  const writeClosure = collectEntrypointClosure([writeEntrypoint]);
+
+  assert.equal(stableClosure.length, 28);
+  assert.equal(writeClosure.length, 54);
+  assert.deepEqual(
+    stableClosure.filter((source) => writeClosure.includes(source)),
+    ["src/continuity/engine.js"]
+  );
+  assert.deepEqual(
+    Array.from(new Set([...stableClosure, ...writeClosure])).sort(),
+    stableRuntimeCanonicalSources(repoRoot)
+  );
+
+  const workflowClosures = new Map([
+    ...IMPLEMENTED_STABLE_SKILLS.map((command) => [
+      `stable/${command}`,
+      stableClosure
+    ]),
+    ...PUBLIC_COMMANDS.map((command) => [
+      `compatibility/${command}`,
+      COMPATIBILITY_WRITE_COMMANDS.includes(command)
+        ? writeClosure
+        : stableClosure
+    ])
+  ]);
+  assert.deepEqual(Array.from(workflowClosures.keys()), [
+    "stable/orient",
+    "stable/resume",
+    "stable/status",
+    "stable/verify",
+    "stable/steer",
+    "stable/aswitch",
+    "compatibility/ask",
+    "compatibility/brief",
+    "compatibility/refresh",
+    "compatibility/resume",
+    "compatibility/todo",
+    "compatibility/verify"
+  ]);
+  for (const [workflow, closure] of workflowClosures) {
+    const expected =
+      workflow === "compatibility/refresh" ||
+      workflow === "compatibility/todo"
+        ? writeClosure
+        : stableClosure;
+    assert.deepEqual(closure, expected, workflow);
+  }
+});
+
 test("release allowlist excludes type tooling and development metadata", () => {
   const output = fs.mkdtempSync(
     path.join(os.tmpdir(), "kanon-types-package-")
@@ -266,6 +328,17 @@ function assertNoUncheckedTypeEscapes(relative, source) {
       `${relative} must not use explicit any`
     );
   }
+}
+
+function collectEntrypointClosure(entries) {
+  return Array.from(
+    new Set(
+      entries.flatMap((entry) => [
+        entry,
+        ...collectRuntimeDependencies(repoRoot, entry)
+      ])
+    )
+  ).sort();
 }
 
 function listJavaScriptFiles(directory) {
