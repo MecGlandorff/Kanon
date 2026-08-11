@@ -42,7 +42,8 @@ test("dual-host manifests are separate and share skills plus one runtime root", 
   assert.equal(readJson("runtime/package.json").type, "module");
   assert.deepEqual(readJson("runtime/package.json").imports, {
     "#kanon-continuity": "./src/continuity/engine.js",
-    "#kanon-repository-inspect": "./repository/inspect.js"
+    "#kanon-repository-inspect": "./repository/inspect.js",
+    "#kanon-repository-read": "./repository/read.js"
   });
   assert.equal(fs.existsSync(path.join(repoRoot, "skills", "kanon", "runtime")), false);
   assert.equal(

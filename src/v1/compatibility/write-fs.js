@@ -2,13 +2,32 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  resolveContainedPath,
-  sanitizeFilenameComponent
-} from "../../path-security.js";
+  canonicalizeRepositoryRoot,
+  isSafeRelativePath,
+  resolveRepositoryPath
+} from "#kanon-repository-read";
 
 /**
- * @typedef {import("../../path-security.js").ContainedPathSuccess |
- *   (import("../../path-security.js").ContainedPathFailure & {
+ * @typedef {{
+ *   ok: true,
+ *   status: "ok",
+ *   root: string,
+ *   path: string,
+ *   relativePath: string,
+ *   stat: fs.Stats
+ * }} ContainedPathSuccess
+ * @typedef {{
+ *   ok: false,
+ *   status: "missing" | "outside-root" | "rejected" | "unreadable",
+ *   root: string | null,
+ *   path: string | null,
+ *   relativePath: string | null,
+ *   reason: string,
+ *   code: string
+ * }} ContainedPathFailure
+ * @typedef {ContainedPathSuccess | ContainedPathFailure} ContainedPathResult
+ * @typedef {ContainedPathSuccess |
+ *   (ContainedPathFailure & {
  *     status: "missing",
  *     path: string
  *   })} PreparedDestination
@@ -20,7 +39,7 @@ import {
  *   bytes: number,
  *   truncated: boolean,
  *   size: number
- * } | import("../../path-security.js").ContainedPathFailure | {
+ * } | ContainedPathFailure | {
  *   ok: false,
  *   status: "budget-exceeded",
  *   relativePath: string,
@@ -32,7 +51,7 @@ import {
 /**
  * @param {string} root
  * @param {string} relativePath
- * @returns {import("../../path-security.js").ContainedPathResult}
+ * @returns {ContainedPathResult}
  */
 export function ensureContainedDirectory(root, relativePath) {
   const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
@@ -81,9 +100,7 @@ export function atomicWriteContained(root, relativePath, contents) {
   const parentRelative = path.posix.dirname(
     relativePath.replaceAll("\\", "/")
   );
-  const tempName =
-    `.${sanitizeFilenameComponent(path.posix.basename(relativePath))}.` +
-    `${process.pid}.${crypto.randomUUID()}.tmp`;
+  const tempName = `.kanon.${process.pid}.${crypto.randomUUID()}.tmp`;
   const tempRelative = parentRelative === "."
     ? tempName
     : `${parentRelative}/${tempName}`;
@@ -267,7 +284,7 @@ export function listContainedDirectory(root, relativePath) {
  * @param {string} root
  * @param {string} relativePath
  * @param {{optional?: boolean}} [options]
- * @returns {import("../../path-security.js").ContainedPathResult}
+ * @returns {ContainedPathResult}
  */
 export function containedFileStat(root, relativePath, options = {}) {
   const result = resolveContainedPath(root, relativePath, { type: "file" });
@@ -313,6 +330,106 @@ function prepareDestination(root, relativePath) {
 }
 
 /**
+ * Adapt the shipped v1 repository path walk for fixed compatibility-write
+ * targets. Missing leaves are allowed only below a currently contained
+ * directory; all existing components retain the v1 link and reparse checks.
+ *
+ * @param {unknown} root
+ * @param {unknown} relativePath
+ * @param {{allowRoot?: boolean, type?: "file" | "directory"}} [policy]
+ * @returns {ContainedPathResult}
+ */
+function resolveContainedPath(root, relativePath, policy = {}) {
+  const canonicalRoot = resolveWriteRoot(root);
+  if (!canonicalRoot.ok) {
+    return canonicalRoot;
+  }
+  if (relativePath === "." && policy.allowRoot) {
+    return canonicalRoot;
+  }
+  if (!isSafeRelativePath(relativePath)) {
+    return pathFailure(
+      canonicalRoot.root,
+      typeof relativePath === "string" ? relativePath : null,
+      "Repository paths must be bounded relative paths.",
+      "INVALID_RELATIVE_PATH"
+    );
+  }
+  const normalized = String(relativePath)
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((part) => part && part !== ".")
+    .join("/");
+  const type = policy.type === "directory" ? "directory" : "file";
+  const existing = resolveRepositoryPath(canonicalRoot.root, normalized, type);
+  if (existing.ok) {
+    return {
+      ok: true,
+      status: "ok",
+      root: existing.root,
+      path: existing.path,
+      relativePath: existing.relative_path,
+      stat: existing.stat
+    };
+  }
+  if (existing.status !== "missing") {
+    return pathFailure(
+      canonicalRoot.root,
+      existing.relative_path,
+      existing.diagnostic,
+      "UNSAFE_PATH"
+    );
+  }
+  return {
+    ok: false,
+    status: "missing",
+    root: canonicalRoot.root,
+    path: path.join(canonicalRoot.root, ...normalized.split("/")),
+    relativePath: normalized,
+    reason: existing.diagnostic,
+    code: "PATH_MISSING"
+  };
+}
+
+/** @param {unknown} root @returns {ContainedPathResult} */
+function resolveWriteRoot(root) {
+  const result = canonicalizeRepositoryRoot(String(root), true);
+  if (!result.ok) {
+    return pathFailure(
+      null,
+      null,
+      result.diagnostic,
+      "ROOT_REALPATH_FAILED",
+      result.status
+    );
+  }
+  return {
+    ok: true,
+    status: "ok",
+    root: result.root,
+    path: result.path,
+    relativePath: result.relative_path,
+    stat: result.stat
+  };
+}
+
+/** @param {string | null} root @param {string | null} relativePath
+ * @param {string} reason @param {string} code
+ * @param {ContainedPathFailure["status"]} [status]
+ * @returns {ContainedPathFailure} */
+function pathFailure(root, relativePath, reason, code, status = "rejected") {
+  return {
+    ok: false,
+    status,
+    root,
+    path: null,
+    relativePath,
+    reason,
+    code
+  };
+}
+
+/**
  * @param {fs.Stats} before
  * @param {fs.Stats} after
  * @returns {boolean}
@@ -332,7 +449,7 @@ function fileIdentityChanged(before, after) {
 
 /**
  * @param {string} relativePath
- * @param {import("../../path-security.js").ContainedPathFailure} result
+ * @param {ContainedPathFailure} result
  */
 function pathError(relativePath, result) {
   return Object.assign(

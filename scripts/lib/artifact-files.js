@@ -37,7 +37,8 @@ export const COMPATIBILITY_WRITE_WORKFLOW_ENTRIES = Object.freeze({
   ]),
   todo: Object.freeze([
     COMPATIBILITY_RUNTIME_ARTIFACT[0],
-    "src/v1/compatibility/todo.js"
+    "src/v1/compatibility/todo.js",
+    "src/v1/repository/read.js"
   ])
 });
 

@@ -108,9 +108,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 39);
-  assert.equal(sources.length, 39);
-  assert.equal(new Set(targets).size, 39);
+  assert.equal(mappings.length, 38);
+  assert.equal(sources.length, 38);
+  assert.equal(new Set(targets).size, 38);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -206,8 +206,8 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
     .map(([source]) => source)
     .sort();
   assert.equal(routerClosure.length, 4);
-  assert.equal(todoClosure.length, 9);
-  assert.equal(refreshClosure.length, 15);
+  assert.equal(todoClosure.length, 10);
+  assert.equal(refreshClosure.length, 14);
   assert.deepEqual(
     Array.from(new Set([...refreshClosure, ...todoClosure]))
       .filter((source) => !V1_RUNTIME_ARTIFACTS.some(
@@ -226,12 +226,13 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
   for (const required of [
     "bin/kanon-write.js",
     "src/config.js",
-    "src/path-security.js",
     "src/trust.js",
     "src/v1/compatibility/cli.js",
     "src/v1/compatibility/todo.js",
     "src/v1/compatibility/todo-store.js",
-    "src/v1/compatibility/write-fs.js"
+    "src/v1/compatibility/write-fs.js",
+    "src/v1/core/trust.js",
+    "src/v1/repository/read.js"
   ]) {
     assert.equal(todoClosure.includes(required), true, required);
   }
@@ -243,6 +244,7 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
     "src/code-intel.js",
     "src/git-runner.js",
     "src/git.js",
+    "src/path-security.js",
     "src/persist.js",
     "src/readme.js",
     "src/render/brief.js",
@@ -307,6 +309,10 @@ test("public workflows have isolated stable, refresh, and todo closures", () => 
     packageManifest.imports?.["#kanon-repository-inspect"],
     "./src/v1/repository/inspect.js"
   );
+  assert.equal(
+    packageManifest.imports?.["#kanon-repository-read"],
+    "./src/v1/repository/read.js"
+  );
   const continuityEntrypoint = continuityImport.slice(2);
   const stableClosure = collectEntrypointClosure([
     stableEntrypoint,
@@ -332,7 +338,7 @@ test("public workflows have isolated stable, refresh, and todo closures", () => 
   );
   assert.deepEqual(
     stableClosure.filter((source) => todoClosure.includes(source)),
-    []
+    ["src/v1/core/trust.js", "src/v1/repository/read.js"]
   );
   assert.deepEqual(
     Array.from(

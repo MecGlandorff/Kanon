@@ -45,9 +45,10 @@ import { isBoundedString } from "../core/trust.js";
 
 /**
  * @param {unknown} input
+ * @param {boolean} [allowFilesystemRoot]
  * @returns {CanonicalRootResult}
  */
-export function canonicalizeRepositoryRoot(input) {
+export function canonicalizeRepositoryRoot(input, allowFilesystemRoot = false) {
   if (!isBoundedString(input, 8_192) || input.includes("\0")) {
     return {
       ok: false,
@@ -70,7 +71,7 @@ export function canonicalizeRepositoryRoot(input) {
     const stat = fs.statSync(root);
     if (
       !stat.isDirectory() ||
-      samePath(root, path.parse(root).root)
+      (!allowFilesystemRoot && samePath(root, path.parse(root).root))
     ) {
       return {
         ok: false,

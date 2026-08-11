@@ -6,7 +6,8 @@
   "type": "module",
   "imports": {
     "#kanon-continuity": "./src/continuity/engine.js",
-    "#kanon-repository-inspect": "./src/v1/repository/inspect.js"
+    "#kanon-repository-inspect": "./src/v1/repository/inspect.js",
+    "#kanon-repository-read": "./src/v1/repository/read.js"
   },
   "repository": {
     "type": "git",
