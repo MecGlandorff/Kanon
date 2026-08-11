@@ -315,6 +315,23 @@ test("package builder uses an exact production allowlist", () => {
   const publicManifest = JSON.parse(
     fs.readFileSync(path.join(output, "package.json"), "utf8")
   );
+  for (const entrypoint of [
+    "bin",
+    "browser",
+    "exports",
+    "main",
+    "module",
+    "types",
+    "typings"
+  ]) {
+    assert.equal(
+      Object.hasOwn(publicManifest, entrypoint),
+      false,
+      `published package must not advertise ${entrypoint}`
+    );
+  }
+  assert.equal(actual.includes("index.js"), false);
+  assert.equal(actual.includes("src/index.js"), false);
   assert.deepEqual(publicManifest.publishConfig, {
     access: "public",
     provenance: true,
