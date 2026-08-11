@@ -13,7 +13,8 @@ git archive --format=tar v1.0.0 -- \
   eval/results \
   eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5 \
   docs/v1-run-package-declarations-withdrawal.md \
-  docs/v1-run-d2e-trace-to-decision.md
+  docs/v1-run-d2e-trace-to-decision.md \
+  docs/v1-run-d2d-dual-docket-prep.md
 ```
 
 The v1.1 tree retains only compact records still used as characterization
@@ -37,11 +38,13 @@ raw payloads and frozen evidence records are archive-only:
   taxonomy;
 - the D.2D ranking evidence manifest (the compact ranking result remains for
   active analysis tooling);
+- the frozen D.2D dual-docket preparation record (the active builders,
+  schemas, compact result, and characterization tests remain in HEAD);
 - the all-candidate D.2E mechanism-analysis payload; and
 - the 84-file synthetic tabletop evidence packet, including its access
   ledgers, handoffs, predictions, traces, and frozen result records.
 
-This removal covers 204 files, 112,997,395 tracked bytes, and 29,991 physical
+This removal covers 205 files, 113,013,691 tracked bytes, and 30,341 physical
 lines as measured from the pre-removal working trees. It does not alter the
 active development corpus, runtime, published package, compact frozen
 summaries, or simulation characterization fixtures that current tests use.
