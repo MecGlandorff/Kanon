@@ -21,7 +21,7 @@ import { safeJsonStringify } from "../trust.js";
 import { VERSION } from "../version.js";
 import { helpText, parseArgs } from "./args.js";
 import { normalizeIo, writeStdout } from "./io.js";
-import { runWriteCommand } from "./write.js";
+import { runWriteCommand } from "../v1/compatibility/cli.js";
 
 /**
  * @param {string[]} [argv]

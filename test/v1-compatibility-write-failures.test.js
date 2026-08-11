@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { runWriteCli } from "../src/cli/write.js";
+import { runWriteCli } from "../src/v1/compatibility/cli.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
 import {
   inspectPreviousState,

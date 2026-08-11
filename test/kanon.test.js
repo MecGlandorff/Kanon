@@ -22,7 +22,7 @@ import {
   writeKanonOutputs
 } from "../src/index.js";
 import { runCli } from "../src/cli.js";
-import { runWriteCli } from "../src/cli/write.js";
+import { runWriteCli } from "../src/v1/compatibility/cli.js";
 import {
   captureCli,
   fileIdentity,

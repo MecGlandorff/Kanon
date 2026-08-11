@@ -108,9 +108,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 41);
-  assert.equal(sources.length, 41);
-  assert.equal(new Set(targets).size, 41);
+  assert.equal(mappings.length, 39);
+  assert.equal(sources.length, 39);
+  assert.equal(new Set(targets).size, 39);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -205,9 +205,9 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
   const shipped = compatibilityRuntimeArtifacts(repoRoot)
     .map(([source]) => source)
     .sort();
-  assert.equal(routerClosure.length, 6);
-  assert.equal(todoClosure.length, 11);
-  assert.equal(refreshClosure.length, 17);
+  assert.equal(routerClosure.length, 4);
+  assert.equal(todoClosure.length, 9);
+  assert.equal(refreshClosure.length, 15);
   assert.deepEqual(
     Array.from(new Set([...refreshClosure, ...todoClosure]))
       .filter((source) => !V1_RUNTIME_ARTIFACTS.some(
@@ -225,10 +225,10 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
   }
   for (const required of [
     "bin/kanon-write.js",
-    "src/cli/write.js",
     "src/config.js",
     "src/path-security.js",
     "src/trust.js",
+    "src/v1/compatibility/cli.js",
     "src/v1/compatibility/todo.js",
     "src/v1/compatibility/todo-store.js",
     "src/v1/compatibility/write-fs.js"
@@ -237,6 +237,9 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
   }
   for (const forbidden of [
     "src/analyze.js",
+    "src/cli/args.js",
+    "src/cli/io.js",
+    "src/cli/write.js",
     "src/code-intel.js",
     "src/git-runner.js",
     "src/git.js",
@@ -290,7 +293,7 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
       legacyStateModule
     );
   }
-  assert.deepEqual(lazyImportTargets("src/cli/write.js"), [
+  assert.deepEqual(lazyImportTargets("src/v1/compatibility/cli.js"), [
     "src/v1/compatibility/refresh.js",
     "src/v1/compatibility/todo.js"
   ]);
