@@ -31,8 +31,9 @@ export const COMPATIBILITY_RUNTIME_ARTIFACT = Object.freeze([
 export const COMPATIBILITY_WRITE_WORKFLOW_ENTRIES = Object.freeze({
   refresh: Object.freeze([
     COMPATIBILITY_RUNTIME_ARTIFACT[0],
-    "src/analyze.js",
-    "src/persist.js"
+    "src/v1/compatibility/refresh.js",
+    "src/v1/repository/inspect.js",
+    "src/continuity/engine.js"
   ]),
   todo: Object.freeze([
     COMPATIBILITY_RUNTIME_ARTIFACT[0],
@@ -58,6 +59,7 @@ export function generatedExtensionlessWrappers() {
 }
 
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
+  ["src/continuity/engine.js", "runtime/src/continuity/engine.js"],
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
   ["src/v1/adapters/codex.js", "runtime/adapters/codex.js"],
   ["src/v1/adapters/shared.js", "runtime/adapters/shared.js"],
@@ -148,7 +150,11 @@ export function compatibilityRuntimeArtifacts(repoRoot) {
       }
     }
   }
+  const stableSources = new Set(
+    V1_RUNTIME_ARTIFACTS.map(([source]) => source)
+  );
   return Array.from(sources)
+    .filter((source) => !stableSources.has(source))
     .sort()
     .map((source) => [source, `runtime/${source}`]);
 }

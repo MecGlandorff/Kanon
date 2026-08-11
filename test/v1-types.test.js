@@ -13,7 +13,8 @@ import {
   IMPLEMENTED_STABLE_SKILLS,
   PUBLIC_COMMANDS,
   stableRuntimeArtifacts,
-  stableRuntimeCanonicalSources
+  stableRuntimeCanonicalSources,
+  V1_RUNTIME_ARTIFACTS
 } from "../scripts/lib/artifact-files.js";
 
 const repoRoot = path.resolve(
@@ -107,9 +108,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 81);
-  assert.equal(sources.length, 81);
-  assert.equal(new Set(targets).size, 81);
+  assert.equal(mappings.length, 41);
+  assert.equal(sources.length, 41);
+  assert.equal(new Set(targets).size, 41);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -206,9 +207,13 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
     .sort();
   assert.equal(routerClosure.length, 6);
   assert.equal(todoClosure.length, 11);
-  assert.equal(refreshClosure.length, 53);
+  assert.equal(refreshClosure.length, 17);
   assert.deepEqual(
-    Array.from(new Set([...refreshClosure, ...todoClosure])).sort(),
+    Array.from(new Set([...refreshClosure, ...todoClosure]))
+      .filter((source) => !V1_RUNTIME_ARTIFACTS.some(
+        ([stableSource]) => stableSource === source
+      ))
+      .sort(),
     shipped
   );
   if (process.platform !== "win32") {
@@ -252,8 +257,24 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
   );
   assert.equal(routerClosure.includes("src/analyze.js"), false);
   assert.equal(routerClosure.includes("src/persist.js"), false);
-  assert.equal(refreshClosure.includes("src/analyze.js"), true);
-  assert.equal(refreshClosure.includes("src/persist.js"), true);
+  assert.equal(refreshClosure.includes("src/analyze.js"), false);
+  assert.equal(refreshClosure.includes("src/persist.js"), false);
+  assert.equal(
+    refreshClosure.includes("src/v1/compatibility/refresh.js"),
+    true
+  );
+  assert.equal(
+    refreshClosure.includes("src/v1/repository/inspect.js"),
+    true
+  );
+  assert.equal(
+    refreshClosure.some((source) =>
+      /^(?:src\/(?:analyze|code-intel|render|scanner|verify)(?:\/|\.js$)|src\/(?:evidence|git-runner|git|persist|readme)\.js$)/.test(
+        source
+      )
+    ),
+    false
+  );
   assert.equal(
     refreshClosure.includes("src/v1/compatibility/state.js"),
     true
@@ -270,8 +291,7 @@ test("shipped compatibility runtime isolates compact write workflows", () => {
     );
   }
   assert.deepEqual(lazyImportTargets("src/cli/write.js"), [
-    "src/analyze.js",
-    "src/persist.js",
+    "src/v1/compatibility/refresh.js",
     "src/v1/compatibility/todo.js"
   ]);
 });
@@ -280,6 +300,10 @@ test("public workflows have isolated stable, refresh, and todo closures", () => 
   const stableEntrypoint = "src/v1/bin/kanon.js";
   const continuityImport = packageManifest.imports?.["#kanon-continuity"];
   assert.equal(continuityImport, "./src/continuity/engine.js");
+  assert.equal(
+    packageManifest.imports?.["#kanon-repository-inspect"],
+    "./src/v1/repository/inspect.js"
+  );
   const continuityEntrypoint = continuityImport.slice(2);
   const stableClosure = collectEntrypointClosure([
     stableEntrypoint,
@@ -295,7 +319,13 @@ test("public workflows have isolated stable, refresh, and todo closures", () => 
   assert.equal(stableClosure.length, 28);
   assert.deepEqual(
     stableClosure.filter((source) => refreshClosure.includes(source)),
-    ["src/continuity/engine.js"]
+    [
+      "src/continuity/engine.js",
+      "src/v1/core/trust.js",
+      "src/v1/repository/git.js",
+      "src/v1/repository/inspect.js",
+      "src/v1/repository/read.js"
+    ]
   );
   assert.deepEqual(
     stableClosure.filter((source) => todoClosure.includes(source)),

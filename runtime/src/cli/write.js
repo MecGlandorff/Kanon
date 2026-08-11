@@ -55,12 +55,10 @@ export async function runWriteCommand(root, parsed, io) {
     throw new Error("Compatibility write command was unavailable.");
   }
 
-  const [{ analyzeRepo }, { writeKanonOutputs }] = await Promise.all([
-    import("../analyze.js"),
-    import("../persist.js")
-  ]);
-  const analysis = analyzeRepo(root);
-  const result = writeKanonOutputs(analysis, {
+  const { refreshKanon } = await import(
+    "../v1/compatibility/refresh.js"
+  );
+  const result = refreshKanon(root, {
     deep: parsed.flags.deep
   });
   writeStdout(

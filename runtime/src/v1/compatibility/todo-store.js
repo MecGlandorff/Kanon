@@ -101,14 +101,11 @@ export function addKanonTodo(root, text) {
   if (Buffer.byteLength(next) > config.inputs.max_todo_bytes) {
     throw new Error("TODO.md would exceed its configured input limit.");
   }
-  atomicWriteContained(root, ".kanon/TODO.md", next);
-  const todos = readKanonTodos(root, {
-    maxBytes: config.inputs.max_todo_bytes
-  });
-  const added = todos[todos.length - 1];
+  const added = parseKanonTodoMarkdown(next).at(-1);
   if (!added) {
-    throw new Error("TODO.md was written but the added item was unavailable.");
+    throw new Error("The bounded TODO payload was unavailable.");
   }
+  atomicWriteContained(root, ".kanon/TODO.md", next);
   return {
     path: ".kanon/TODO.md",
     todo: added

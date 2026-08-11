@@ -5,7 +5,8 @@
   "description": "Evidence-backed repo continuity skill runtime for Codex and Claude Code.",
   "type": "module",
   "imports": {
-    "#kanon-continuity": "./src/continuity/engine.js"
+    "#kanon-continuity": "./src/continuity/engine.js",
+    "#kanon-repository-inspect": "./src/v1/repository/inspect.js"
   },
   "repository": {
     "type": "git",
