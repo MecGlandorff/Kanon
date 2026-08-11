@@ -16,12 +16,12 @@ import {
   ensureContainedDirectory,
   listContainedDirectory,
   readContainedText
-} from "./persistence/safe-fs.js";
+} from "./v1/compatibility/write-fs.js";
 import {
   inspectPreviousHandoff,
   inspectPreviousState,
   validatePersistedState
-} from "./persistence/state.js";
+} from "./v1/compatibility/state.js";
 import {
   safeJsonStringify
 } from "./trust.js";

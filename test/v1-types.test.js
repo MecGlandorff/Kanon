@@ -107,9 +107,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = stableRuntimeCanonicalSources(repoRoot);
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 83);
-  assert.equal(sources.length, 83);
-  assert.equal(new Set(targets).size, 83);
+  assert.equal(mappings.length, 81);
+  assert.equal(sources.length, 81);
+  assert.equal(new Set(targets).size, 81);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))
@@ -191,7 +191,7 @@ test("typed compatibility routes retain the approved public surface", () => {
   }
 });
 
-test("shipped compatibility runtime isolates the compact todo workflow", () => {
+test("shipped compatibility runtime isolates compact write workflows", () => {
   const routerClosure = collectEntrypointClosure([
     COMPATIBILITY_WRITE_WORKFLOW_ENTRIES.todo[0]
   ]);
@@ -206,7 +206,7 @@ test("shipped compatibility runtime isolates the compact todo workflow", () => {
     .sort();
   assert.equal(routerClosure.length, 6);
   assert.equal(todoClosure.length, 11);
-  assert.equal(refreshClosure.length, 55);
+  assert.equal(refreshClosure.length, 53);
   assert.deepEqual(
     Array.from(new Set([...refreshClosure, ...todoClosure])).sort(),
     shipped
@@ -254,6 +254,21 @@ test("shipped compatibility runtime isolates the compact todo workflow", () => {
   assert.equal(routerClosure.includes("src/persist.js"), false);
   assert.equal(refreshClosure.includes("src/analyze.js"), true);
   assert.equal(refreshClosure.includes("src/persist.js"), true);
+  assert.equal(
+    refreshClosure.includes("src/v1/compatibility/state.js"),
+    true
+  );
+  for (const legacyStateModule of [
+    "src/persistence/safe-fs.js",
+    "src/persistence/state-fields.js",
+    "src/persistence/state.js"
+  ]) {
+    assert.equal(
+      refreshClosure.includes(legacyStateModule),
+      false,
+      legacyStateModule
+    );
+  }
   assert.deepEqual(lazyImportTargets("src/cli/write.js"), [
     "src/analyze.js",
     "src/persist.js",
