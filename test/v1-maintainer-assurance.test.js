@@ -99,9 +99,11 @@ test("archive-only evidence retains its exact frozen bindings", () => {
     "eval/results/d2b-predeclared-taxonomy.json";
   const d2dRankingManifest =
     "eval/results/d2d-ranking-1f2ba552/evidence-manifest.json";
+  const d2eTraceDecision = "docs/v1-run-d2e-trace-to-decision.md";
   const archived = [
     d2bTaxonomy,
     d2dRankingManifest,
+    d2eTraceDecision,
     "docs/v1-run-package-declarations-withdrawal.md",
     "eval/results/development-0.4.0-rc.1-d2b-7da293a5.json",
     "eval/results/post-correction-evidence-sha256-" +
@@ -132,6 +134,13 @@ test("archive-only evidence retains its exact frozen bindings", () => {
       repoRoot,
       d2dRankingManifest,
       "4dbb12cca8020fd17020cb22c274d7b544242767ac81c10a4c381e0f2818e401"
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2eTraceDecision,
+      "7f44faf8c2cc610cbb13b6485735f7b95ffec14f14fef67e53946ae5e9ea007a"
     )
   );
   assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));
