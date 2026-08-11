@@ -596,7 +596,7 @@ function assertContainedFile(repoRoot, relative, digest) {
   );
 }
 
-function assertArchivedEvidenceFile(repoRoot, relative, digest) {
+export function assertArchivedEvidenceFile(repoRoot, relative, digest) {
   expect(
     typeof relative === "string" &&
       relative.length > 0 &&

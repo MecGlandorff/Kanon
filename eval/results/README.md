@@ -25,12 +25,13 @@ raw payloads are archive-only:
 - 30 post-correction traces, the paired raw reports, and their intermediate
   manifests;
 - the candidate-level post-correction comparison and evaluation payloads;
-- the failed D.2B raw development report;
+- the failed D.2B raw development report and its case/path predeclared
+  taxonomy;
 - the all-candidate D.2E mechanism-analysis payload; and
 - the 84-file synthetic tabletop evidence packet, including its access
   ledgers, handoffs, predictions, traces, and frozen result records.
 
-This removal covers 200 files, 112,971,317 tracked bytes, and 29,463 physical
+This removal covers 201 files, 112,979,354 tracked bytes, and 29,626 physical
 lines as measured from the pre-removal working trees. It does not alter the
 active development corpus, runtime, published package, compact frozen
 summaries, or simulation characterization fixtures that current tests use.

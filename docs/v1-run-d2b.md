@@ -2,10 +2,10 @@
 
 Date: 2026-07-29
 
-Archive note for v1.1.0: the 218,211-byte raw report is no longer duplicated
-in the maintained tree. Its exact blob remains at
-`v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`; the compact
-rendering and the findings below remain current-tree records. See the
+Archive note for v1.1.0: the 218,211-byte raw report and 8,037-byte case/path
+taxonomy are no longer duplicated in the maintained tree. Their exact blobs
+remain at their original paths in `v1.0.0`; the compact rendering and the
+findings below remain current-tree records. See the
 [historical evaluation archive](../eval/results/README.md) for retrieval.
 
 Scope: one generic deterministic product correction followed by exactly one
@@ -33,10 +33,11 @@ targets.
 
 ## Pre-edit failure taxonomy
 
-The exhaustive case/path mapping is evaluation-only data in
-`eval/results/d2b-predeclared-taxonomy.json`. The production-facing taxonomy is
-anonymized here. Counts are disjoint within each table and reconcile to every
-D.2A error in scope.
+The exhaustive evaluation-only case/path mapping is archived at
+`v1.0.0:eval/results/d2b-predeclared-taxonomy.json`, SHA-256
+`c266146f2282d777bd87d2ba5beaa30fecf6281b5618dc77074101e091fd2c33`.
+The production-facing taxonomy is anonymized here. Counts are disjoint within
+each table and reconcile to every D.2A error in scope.
 
 ### Important-file false positives
 
@@ -172,6 +173,8 @@ regenerated into runtime mirrors only through `npm run build:skill`.
 | Raw report | `v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json` (archive-only) |
 | Raw report SHA-256 | `e1c69f8f443e8dcd8ebf75abf7ce15e01029ed979d409ec356070c05afa0fbde` |
 | Raw report bytes | 218,211 |
+| Predeclared taxonomy | `v1.0.0:eval/results/d2b-predeclared-taxonomy.json` (archive-only) |
+| Predeclared taxonomy SHA-256 | `c266146f2282d777bd87d2ba5beaa30fecf6281b5618dc77074101e091fd2c33` |
 | Development executions in D.2B | exactly one |
 
 The cache was the existing immutable local development cache. The invocation

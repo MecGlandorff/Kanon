@@ -13,6 +13,7 @@ import {
   PRODUCTION_ARTIFACT_SHA256,
   RISK_IDS,
   WAIVER_RISK_IDS,
+  assertArchivedEvidenceFile,
   assertMaintainerPath,
   deriveMaintainerConclusion,
   loadCanonicalJson,
@@ -94,7 +95,10 @@ test("maintainer namespace is separate and excluded from production", () => {
 });
 
 test("archive-only evidence retains its exact frozen bindings", () => {
+  const d2bTaxonomy =
+    "eval/results/d2b-predeclared-taxonomy.json";
   const archived = [
+    d2bTaxonomy,
     "eval/results/development-0.4.0-rc.1-d2b-7da293a5.json",
     "eval/results/post-correction-evidence-sha256-" +
       "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
@@ -112,6 +116,13 @@ test("archive-only evidence retains its exact frozen bindings", () => {
   for (const relative of archived) {
     assert.equal(fs.existsSync(path.join(repoRoot, relative)), false, relative);
   }
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2bTaxonomy,
+      "c266146f2282d777bd87d2ba5beaa30fecf6281b5618dc77074101e091fd2c33"
+    )
+  );
   assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));
 });
 
