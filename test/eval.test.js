@@ -557,6 +557,15 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
     )),
     true
   );
+  const artifactAnalyzer = path.join(
+    artifactRoot,
+    "runtime",
+    "src",
+    "v1",
+    "evaluation",
+    "analyze.js"
+  );
+  assert.equal(fs.existsSync(artifactAnalyzer), true);
   fs.mkdirSync(cacheRoot);
   const item = corpus.cases[0];
   const cached = path.join(
@@ -618,6 +627,59 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
   assert.equal(report.artifact.conformance.passed, true);
   assert.equal(report.results.length, 1);
   assert.equal(report.results[0].analysis_error, null);
+
+  const analysisRoot = path.join(root, "trace-analysis-root");
+  const traceDirectory = path.join(root, "trace-output");
+  fs.mkdirSync(path.join(analysisRoot, "src"), { recursive: true });
+  fs.mkdirSync(traceDirectory);
+  fs.writeFileSync(
+    path.join(analysisRoot, "README.md"),
+    "# Artifact trace fixture\n"
+  );
+  fs.writeFileSync(
+    path.join(analysisRoot, "package.json"),
+    JSON.stringify({
+      name: "artifact-trace-fixture",
+      main: "src/main.js",
+      scripts: { test: "node --test" }
+    })
+  );
+  fs.writeFileSync(
+    path.join(analysisRoot, "src", "main.js"),
+    "export const main = true;\n"
+  );
+  const traceBinding = {
+    protocolSha256: "a".repeat(64),
+    traceSourceCommit: head.stdout.trim(),
+    artifactSha256: sha256File(tarball),
+    corpusSha256: corpus._manifest.sha256,
+    caseId: "fixture/artifact-trace",
+    revision: "b".repeat(40),
+    ordinal: 1
+  };
+  const traced = analyzeCase(
+    artifactAnalyzer,
+    analysisRoot,
+    {
+      id: traceBinding.caseId,
+      revision: traceBinding.revision
+    },
+    20_000,
+    {
+      output_directory: traceDirectory,
+      file_name: "case-001.json",
+      binding: traceBinding
+    }
+  );
+  assert.equal(traced.ranking_trace.status, "written");
+  assert.equal(traced.ranking_trace.complete, true);
+  assert.equal(traced.state.important_files.length <= 5, true);
+  const persistedTrace = readJson(path.join(traceDirectory, "case-001.json"));
+  assert.equal(persistedTrace.completeness.complete, true);
+  assert.deepEqual(
+    persistedTrace.predictions.important_files,
+    traced.state.important_files.map((file) => file.path)
+  );
 
   const substitutedRoot = path.join(root, "substituted-root");
   fs.mkdirSync(substitutedRoot);

@@ -5,11 +5,12 @@ It targets conventional JavaScript/TypeScript, Python, Go, and Rust layouts.
 
 Today it can:
 
-- read local imports and rank files by fan-in;
-- find content-backed entrypoints such as Python `__main__`, Go/Rust `main`,
-  package binaries, and JavaScript executables;
-- extract commands from package metadata, build targets, selected contributor
-  documentation, and conventional Cargo, Go, and Django layouts;
+- read bounded JavaScript/TypeScript and Python imports and rank files by
+  fan-in;
+- find content-backed entrypoints such as Python `__main__`, package binaries,
+  and JavaScript executables;
+- extract directly declared commands from package metadata, Python project
+  scripts, and bounded Poe, Make, and Just targets;
 - detect direct README/package-script contradictions and report unobserved
   Node or Python targets as Unknown;
 - report whether conventional CI and deployment configuration was found.
@@ -18,6 +19,11 @@ Kanon does not execute repository code or prove that a detected command will
 succeed in the user's environment. Explicit configuration is **Known**;
 documented or conventional inference is **Likely**; absence remains
 **Unknown**.
+
+The v1.1 compatibility refresh intentionally does not synthesize conventional
+Cargo, Go, or Django commands or project Go/Rust import and entrypoint code
+intelligence. Their manifests and paths can still be observed as bounded
+repository evidence.
 
 The visible 30-repository corpus is development and regression data. Its
 results are in-sample and are not presented as performance on unseen

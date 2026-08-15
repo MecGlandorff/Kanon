@@ -250,7 +250,7 @@ function verifyDocumentation(inspection, target) {
         "The requested documentation was not observed; this is not a contradiction.",
         repository_value: repositoryIdentifier(target, 4_096)
     });
-    if (!inspection.evidence_complete) {
+    if (!inspection.coverage.complete) {
       diagnostics.push(
         "Incomplete evidence prevents a documentation-absence conclusion."
       );
@@ -305,7 +305,7 @@ function verifyDocumentation(inspection, target) {
       });
     }
   }
-  if (!inspection.evidence_complete) {
+  if (!inspection.coverage.complete) {
     diagnostics.push(
       "Incomplete, excluded, unreadable, or bounded evidence prevents absence conclusions."
     );
@@ -322,7 +322,7 @@ function verifyDocumentation(inspection, target) {
     status:
       contradictions.length > 0
         ? "Stale"
-        : !inspection.evidence_complete ||
+        : !inspection.coverage.complete ||
             nonObservations.length > 0 ||
             claimsTruncated
           ? "Unknown"
@@ -386,7 +386,7 @@ function verifyGeneratedArtifacts(inspection) {
   }
   compareGeneratedMetadata(inspection, contradictions, nonObservations);
   const incomplete =
-    !inspection.evidence_complete ||
+    !inspection.coverage.complete ||
     nonObservations.length > 0 ||
     compared === 0;
   const contradictionsTruncated =

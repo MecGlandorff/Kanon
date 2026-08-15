@@ -28,6 +28,9 @@ export const COMPATIBILITY_RUNTIME_ARTIFACT = Object.freeze([
   "runtime/bin/kanon-write.js"
 ]);
 
+export const EVALUATION_RUNTIME_ENTRY =
+  "src/v1/evaluation/analyze.js";
+
 export const COMPATIBILITY_WRITE_WORKFLOW_ENTRIES = Object.freeze({
   refresh: Object.freeze([
     COMPATIBILITY_RUNTIME_ARTIFACT[0],
@@ -142,7 +145,13 @@ export function collectRuntimeDependencies(
  * @returns {[string, string][]}
  */
 export function compatibilityRuntimeArtifacts(repoRoot) {
-  const sources = new Set();
+  const sources = new Set([EVALUATION_RUNTIME_ENTRY]);
+  for (const dependency of collectRuntimeDependencies(
+    repoRoot,
+    EVALUATION_RUNTIME_ENTRY
+  )) {
+    sources.add(dependency);
+  }
   for (const entries of Object.values(COMPATIBILITY_WRITE_WORKFLOW_ENTRIES)) {
     for (const entry of entries) {
       sources.add(entry);

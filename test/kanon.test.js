@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -677,10 +678,10 @@ test("compatibility refresh enforces configured file limits", async () => {
 
 test("review regressions: stable inspection preserves receipt semantics", () => {
   const root = makeFixture({
-    ".kanonignore": "coverage..json\n",
+    ".kanonignore": "ignored.json\n",
     ".env.example": "SAFE_TEMPLATE=true\n",
     "README.md": "# Receipt fixture\n",
-    "coverage..json": "{}\n",
+    "ignored.json": "{}\n",
     "src/index.js": "export const value = true;\n"
   });
   const initialized = initializeGit(root);
@@ -705,10 +706,68 @@ test("review regressions: stable inspection preserves receipt semantics", () => 
     false
   );
   assert.equal(
-    orient.files.some((file) => file.path === "coverage..json"),
+    orient.files.some((file) => file.path === "ignored.json"),
     false
   );
   assert.equal(orient.evidence_fingerprint, verify.evidence_fingerprint);
+});
+
+test("review regressions: stable and compatibility ignore policies remain distinct", async () => {
+  const stableRoot = makeFixture({
+    ".kanonignore": "!README.md\n",
+    "README.md": "# Stable fail-closed fixture\n"
+  });
+  const stable = inspectRepository(
+    stableRoot,
+    "inspect README.md",
+    { profile: "orient" }
+  );
+  assert.equal(stable.ok, true);
+  if (!stable.ok) return;
+  assert.equal(stable.files.length, 0);
+  assert.equal(stable.coverage.complete, false);
+  assert.equal(stable.coverage.budgets_reached.includes("invalid_ignore_rules"), true);
+
+  const compatibilityConfig = structuredClone(DEFAULT_CONFIG);
+  compatibilityConfig.scan.respect_git_ignore = false;
+  const compatibilityRoot = makeFixture({
+    ".kanon/config.json": `${JSON.stringify(compatibilityConfig)}\n`,
+    ".kanonignore": "README.md\n!README.md\ncoverage..json\n",
+    "README.md": "# Compatibility negation fixture\n",
+    "coverage..json": "{}\n"
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", compatibilityRoot]);
+  const compatibility = readJson(
+    path.join(compatibilityRoot, ".kanon", "STATE.json")
+  );
+  const paths = compatibility.files.fingerprints.map((file) => file.path);
+  assert.equal(compatibility.scan.complete, true);
+  assert.equal(paths.includes("README.md"), true);
+  assert.equal(paths.includes("coverage..json"), false);
+
+  const instructionText = `${"A".repeat(9_000)}\n`;
+  const instructionRoot = makeFixture({
+    "AGENTS.md": instructionText,
+    "README.md": "# Bounded instruction fixture\n"
+  });
+  const instructionInspection = inspectRepository(
+    instructionRoot,
+    "inspect AGENTS.md",
+    { profile: "orient" }
+  );
+  assert.equal(instructionInspection.ok, true);
+  if (!instructionInspection.ok) return;
+  const instruction = instructionInspection.instructions.find(
+    (item) => item.path === "AGENTS.md"
+  );
+  assert.ok(instruction);
+  assert.equal(
+    instruction.sha256,
+    crypto.createHash("sha256")
+      .update(Buffer.from(instructionText).subarray(0, 8 * 1024))
+      .digest("hex")
+  );
+  assert.equal(instruction.truncated, true);
 });
 
 test("review regressions: compatibility refresh retains bounded public facts", async () => {
@@ -844,6 +903,139 @@ test("review regressions: compatibility refresh retains bounded public facts", a
   const skillState = readJson(path.join(skillRoot, ".kanon", "STATE.json"));
   assert.equal(skillState.purpose.claim, "Skill-only compatibility purpose");
   assert.equal(skillState.verification.applicable, false);
+});
+
+test("compatibility refresh preserves semantic priority and root README scope", async () => {
+  const budgetConfig = structuredClone(DEFAULT_CONFIG);
+  budgetConfig.scan.max_total_text_bytes = 1_024;
+  budgetConfig.scan.respect_git_ignore = false;
+  const budgetRoot = makeFixture({
+    ".kanon/config.json": `${JSON.stringify(budgetConfig)}\n`,
+    "README.md": `# Budgeted README purpose\n\n${"R".repeat(820)}\n`,
+    "package.json": JSON.stringify({
+      name: "budget-fixture",
+      padding: "P".repeat(320)
+    })
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", budgetRoot]);
+  const budgetState = readJson(path.join(budgetRoot, ".kanon", "STATE.json"));
+  assert.equal(budgetState.purpose.claim, "Budgeted README purpose");
+  assert.equal(
+    budgetState.scan.budgets_reached.includes("max_total_text_bytes"),
+    true
+  );
+
+  const nestedRoot = makeFixture({
+    "docs/README.md": "# Nested component purpose\n"
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", nestedRoot]);
+  const nestedState = readJson(path.join(nestedRoot, ".kanon", "STATE.json"));
+  assert.equal(nestedState.purpose.confidence, "unknown");
+  assert.equal(nestedState.verification.target, "README.md");
+  assert.equal(nestedState.verification.checked, false);
+  assert.equal(nestedState.verification.unknowns[0].type, "missing_readme");
+});
+
+test("compatibility refresh downgrades claims beyond retained evidence", async () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.persistence.max_evidence_records = 2;
+  const existingRecord = {
+    id: "e_existing_001",
+    kind: "metadata",
+    path: "prior.json",
+    claim: "Previously retained evidence.",
+    trust: "repository-untrusted"
+  };
+  const root = makeFixture({
+    ".kanon/config.json": `${JSON.stringify(config)}\n`,
+    ".kanon/EVIDENCE.jsonl": `${JSON.stringify(existingRecord)}\n`,
+    "README.md": "# Retention fixture\n\nRun `npm run missing`.\n",
+    "package.json": JSON.stringify({
+      name: "retention-fixture",
+      description: "Retention-backed purpose",
+      scripts: {
+        start: "node src/main.js",
+        test: "node --test"
+      }
+    }),
+    "Dockerfile": "FROM scratch\n",
+    "src/main.js": "// TODO: retained boundary\n"
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+  const ledger = fs.readFileSync(
+    path.join(root, ".kanon", "EVIDENCE.jsonl"),
+    "utf8"
+  ).trim().split("\n").map((line) => JSON.parse(line));
+
+  assert.equal(state.evidence_count, 1);
+  assert.equal(ledger.length, 2);
+  assert.equal(state.purpose.claim, "Retention-backed purpose");
+  assert.equal(state.deployment.found, false);
+  assert.equal(state.verification.issues.length, 0);
+  assert.equal(
+    state.current_state.unknown.some((item) =>
+      /evidence retention/.test(`${item.claim} ${item.reason || ""}`)
+    ),
+    true
+  );
+  for (const claim of [
+    ...state.current_state.known,
+    ...state.current_state.likely,
+    ...state.current_state.stale_suspicious
+  ]) {
+    if (claim.trust === "repository-untrusted") {
+      assert.equal(claim.evidence?.filter(Boolean).length > 0, true);
+    }
+  }
+  for (const command of Object.values(state.commands).flat()) {
+    if (command.confidence !== "unknown") {
+      assert.equal(command.evidence.filter(Boolean).length > 0, true);
+    }
+  }
+});
+
+test("important-file ranking reserves measured entrypoints and fan-in", async () => {
+  const root = makeFixture({
+    "AGENTS.md": "root instruction\n",
+    "CLAUDE.md": "host instruction\n",
+    "CONTRIBUTING.md": "contribution instruction\n",
+    ".github/copilot-instructions.md": "copilot instruction\n",
+    "README.md": "# Ranking fixture\n",
+    "README.mdx": "# MDX fixture\n",
+    "README.rst": "RST fixture\n",
+    "README.adoc": "= AsciiDoc fixture\n",
+    "README.txt": "Text fixture\n",
+    "README": "Plain fixture\n",
+    "package.json": JSON.stringify({
+      name: "ranking-fixture",
+      main: "src/main.js"
+    }),
+    "pyproject.toml": "[project]\nname = \"ranking-fixture\"\n",
+    "Cargo.toml": "[package]\nname = \"ranking-fixture\"\n",
+    "go.mod": "module example.invalid/ranking\n",
+    "Makefile": "build:\n\t@true\n",
+    "CHANGELOG.md": "# Changes\n",
+    "RELEASING.md": "# Releasing\n",
+    "src/main.js": "import './shared.js';\n",
+    "src/a.js": "import './shared.js';\n",
+    "src/b.js": "import './shared.js';\n",
+    "src/c.js": "import './shared.js';\n",
+    "src/shared.js": "export const shared = true;\n"
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+  assert.equal(state.important_files.length <= 16, true);
+  assert.equal(
+    state.important_files.some((file) => file.path === "src/main.js"),
+    true
+  );
+  assert.equal(
+    state.important_files.some((file) =>
+      file.path === "src/shared.js" && file.fan_in === 4
+    ),
+    true
+  );
 });
 
 test("repository inspection exposes compatibility filesystem-root policy", () => {

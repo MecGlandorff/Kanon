@@ -39,12 +39,19 @@ import {
   inspectKanonTodos,
   writeKanonGitignore
 } from "./todo-store.js";
-const MAX_EVIDENCE_RECORDS = 40;
 const MAX_RENDERED_EXCERPT_BYTES = 240;
 const MAX_TODO_OBSERVATIONS = 40;
 const MAX_CODE_OBSERVATIONS = 20;
 const MAX_COMMANDS_PER_GROUP = 8;
 const MAX_VERIFICATION_COMMANDS = 64;
+const ROOT_README_NAMES = Object.freeze([
+  "readme.md",
+  "readme.mdx",
+  "readme.rst",
+  "readme.adoc",
+  "readme.txt",
+  "readme"
+]);
 /**
  * @typedef {Extract<ReturnType<typeof inspectRepository>, {ok: true}>}
  *   Inspection
@@ -59,8 +66,13 @@ const MAX_VERIFICATION_COMMANDS = 64;
  * @typedef {{
  *   runId: string,
  *   records: EvidenceRecord[],
- *   byClaim: Map<string, string>
+ *   byClaim: Map<string, string>,
+ *   maxRecords: number,
+ *   maxBytes: number,
+ *   bytes: number,
+ *   truncated: boolean
  * }} EvidenceContext
+ * @typedef {{maxRecords: number, maxBytes: number}} EvidenceRetention
  * @typedef {{
  *   claim: string,
  *   reason?: string,
@@ -142,23 +154,28 @@ function prepareRefreshAnalysis(root, options = {}) {
   if (!inspection.ok) {
     throw new Error(inspection.diagnostic);
   }
+  const evidenceRetention = availableEvidenceRetention(
+    inspection.root,
+    configInspection.config.persistence
+  );
   return {
     analysis: buildRefreshAnalysis(
       inspection,
       configInspection,
-      options.runId
+      options.runId,
+      evidenceRetention
     ),
     config: configInspection.config
   };
 }
-/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection @param {string | undefined} requestedRunId */
-function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
+/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection @param {string | undefined} requestedRunId @param {EvidenceRetention} evidenceRetention */
+function buildRefreshAnalysis(inspection, configInspection, requestedRunId, evidenceRetention) {
   const generatedAt = new Date().toISOString();
   const runId = typeof requestedRunId === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9-]{13,63}$/.test(requestedRunId)
     ? requestedRunId
     : createRunId(generatedAt);
-  const evidence = createEvidenceContext(inspection, runId);
+  const evidence = createEvidenceContext(runId, evidenceRetention);
   const texts = repositoryInspectionTexts(inspection);
   const packageInfo = readPackageEvidence(texts);
   const pyprojectInfo = readPyprojectEvidence(texts);
@@ -201,7 +218,7 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
           testPaths[0],
           "test",
           `${testPaths.length} test-like file(s) found.`
-        )]
+        )].filter(Boolean)
       : declaredTest
         ? commands.test[0]?.evidence || []
         : pytest && pythonTest.path
@@ -210,7 +227,7 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
               pythonTest.path,
               "test",
               "Pytest configuration or dependency evidence was observed."
-            )]
+            )].filter(Boolean)
           : []
   };
   const ci = projectSignal(
@@ -260,7 +277,7 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
         ".kanon/config.json",
         "config",
         configInspection.warning
-      )]
+      )].filter(Boolean)
     : [];
   const configuration = {
     found: configInspection.found,
@@ -270,6 +287,22 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
     command_execution: configInspection.config.command_execution,
     evidence: configurationEvidence
   };
+  const entrypointEvidence = facts.code_intelligence.entrypoints[0]
+    ? [evidenceFor(
+        evidence,
+        facts.code_intelligence.entrypoints[0].path,
+        "source",
+        "Bounded entrypoint observation used in current-state projection."
+      )].filter(Boolean)
+    : [];
+  const todoEvidence = facts.todos[0]
+    ? [evidenceFor(
+        evidence,
+        facts.todos[0].path,
+        "source",
+        "Bounded TODO/FIXME observation used in current-state projection."
+      )].filter(Boolean)
+    : [];
   const currentState = projectCurrentState({
     purpose,
     tests,
@@ -281,7 +314,11 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
     configuration,
     commands,
     facts,
-    verification
+    verification,
+    git,
+    entrypointEvidence,
+    todoEvidence,
+    evidenceTruncated: evidence.truncated
   });
   const stateValue = {
     version: VERSION,
@@ -341,23 +378,21 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
     root: inspection.root,
     state,
     evidence: evidence.records,
-    inspection: { files }
+    evidence_truncated: evidence.truncated,
+    inspection: { files, scan: state.scan }
   };
 }
-/** @param {Inspection} inspection @param {string} runId @returns {EvidenceContext} */
-function createEvidenceContext(inspection, runId) {
-  /** @type {EvidenceContext} */
-  const context = { runId, records: [], byClaim: new Map() };
-  for (const item of inspection.evidence) {
-    evidenceFor(
-      context,
-      item.path,
-      item.kind,
-      "Bounded repository evidence selected by the v1 inspector.",
-      item.content
-    );
-  }
-  return context;
+/** @param {string} runId @param {EvidenceRetention} retention @returns {EvidenceContext} */
+function createEvidenceContext(runId, retention) {
+  return {
+    runId,
+    records: [],
+    byClaim: new Map(),
+    maxRecords: retention.maxRecords,
+    maxBytes: retention.maxBytes,
+    bytes: 0,
+    truncated: false
+  };
 }
 /** @param {EvidenceContext} context @param {string} selectedPath @param {string} kind @param {string} claim @param {string} [excerpt] @returns {string} */
 function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
@@ -365,9 +400,6 @@ function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
   const existing = context.byClaim.get(key);
   if (existing) {
     return existing;
-  }
-  if (context.records.length >= MAX_EVIDENCE_RECORDS) {
-    return "";
   }
   const id =
     `e_${context.runId}_${String(context.records.length + 1).padStart(3, "0")}`;
@@ -386,9 +418,52 @@ function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
   if (selectedExcerpt) {
     record.excerpt = selectedExcerpt;
   }
+  const recordBytes = Buffer.byteLength(
+    `${safeJsonStringify(record, 0)}\n`
+  );
+  if (
+    context.records.length >= context.maxRecords ||
+    context.bytes + recordBytes > context.maxBytes
+  ) {
+    context.truncated = true;
+    return "";
+  }
   context.records.push(record);
   context.byClaim.set(key, id);
+  context.bytes += recordBytes;
   return id;
+}
+/** @param {string} root @param {typeof DEFAULT_CONFIG.persistence} limits @returns {EvidenceRetention} */
+function availableEvidenceRetention(root, limits) {
+  const relative = ".kanon/EVIDENCE.jsonl";
+  const target = containedFileStat(root, relative, { optional: true });
+  if (!target.ok) {
+    return {
+      maxRecords: limits.max_evidence_records,
+      maxBytes: limits.max_evidence_bytes
+    };
+  }
+  const existing = readContainedText(
+    root,
+    relative,
+    limits.max_evidence_bytes
+  );
+  if (!existing.ok) {
+    return { maxRecords: 0, maxBytes: 0 };
+  }
+  const currentRecords = existing.text
+    ? existing.text.split(/\r?\n/).filter(Boolean).length
+    : 0;
+  return {
+    maxRecords: Math.max(
+      0,
+      limits.max_evidence_records - currentRecords
+    ),
+    maxBytes: Math.max(
+      0,
+      limits.max_evidence_bytes - target.stat.size
+    )
+  };
 }
 /** @param {Map<string, string>} texts @returns {Record<string, unknown> | null} */
 function readPackageEvidence(texts) {
@@ -616,37 +691,25 @@ function projectPurpose(inspection, packageInfo, pyprojectInfo, evidence, texts)
   if (typeof packageInfo?.description === "string") {
     const claim = safeTerminalText(packageInfo.description);
     if (claim) {
-      return {
+      return projectedPurpose(
         claim,
-        confidence: /** @type {const} */ ("likely"),
-        evidence: [evidenceFor(
-          evidence,
-          "package.json",
-          "metadata",
-          "Package description used as declared-purpose evidence."
-        )],
-        trust: "repository-untrusted"
-      };
+        "package.json",
+        "metadata",
+        "Package description used as declared-purpose evidence.",
+        evidence
+      );
     }
   }
   if (pyprojectInfo?.description) {
-    return {
-      claim: safeTerminalText(pyprojectInfo.description),
-      confidence: /** @type {const} */ ("likely"),
-      evidence: [evidenceFor(
-        evidence,
-        "pyproject.toml",
-        "metadata",
-        "Python project description used as declared-purpose evidence."
-      )],
-      trust: "repository-untrusted"
-    };
-  }
-  const readmePath = inspection.files
-    .map((file) => file.path)
-    .find((selectedPath) =>
-      path.posix.basename(selectedPath).toLowerCase().startsWith("readme")
+    return projectedPurpose(
+      pyprojectInfo.description,
+      "pyproject.toml",
+      "metadata",
+      "Python project description used as declared-purpose evidence.",
+      evidence
     );
+  }
+  const readmePath = selectRootReadmePath(inspection.files);
   const readmeText = readmePath ? texts.get(readmePath) : undefined;
   const heading = readmeText
     ? readmeText
@@ -655,41 +718,63 @@ function projectPurpose(inspection, packageInfo, pyprojectInfo, evidence, texts)
     .find(Boolean)
     : undefined;
   if (readmePath && heading) {
-    return {
-      claim: safeTerminalText(heading),
-      confidence: /** @type {const} */ ("likely"),
-      evidence: [evidenceFor(
-        evidence,
-        readmePath,
-        "documentation",
-        "README heading used as declared-purpose evidence."
-      )],
-      trust: "repository-untrusted"
-    };
+    return projectedPurpose(
+      heading,
+      readmePath,
+      "documentation",
+      "README heading used as declared-purpose evidence.",
+      evidence
+    );
   }
   const skillText = texts.get("SKILL.md");
   const skillDescription = skillText?.match(
     /^\s*description:\s*["']?(.+?)["']?\s*$/m
   )?.[1];
   if (skillDescription) {
-    return {
-      claim: safeTerminalText(skillDescription),
-      confidence: /** @type {const} */ ("likely"),
-      evidence: [evidenceFor(
-        evidence,
-        "SKILL.md",
-        "metadata",
-        "Skill description used as declared-purpose evidence."
-      )],
-      trust: "repository-untrusted"
-    };
+    return projectedPurpose(
+      skillDescription,
+      "SKILL.md",
+      "metadata",
+      "Skill description used as declared-purpose evidence.",
+      evidence
+    );
   }
+  return unknownPurpose();
+}
+/** @param {string} claim @param {string} selectedPath @param {string} kind @param {string} evidenceClaim @param {EvidenceContext} evidence */
+function projectedPurpose(claim, selectedPath, kind, evidenceClaim, evidence) {
+  const selectedClaim = safeTerminalText(claim);
+  const evidenceId = evidenceFor(
+    evidence,
+    selectedPath,
+    kind,
+    evidenceClaim
+  );
+  if (!selectedClaim || !evidenceId) return unknownPurpose();
+  return {
+    claim: selectedClaim,
+    confidence: /** @type {const} */ ("likely"),
+    evidence: [evidenceId],
+    trust: "repository-untrusted"
+  };
+}
+function unknownPurpose() {
   return {
     claim: "Repository purpose is Unknown.",
     confidence: /** @type {const} */ ("unknown"),
     evidence: [],
     trust: "kanon-generated"
   };
+}
+/** @param {{path: string}[]} files @returns {string | null} */
+function selectRootReadmePath(files) {
+  for (const name of ROOT_README_NAMES) {
+    const match = files.find((file) =>
+      !file.path.includes("/") && file.path.toLowerCase() === name
+    );
+    if (match) return match.path;
+  }
+  return null;
 }
 /** @param {Inspection} inspection @param {Record<string, unknown> | null} packageInfo @param {{name: string | null} | null} pyprojectInfo @returns {string} */
 function repositoryName(inspection, packageInfo, pyprojectInfo) {
@@ -727,7 +812,7 @@ function projectCommands(packageInfo, pyprojectInfo, pythonTest, inspection, evi
       command,
       cwd: ".",
       source,
-      confidence,
+      confidence: evidenceId ? confidence : /** @type {const} */ ("unknown"),
       evidence: evidenceId ? [evidenceId] : [],
       detail,
       trust: "repository-untrusted",
@@ -951,21 +1036,30 @@ function tomlSection(text, name) {
 }
 /** @param {string[]} paths @param {string} kind @param {string} claim @param {EvidenceContext} evidence @returns {ProjectSignal} */
 function projectSignal(paths, kind, claim, evidence) {
+  const files = paths.slice(0, 32).flatMap((selectedPath) => {
+    const evidenceId = evidenceFor(evidence, selectedPath, kind, claim);
+    return evidenceId ? [{ path: selectedPath, evidence: evidenceId }] : [];
+  });
   return {
-    found: paths.length > 0,
-    files: paths.slice(0, 32).map((selectedPath) => ({
-      path: selectedPath,
-      evidence: evidenceFor(evidence, selectedPath, kind, claim)
-    }))
+    found: files.length > 0,
+    files
   };
 }
 /** @param {Inspection} inspection @param {EvidenceContext} evidence @param {RepositoryFacts} facts @returns {ImportantFile[]} */
 function projectImportantFiles(inspection, evidence, facts) {
-  /** @type {Map<string, {kind: string, reason: string}>} */
-  const selected = new Map();
-  /** @param {string} selectedPath @param {string} kind @param {string} reason */
-  const add = (selectedPath, kind, reason) => {
-    if (!selected.has(selectedPath)) selected.set(selectedPath, { kind, reason });
+  /** @type {Map<string, {kind: string, reason: string, score: number}>} */
+  const candidates = new Map();
+  /** @type {{instructions: string[], entrypoints: string[], fanIn: string[], baseline: string[]}} */
+  const classes = { instructions: [], entrypoints: [], fanIn: [], baseline: [] };
+  /** @param {string} selectedPath @param {string} kind @param {string} reason @param {number} score @param {keyof typeof classes | null} selectedClass */
+  const add = (selectedPath, kind, reason, score, selectedClass = null) => {
+    const existing = candidates.get(selectedPath);
+    if (!existing || score > existing.score) {
+      candidates.set(selectedPath, { kind, reason, score });
+    }
+    if (selectedClass && !classes[selectedClass].includes(selectedPath)) {
+      classes[selectedClass].push(selectedPath);
+    }
   };
   for (const item of inspection.evidence.filter((item) =>
     item.kind === "instruction"
@@ -973,37 +1067,86 @@ function projectImportantFiles(inspection, evidence, facts) {
     add(
       item.path,
       item.kind,
-      "applicable repository instruction; content remains untrusted"
+      "applicable repository instruction; content remains untrusted",
+      1_000,
+      "instructions"
     );
   }
   for (const file of inspection.files) {
     if (isBaselinePath(file.path)) {
-      add(file.path, "artifact", "root project metadata or documentation");
+      add(
+        file.path,
+        "artifact",
+        "root project metadata or documentation",
+        850,
+        "baseline"
+      );
     }
   }
   for (const item of facts.code_intelligence.entrypoints.slice(0, 8)) {
-    add(item.path, "source", `entrypoint: ${item.reason}`);
+    add(
+      item.path,
+      "source",
+      `entrypoint: ${item.reason}`,
+      item.confidence === "known" ? 975 : 925,
+      "entrypoints"
+    );
   }
   for (const item of facts.code_intelligence.top_fan_in.slice(0, 8)) {
-    add(item.path, "source", `imported by ${item.fan_in} local file(s)`);
+    add(
+      item.path,
+      "source",
+      `imported by ${item.fan_in} local file(s)`,
+      940 + Math.min(30, item.fan_in),
+      "fanIn"
+    );
   }
   for (const item of inspection.evidence) {
-    add(item.path, item.kind, "selected by the bounded v1 repository inspector");
+    add(
+      item.path,
+      item.kind,
+      "selected by the bounded v1 repository inspector",
+      700,
+      null
+    );
   }
-  return Array.from(selected.entries()).slice(0, 16).map(([
-    selectedPath,
-    selectedValue
-  ]) => ({
-    path: selectedPath,
-    reason: selectedValue.reason,
-    fan_in: facts.fan_in.get(selectedPath) || 0,
-    evidence: [evidenceFor(
+  const reserved = new Set([
+    ...classes.instructions.slice(0, 4),
+    ...classes.entrypoints.slice(0, 4),
+    ...classes.fanIn.slice(0, 4),
+    ...classes.baseline.slice(0, 4)
+  ]);
+  const ranked = Array.from(candidates.entries()).sort((left, right) =>
+    right[1].score - left[1].score ||
+    (facts.fan_in.get(right[0]) || 0) -
+      (facts.fan_in.get(left[0]) || 0) ||
+    left[0].localeCompare(right[0])
+  );
+  const selectedPaths = [
+    ...ranked.filter(([selectedPath]) => reserved.has(selectedPath)),
+    ...ranked.filter(([selectedPath]) => !reserved.has(selectedPath))
+  ].slice(0, 16).sort((left, right) =>
+    right[1].score - left[1].score ||
+    (facts.fan_in.get(right[0]) || 0) -
+      (facts.fan_in.get(left[0]) || 0) ||
+    left[0].localeCompare(right[0])
+  );
+  return selectedPaths.flatMap(([selectedPath, selectedValue]) => {
+    const evidenceId = evidenceFor(
       evidence,
       selectedPath,
       selectedValue.kind,
       "Important file selected from bounded repository evidence."
-    )].filter(Boolean)
-  }));
+    );
+    return evidenceId
+      ? [{
+          path: selectedPath,
+          reason: selectedValue.reason,
+          fan_in: facts.fan_in.get(selectedPath) || 0,
+          evidence: [evidenceId]
+        }]
+      : [];
+  });
 }
 /** @param {Inspection} inspection @param {EvidenceContext} evidence */
 function projectGit(inspection, evidence) {
@@ -1091,11 +1234,7 @@ function projectScan(inspection, facts) {
 }
 /** @param {{inspection: Inspection, texts: Map<string, string>, packageInfo: Record<string, unknown> | null, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, evidence: EvidenceContext, scan: ReturnType<typeof projectScan>}} input */
 function projectReadmeVerification(input) {
-  const target = input.inspection.files
-    .map((file) => file.path)
-    .find((selectedPath) =>
-      path.posix.basename(selectedPath).toLowerCase().startsWith("readme")
-    );
+  const target = selectRootReadmePath(input.inspection.files);
   if (!target) {
     if (input.texts.has("SKILL.md")) {
       return {
@@ -1168,25 +1307,35 @@ function projectReadmeVerification(input) {
     const expectation = packageScriptExpectation(command);
     if (expectation && input.packageInfo) {
       if (typeof scripts[expectation.script] !== "string") {
-        issues.push({
-          type: "command_drift",
-          severity: "warning",
-          conclusion: "contradiction",
-          claim: `README says to run \`${command}\`.`,
-          observation:
-            `package.json has no \`${expectation.script}\` script; available scripts: ${availableScripts.length ? availableScripts.join(", ") : "(none)"}.`,
-          evidence: [
-            readmeEvidence,
-            evidenceFor(
-              input.evidence,
-              "package.json",
-              "metadata",
-              "Package scripts used to verify documented commands."
-            )
-          ].filter(Boolean),
-          suggestion:
-            "Resolve this direct declaration contradiction before relying on the documented command."
-        });
+        const packageEvidence = evidenceFor(
+          input.evidence,
+          "package.json",
+          "metadata",
+          "Package scripts used to verify documented commands."
+        );
+        if (readmeEvidence && packageEvidence) {
+          issues.push({
+            type: "command_drift",
+            severity: "warning",
+            conclusion: "contradiction",
+            claim: `README says to run \`${command}\`.`,
+            observation:
+              `package.json has no \`${expectation.script}\` script; available scripts: ${availableScripts.length ? availableScripts.join(", ") : "(none)"}.`,
+            evidence: [readmeEvidence, packageEvidence],
+            suggestion:
+              "Resolve this direct declaration contradiction before relying on the documented command."
+          });
+        } else {
+          unknowns.push({
+            type: "command_drift",
+            severity: "info",
+            conclusion: "unknown",
+            claim: "A documented package command could not be retained as a verified contradiction.",
+            observation:
+              "The configured evidence retention boundary was reached.",
+            evidence: [readmeEvidence, packageEvidence].filter(Boolean)
+          });
+        }
       }
       continue;
     }
@@ -1374,7 +1523,7 @@ function excerptAround(text, pattern) {
     ? ""
     : text.slice(Math.max(0, match.index - 80), Math.min(text.length, match.index + 160));
 }
-/** @param {{ purpose: ReturnType<typeof projectPurpose>, tests: {found: boolean, files: string[], count: number, frameworks: string[], evidence: string[]}, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, importantFiles: ImportantFile[], inspection: Inspection, configuration: ConfigurationState, commands: CommandGroups, facts: RepositoryFacts, verification: ReturnType<typeof projectReadmeVerification> }} input */
+/** @param {{ purpose: ReturnType<typeof projectPurpose>, tests: {found: boolean, files: string[], count: number, frameworks: string[], evidence: string[]}, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, importantFiles: ImportantFile[], inspection: Inspection, configuration: ConfigurationState, commands: CommandGroups, facts: RepositoryFacts, verification: ReturnType<typeof projectReadmeVerification>, git: ReturnType<typeof projectGit>, entrypointEvidence: string[], todoEvidence: string[], evidenceTruncated: boolean }} input */
 function projectCurrentState(input) {
   /** @type {Claim[]} */
   const known = [];
@@ -1395,7 +1544,7 @@ function projectCurrentState(input) {
   } else {
     unknown.push({ claim: "Repository purpose is Unknown." });
   }
-  if (input.tests.found) {
+  if (input.tests.found && input.tests.evidence.some(Boolean)) {
     known.push({
       claim: `${input.tests.count || "Some"} test evidence found${
         input.tests.frameworks.length
@@ -1404,6 +1553,11 @@ function projectCurrentState(input) {
       }.`,
       evidence: input.tests.evidence,
       trust: "repository-untrusted"
+    });
+  } else if (input.tests.found) {
+    unknown.push({
+      claim: "Test evidence was observed but could not be retained.",
+      reason: "The configured evidence retention boundary was reached."
     });
   }
   if (input.ci.found) {
@@ -1418,7 +1572,10 @@ function projectCurrentState(input) {
   if (input.release.found) {
     known.push(signalClaim("Release/changelog evidence found", input.release));
   }
-  if (input.inspection.git.observation_complete) {
+  if (
+    input.inspection.git.observation_complete &&
+    input.git.evidence.some(Boolean)
+  ) {
     known.push({
       claim:
         `Git repository${
@@ -1426,14 +1583,17 @@ function projectCurrentState(input) {
             ? ` on branch ${input.inspection.git.branch}`
             : ""
         }; ${input.inspection.git.change_count} working-tree change(s).`,
+      evidence: input.git.evidence,
       trust: "repository-untrusted"
     });
   } else {
     unknown.push({
       claim: "Git state is Unknown.",
-      reason:
-        input.inspection.git.diagnostics.join(" ") ||
-        "Git observation did not complete."
+      reason: input.evidenceTruncated &&
+          input.inspection.git.observation_complete
+        ? "The configured evidence retention boundary was reached."
+        : input.inspection.git.diagnostics.join(" ") ||
+          "Git observation did not complete."
     });
   }
   const commandEntries = Object.entries(input.commands);
@@ -1441,12 +1601,19 @@ function projectCurrentState(input) {
   for (const [group, commands] of commandEntries) {
     for (const command of commands) {
       commandCount += 1;
-      const target = command.confidence === "known" ? known : likely;
-      target.push({
-        claim: `A ${group} command candidate is directly declared: ${command.command}.`,
-        evidence: command.evidence,
-        trust: "repository-untrusted"
-      });
+      if (command.confidence === "unknown" || !command.evidence.some(Boolean)) {
+        unknown.push({
+          claim: `A ${group} command declaration was observed but could not be retained as Known evidence.`,
+          reason: "The configured evidence retention boundary was reached."
+        });
+      } else {
+        const target = command.confidence === "known" ? known : likely;
+        target.push({
+          claim: `A ${group} command candidate is directly declared: ${command.command}.`,
+          evidence: command.evidence,
+          trust: "repository-untrusted"
+        });
+      }
     }
   }
   if (commandCount === 0) {
@@ -1455,17 +1622,32 @@ function projectCurrentState(input) {
       reason: "No bounded command declaration was observed."
     });
   }
-  if (input.facts.code_intelligence.entrypoints.length > 0) {
+  if (
+    input.facts.code_intelligence.entrypoints.length > 0 &&
+    input.entrypointEvidence.length > 0
+  ) {
     known.push({
       claim:
         `${input.facts.code_intelligence.entrypoints.length} bounded entrypoint observation(s) found.`,
+      evidence: input.entrypointEvidence,
       trust: "repository-untrusted"
     });
+  } else if (input.facts.code_intelligence.entrypoints.length > 0) {
+    unknown.push({
+      claim: "Entrypoint observations could not be retained as Known evidence.",
+      reason: "The configured evidence retention boundary was reached."
+    });
   }
-  if (input.facts.todos.length > 0) {
+  if (input.facts.todos.length > 0 && input.todoEvidence.length > 0) {
     known.push({
       claim: `${input.facts.todos.length} TODO/FIXME marker(s) found.`,
+      evidence: input.todoEvidence,
       trust: "repository-untrusted"
+    });
+  } else if (input.facts.todos.length > 0) {
+    unknown.push({
+      claim: "TODO/FIXME observations could not be retained as Known evidence.",
+      reason: "The configured evidence retention boundary was reached."
     });
   }
   if (!input.facts.complete) {
@@ -1483,9 +1665,11 @@ function projectCurrentState(input) {
     if (!signal.found) {
       unknown.push({
         claim: `Conventional ${label} evidence is Unknown.`,
-        reason: input.inspection.evidence_complete
-          ? "The bounded v1 inspection did not observe a conventional path."
-          : "The bounded v1 inspection was incomplete; absence is not established."
+        reason: input.evidenceTruncated
+          ? "The configured evidence retention boundary was reached."
+          : input.inspection.evidence_complete
+            ? "The bounded v1 inspection did not observe a conventional path."
+            : "The bounded v1 inspection was incomplete; absence is not established."
       });
     }
   }
@@ -1522,6 +1706,12 @@ function projectCurrentState(input) {
       reason: input.configuration.warning,
       evidence: input.configuration.evidence,
       trust: "kanon-generated"
+    });
+  }
+  if (input.evidenceTruncated) {
+    unknown.push({
+      claim: "Some repository claims are Unknown because evidence retention was exhausted.",
+      reason: "Known and Likely claims require retained claim-specific evidence."
     });
   }
   if (input.inspection.coverage.sensitive_files_excluded > 0) {
@@ -1614,6 +1804,11 @@ function persistRefresh(analysis, config, options) {
   ensureConfig(root);
   const warnings = [previous.warning, todos.warning, handoff.warning]
     .filter((warning) => typeof warning === "string");
+  if (analysis.evidence_truncated) {
+    warnings.push(
+      "Evidence retention limit was reached; unsupported claims were downgraded to Unknown."
+    );
+  }
   const snapshot = writeSnapshot(
     root,
     analysis.state.run_id,

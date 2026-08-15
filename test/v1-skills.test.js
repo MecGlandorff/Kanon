@@ -483,6 +483,46 @@ test("verify separates contradictions, non-observation, and declarations", async
   );
 });
 
+test("verify keeps scan-backed conclusions independent from Git availability", async () => {
+  const root = makeFixture({
+    "README.md": "# Fixture\n",
+    "package.json": JSON.stringify({
+      name: "fixture",
+      version: "1.2.3",
+      scripts: { test: "node --test" }
+    }),
+    "runtime/build-metadata.json": JSON.stringify({
+      package_version: "1.2.3"
+    }),
+    "src/v1/example.js": "export const value = 1;\n",
+    "runtime/example.js": "export const value = 1;\n"
+  });
+  const result = await invokeCodexSkill(
+    stableInvocation("verify", root, {
+      task: "verify README.md",
+      target: "README.md"
+    }),
+    {
+      ...adapterContext([]),
+      git_runner() {
+        return {
+          ok: false,
+          status: 128,
+          stdout: "",
+          stderr: "Git unavailable",
+          timeout: false,
+          overflow: false
+        };
+      }
+    }
+  );
+
+  assert.equal(result.report.live.coverage.complete, true);
+  assert.equal(result.report.documentation.status, "Known");
+  assert.equal(result.report.generated_artifacts.status, "Known");
+  assert.equal(result.report.receipt.status, "Unknown");
+});
+
 test("declared-validation Unknown prevents an aggregate Known claim", async () => {
   const scripts = Object.fromEntries(
     Array.from(

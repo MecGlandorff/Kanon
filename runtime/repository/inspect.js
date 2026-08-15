@@ -96,12 +96,6 @@ const BASELINE_PATHS = new Map([
   ["pyproject.toml", 94], ["Cargo.toml", 94], ["go.mod", 94],
   ["Makefile", 90], ["CHANGELOG.md", 72], ["RELEASING.md", 72]
 ]);
-const TEXT_READ_PRIORITY = new Map(/** @type {[string, number][]} */ ([
-  ["package.json", 0], ["pyproject.toml", 1],
-  ["Makefile", 2], ["makefile", 2], ["GNUmakefile", 2],
-  ["Justfile", 2], ["justfile", 2],
-  ...INSTRUCTION_NAMES.map((name) => [name, 3])
-]));
 /** @type {WeakMap<object, Map<string, string>>} */
 const INSPECTION_TEXTS = new WeakMap();
 /**
@@ -301,7 +295,8 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     limits.compatibility_policy
       ? null
       : new Set([...applicableInstructions, ...selected]),
-    new Set(applicableInstructions)
+    new Set(applicableInstructions),
+    limits.compatibility_policy
   );
   const instructions = readApplicableInstructions(
     applicableInstructions, scan.files, texts, coverage
@@ -536,7 +531,7 @@ function readApplicableInstructions(candidates, files, texts, coverage) {
       kind: "instruction",
       path: candidate,
       size: file.size,
-      sha256: file.sha256 || sha256(Buffer.from(contentText)),
+      sha256: sha256(Buffer.from(contentText, "utf8")),
       content,
       truncated: sanitizationTruncated,
       trust: "repository-untrusted"
@@ -548,8 +543,8 @@ function readApplicableInstructions(candidates, files, texts, coverage) {
   }
   return instructions;
 }
-/** @param {string} root @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {Set<string> | null} selectedPaths @param {Set<string>} instructionPaths @returns {Map<string, string>} */
-function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instructionPaths) {
+/** @param {string} root @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {Set<string> | null} selectedPaths @param {Set<string>} instructionPaths @param {boolean} compatibilityPolicy @returns {Map<string, string>} */
+function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instructionPaths, compatibilityPolicy) {
   const started = process.hrtime.bigint();
   const deadline = Date.now() + Math.max(
     0,
@@ -558,8 +553,16 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
   let remaining = coverage.limits.max_total_text_bytes;
   /** @type {Map<string, string>} */ const texts = new Map();
   const selectedFiles = [...files].sort((left, right) =>
-    (TEXT_READ_PRIORITY.get(left.path) ?? 4) -
-      (TEXT_READ_PRIORITY.get(right.path) ?? 4) ||
+    textReadPriority(
+      left.path,
+      instructionPaths,
+      compatibilityPolicy
+    ) -
+      textReadPriority(
+        right.path,
+        instructionPaths,
+        compatibilityPolicy
+      ) ||
     compareText(left.path, right.path)
   );
   for (const file of selectedFiles) {
@@ -616,11 +619,40 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
   coverage.elapsed_ms += elapsedMilliseconds(started);
   return texts;
 }
+/** @param {string} selectedPath @param {Set<string>} instructionPaths @param {boolean} compatibilityPolicy @returns {number} */
+function textReadPriority(selectedPath, instructionPaths, compatibilityPolicy) {
+  if (!compatibilityPolicy) {
+    if (selectedPath === "package.json") return 0;
+    if (selectedPath === "pyproject.toml") return 1;
+    if (/^(?:Makefile|makefile|GNUmakefile|Justfile|justfile)$/.test(selectedPath)) {
+      return 2;
+    }
+    return instructionPaths.has(selectedPath) ? 3 : 4;
+  }
+  if (/^README(?:\.(?:md|mdx|rst|adoc|txt))?$/i.test(selectedPath)) return 0;
+  if (selectedPath === "package.json") return 1;
+  if (selectedPath === "pyproject.toml") return 2;
+  if (
+    /^(?:pytest\.ini|setup\.cfg|tox\.ini|requirements(?:-[^/]+)?\.txt)$/.test(
+      selectedPath
+    )
+  ) return 3;
+  if (selectedPath === "SKILL.md") return 4;
+  if (/^(?:Makefile|makefile|GNUmakefile|Justfile|justfile)$/.test(selectedPath)) {
+    return 5;
+  }
+  return instructionPaths.has(selectedPath) ? 6 : 7;
+}
 /** @param {string} root @param {InspectionCoverage} coverage @param {InspectionLimits} limits @param {import("./git.js").GitRunner | undefined} gitRunner @returns {{files: InspectedFile[]}} */
 function scanRepository(root, coverage, limits, gitRunner) {
   const started = process.hrtime.bigint();
   const deadline = Date.now() + limits.max_scan_ms;
-  const ignore = loadIgnoreRules(root, coverage, limits.max_ignore_bytes);
+  const ignore = loadIgnoreRules(
+    root,
+    coverage,
+    limits.max_ignore_bytes,
+    limits.compatibility_policy
+  );
   if (!ignore.complete) {
     coverage.elapsed_ms = elapsedMilliseconds(started);
     return { files: [] };
@@ -935,8 +967,8 @@ function readBoundedDirectory(directory, maximumEntries, deadline) {
     return { ok: false };
   }
 }
-/** @param {string} root @param {InspectionCoverage} coverage @param {number} maximumBytes @returns {IgnoreLoadResult} */
-function loadIgnoreRules(root, coverage, maximumBytes) {
+/** @param {string} root @param {InspectionCoverage} coverage @param {number} maximumBytes @param {boolean} compatibilityPolicy @returns {IgnoreLoadResult} */
+function loadIgnoreRules(root, coverage, maximumBytes, compatibilityPolicy) {
   const read = readBoundedRepositoryFile(
     root,
     ".kanonignore",
@@ -972,15 +1004,21 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
     if (!selected || selected.startsWith("#")) {
       continue;
     }
-    const negated = selected.startsWith("!");
+    const negated = compatibilityPolicy && selected.startsWith("!");
     const pattern = negated ? selected.slice(1) : selected;
     const portablePattern = pattern.replaceAll("\\", "/");
     const unrootedPattern = portablePattern.replace(/^\//, "");
     if (
       rules.length >= MAX_IGNORE_RULES ||
-      hasTraversalSegment(unrootedPattern) ||
-      portablePattern.startsWith("//") ||
-      /^[A-Za-z]:\//.test(portablePattern) ||
+      (
+        compatibilityPolicy
+          ? hasTraversalSegment(unrootedPattern) ||
+            portablePattern.startsWith("//") ||
+            /^[A-Za-z]:\//.test(portablePattern)
+          : selected.startsWith("!") ||
+            selected.includes("..") ||
+            path.isAbsolute(selected)
+      ) ||
       pattern.length === 0 ||
       pattern.length > 512 ||
       /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(

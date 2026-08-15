@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   COMPATIBILITY_WRITE_COMMANDS,
   IMPLEMENTED_STABLE_SKILLS,
@@ -183,7 +183,7 @@ test("typed compatibility routes retain the approved public surface", () => {
   }
 });
 
-test("built public entries prove runtime reachability by execution", {
+test("built public and evaluator entries prove runtime reachability by execution", {
   timeout: 120_000
 }, () => {
   const runtimeRoot = path.join(repoRoot, "runtime");
@@ -362,6 +362,40 @@ test("built public entries prove runtime reachability by execution", {
     false
   );
   for (const module of todo.modules) loadedUnion.add(module);
+
+  const evaluatorRunner = path.join(
+    instrumentation.directory,
+    "run-evaluator.mjs"
+  );
+  fs.writeFileSync(
+    evaluatorRunner,
+    `import { analyzeRepo } from ${JSON.stringify(pathToFileURL(path.join(
+      runtimeRoot,
+      "src",
+      "v1",
+      "evaluation",
+      "analyze.js"
+    )).href)};\n` +
+      `const analysis = analyzeRepo(process.argv[2], { runId: "reachability-evaluation" });\n` +
+      `process.stdout.write(JSON.stringify({ version: analysis.state.version, important_files: analysis.state.important_files, scan: analysis.inspection.scan }) + "\\n");\n`
+  );
+  const evaluator = runInstrumentedEntry(
+    evaluatorRunner,
+    [fixture],
+    fixture,
+    instrumentation
+  );
+  assert.equal(evaluator.status, 0, evaluator.stderr || evaluator.stdout);
+  const evaluatorOutput = JSON.parse(evaluator.stdout);
+  assert.equal(typeof evaluatorOutput.version, "string");
+  assert.equal(Array.isArray(evaluatorOutput.important_files), true);
+  assert.equal(evaluatorOutput.important_files.length <= 5, true);
+  assert.equal(typeof evaluatorOutput.scan.complete, "boolean");
+  assert.equal(
+    evaluator.modules.includes("src/v1/evaluation/analyze.js"),
+    true
+  );
+  for (const module of evaluator.modules) loadedUnion.add(module);
 
   const shipped = listJavaScriptFiles(runtimeRoot)
     .map((relative) => relative.replace(/^runtime\//, ""));

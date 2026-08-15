@@ -307,7 +307,7 @@ async function loadBoundArtifact(options, candidate) {
   }
   const analyzer = resolveContainedPath(
     artifactRoot,
-    "runtime/src/v1/compatibility/refresh.js",
+    "runtime/src/v1/evaluation/analyze.js",
     { type: "file" }
   );
   if (!analyzer.ok) {
