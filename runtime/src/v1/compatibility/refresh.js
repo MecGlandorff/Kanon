@@ -125,17 +125,18 @@ const ROOT_README_NAMES = Object.freeze([
  *   todos: {path: string, line: number, text: string, trust: string}[]
  * }} RepositoryFacts
  * @typedef {Command & {score: number}} CommandCandidate
+ * @typedef {(event: Record<string, unknown>) => void} RankingObserver
  */
 /** Run one bounded compatibility refresh using only the v1 repository inspector and the narrow compatibility persistence modules. @param {string} root @param {{deep?: boolean}} [options] */
 export function refreshKanon(root, options = {}) {
   const prepared = prepareRefreshAnalysis(root);
   return persistRefresh(prepared.analysis, prepared.config, options);
 }
-/** @param {string} [root] @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1]}} [options] */
+/** @param {string} [root] @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1], inspectGit?: boolean, _rankingObserver?: RankingObserver}} [options] */
 export function analyzeRepo(root = process.cwd(), options = {}) {
   return prepareRefreshAnalysis(root, options).analysis;
 }
-/** @param {string} root @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1]}} [options] */
+/** @param {string} root @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1], inspectGit?: boolean, _rankingObserver?: RankingObserver}} [options] */
 function prepareRefreshAnalysis(root, options = {}) {
   const requestedRoot = path.resolve(root);
   const configInspection = inspectKanonConfig(requestedRoot);
@@ -145,6 +146,7 @@ function prepareRefreshAnalysis(root, options = {}) {
     {
       profile: "resume",
       allow_filesystem_root: true,
+      inspect_git: options.inspectGit !== false,
       scan: {
         ...scanOptionsFromConfig(configInspection.config, options.scan),
         compatibilityPolicy: true
@@ -163,13 +165,14 @@ function prepareRefreshAnalysis(root, options = {}) {
       inspection,
       configInspection,
       options.runId,
-      evidenceRetention
+      evidenceRetention,
+      options._rankingObserver
     ),
     config: configInspection.config
   };
 }
-/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection @param {string | undefined} requestedRunId @param {EvidenceRetention} evidenceRetention */
-function buildRefreshAnalysis(inspection, configInspection, requestedRunId, evidenceRetention) {
+/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection @param {string | undefined} requestedRunId @param {EvidenceRetention} evidenceRetention @param {RankingObserver | undefined} rankingObserver */
+function buildRefreshAnalysis(inspection, configInspection, requestedRunId, evidenceRetention, rankingObserver) {
   const generatedAt = new Date().toISOString();
   const runId = typeof requestedRunId === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9-]{13,63}$/.test(requestedRunId)
@@ -257,7 +260,8 @@ function buildRefreshAnalysis(inspection, configInspection, requestedRunId, evid
   const importantFiles = projectImportantFiles(
     inspection,
     evidence,
-    facts
+    facts,
+    rankingObserver
   );
   const git = projectGit(inspection, evidence);
   const scan = projectScan(inspection, facts);
@@ -551,6 +555,9 @@ function observeRepositoryFacts(inspection, texts, packageInfo) {
   let work = 0;
   let complete = true;
   for (const [source, text] of texts) {
+    if (/(?:\.min\.(?:js|css)$|_pb2\.py$|\.snap$|\.lock$)/i.test(source)) {
+      continue;
+    }
     const python = source.endsWith(".py");
     const patterns = python
       ? [/^\s*from\s+([.\w]+)\s+import\b/gm, /^\s*import\s+([\w.]+)/gm]
@@ -1045,8 +1052,8 @@ function projectSignal(paths, kind, claim, evidence) {
     files
   };
 }
-/** @param {Inspection} inspection @param {EvidenceContext} evidence @param {RepositoryFacts} facts @returns {ImportantFile[]} */
-function projectImportantFiles(inspection, evidence, facts) {
+/** @param {Inspection} inspection @param {EvidenceContext} evidence @param {RepositoryFacts} facts @param {RankingObserver | undefined} observer @returns {ImportantFile[]} */
+function projectImportantFiles(inspection, evidence, facts, observer) {
   /** @type {Map<string, {kind: string, reason: string, score: number}>} */
   const candidates = new Map();
   /** @type {{instructions: string[], entrypoints: string[], fanIn: string[], baseline: string[]}} */
@@ -1131,7 +1138,7 @@ function projectImportantFiles(inspection, evidence, facts) {
       (facts.fan_in.get(left[0]) || 0) ||
     left[0].localeCompare(right[0])
   );
-  return selectedPaths.flatMap(([selectedPath, selectedValue]) => {
+  const importantFiles = selectedPaths.flatMap(([selectedPath, selectedValue]) => {
     const evidenceId = evidenceFor(
       evidence,
       selectedPath,
@@ -1147,6 +1154,120 @@ function projectImportantFiles(inspection, evidence, facts) {
         }]
       : [];
   });
+  emitCompactRanking(
+    observer,
+    inspection.files,
+    ranked,
+    selectedPaths.map(([selectedPath]) => selectedPath),
+    importantFiles,
+    facts
+  );
+  return importantFiles;
+}
+/** @param {RankingObserver | undefined} observer @param {Inspection["files"]} files @param {[string, {kind: string, reason: string, score: number}][]} ranked @param {string[]} selectedCandidates @param {ImportantFile[]} importantFiles @param {RepositoryFacts} facts */
+function emitCompactRanking(observer, files, ranked, selectedCandidates, importantFiles, facts) {
+  if (typeof observer !== "function") return;
+  const rankedByPath = new Map(ranked);
+  for (const [index, file] of files.entries()) {
+    const eligible = rankedByPath.has(file.path);
+    emitRankingObservation(observer, {
+      type: "candidate-discovered",
+      path: file.path,
+      discovery_source: "scanner",
+      input_position: index + 1,
+      eligible,
+      eligibility_reason: eligible
+        ? "compact-ranking-candidate"
+        : file.text
+          ? "no-compact-ranking-evidence"
+          : "non-text-file"
+    });
+  }
+  for (const [index, [selectedPath, selectedValue]] of ranked.entries()) {
+    const fanIn = facts.fan_in.get(selectedPath) || 0;
+    emitRankingObservation(observer, {
+      type: "candidate-scored",
+      path: selectedPath,
+      score: selectedValue.score,
+      fan_in: fanIn,
+      referenced_by: 0,
+      signals: [{
+        type: "compact-important-file",
+        reason: selectedValue.reason,
+        score: selectedValue.score,
+        confidence: "known",
+        source: "compatibility-projector"
+      }],
+      contributions: [{
+        name: "compact-priority",
+        value: selectedValue.score
+      }],
+      tie_break: {
+        score: selectedValue.score,
+        fan_in: fanIn,
+        path: selectedPath
+      }
+    });
+    emitRankingObservation(observer, {
+      type: "candidate-ordered",
+      path: selectedPath,
+      ranked_position: index + 1,
+      ordering: ["score:desc", "fan_in:desc", "path:asc"]
+    });
+  }
+  emitRankingObservation(observer, {
+    type: "curation-stage-entered",
+    stage: "compact-important-files",
+    stage_ordinal: 1,
+    ordering: ["score:desc", "fan_in:desc", "path:asc"],
+    quota: 16,
+    selected: []
+  });
+  const retained = new Set(importantFiles.map((item) => item.path));
+  const projected = new Set(selectedCandidates);
+  /** @type {string[]} */
+  const selected = [];
+  for (const [index, [selectedPath, selectedValue]] of ranked.entries()) {
+    const retainedPath = retained.has(selectedPath);
+    emitRankingObservation(observer, {
+      type: "curation-decision",
+      path: selectedPath,
+      stage: "compact-important-files",
+      stage_ordinal: 1,
+      entry_position: index + 1,
+      selected_count_on_entry: selected.length,
+      decision: retainedPath
+        ? "selected"
+        : projected.has(selectedPath)
+          ? "not-selected"
+          : "quota-excluded",
+      reason: retainedPath
+        ? selectedValue.reason
+        : projected.has(selectedPath)
+          ? "retained evidence was unavailable"
+          : "excluded by the compact important-file quota",
+      heuristic: "compact-important-file",
+      deduplicated: false,
+      displaced_by: null,
+      quota: 16,
+      cap: 16
+    });
+    if (retainedPath) selected.push(selectedPath);
+  }
+  emitRankingObservation(observer, {
+    type: "curation-stage-exited",
+    stage: "compact-important-files",
+    stage_ordinal: 1,
+    selected
+  });
+}
+/** @param {RankingObserver} observer @param {Record<string, unknown>} event */
+function emitRankingObservation(observer, event) {
+  try {
+    observer(event);
+  } catch {
+    return;
+  }
 }
 /** @param {Inspection} inspection @param {EvidenceContext} evidence */
 function projectGit(inspection, evidence) {
@@ -2183,7 +2304,7 @@ function hasReleaseWorkflowSignal(text) {
 /** @param {string} selectedPath */
 function isBaselinePath(selectedPath) {
   return /^README(?:\.[^/]+)?$/i.test(selectedPath) ||
-    /^(?:package\.json|pyproject\.toml|Cargo\.toml|go\.mod|Makefile|CHANGELOG\.md|RELEASING\.md)$/.test(selectedPath);
+    /^(?:package\.json|pyproject\.toml|Cargo\.toml|go\.mod|setup\.py|requirements\.txt|pnpm-workspace\.yaml|nx\.json|Makefile|GNUmakefile|Justfile|CHANGELOG\.md|RELEASING\.md)$/.test(selectedPath);
 }
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function plainRecord(value) {

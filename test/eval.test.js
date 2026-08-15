@@ -676,6 +676,23 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
   assert.equal(traced.state.important_files.length <= 5, true);
   const persistedTrace = readJson(path.join(traceDirectory, "case-001.json"));
   assert.equal(persistedTrace.completeness.complete, true);
+  assert.equal(
+    persistedTrace.schema_version,
+    "kanon-d2e-compact-ranking-trace-v2"
+  );
+  assert.deepEqual(
+    persistedTrace.stages.map((stage) => stage.name),
+    ["compact-important-files", "evaluation-five-file-cap"]
+  );
+  const eligibleCandidates = persistedTrace.candidates.filter(
+    (candidate) => candidate.ranking.eligible
+  );
+  assert.equal(eligibleCandidates.length > 0, true);
+  assert.equal(eligibleCandidates.every((candidate) =>
+    candidate.ranking.contributions.some(
+      (contribution) => contribution.name === "compact-priority"
+    ) && candidate.ranking.score < 2_000
+  ), true);
   assert.deepEqual(
     persistedTrace.predictions.important_files,
     traced.state.important_files.map((file) => file.path)

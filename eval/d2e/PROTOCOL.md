@@ -7,6 +7,11 @@ offline trace of the frozen D.2A development corpus. It does not authorize a
 behavioral correction, label work, a second corpus experiment, slice 17, a
 candidate freeze, a version change, a holdout, or a release.
 
+This frozen protocol describes `kanon-d2e-ranking-trace-v1` for the historical
+v0.4 ranking implementation. The v1.1 installed evaluator does not emulate
+those removed stages: it uses the separately versioned compact trace contract
+described in `eval/PROTOCOL.md`.
+
 ## Frozen commitments
 
 - Branch before protocol work: `release/v.1.0.0`.

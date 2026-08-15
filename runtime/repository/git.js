@@ -73,6 +73,7 @@ const MAX_PATH_ENTRIES = 128;
  * @param {string} canonicalRoot
  * @param {{
  *   runner?: GitRunner,
+ *   enabled?: boolean,
  *   timeout_ms?: number,
  *   max_output_bytes?: number,
  *   compatibility_sensitive_paths?: boolean
@@ -80,6 +81,9 @@ const MAX_PATH_ENTRIES = 128;
  * @returns {GitObservation}
  */
 export function observeRepositoryGit(canonicalRoot, options = {}) {
+  if (options.enabled === false) {
+    return unavailableGit(["Git observation was disabled by caller."]);
+  }
   const runner = typeof options.runner === "function"
     ? options.runner
     : runBoundedGit;

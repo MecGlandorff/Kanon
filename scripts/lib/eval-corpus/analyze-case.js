@@ -6,7 +6,10 @@ import { pathToFileURL } from "node:url";
 import { atomicWriteContained } from "../../../src/persistence/safe-fs.js";
 import { resolveContainedPath } from "../../../src/path-security.js";
 import {
+  COMPACT_TRACE_SCHEMA_VERSION,
+  createCompactRankingTraceCollector,
   createRankingTraceCollector,
+  validateCompactRankingTrace,
   validateRankingTrace
 } from "../d2e-trace.js";
 import { canonicalJson } from "../d2e-evidence.js";
@@ -17,8 +20,12 @@ try {
   if (typeof module.analyzeRepo !== "function") {
     throw new Error("Analyzer module does not export analyzeRepo.");
   }
+  const compactTrace =
+    module.RANKING_TRACE_SCHEMA_VERSION === COMPACT_TRACE_SCHEMA_VERSION;
   const collector = input.ranking_trace
-    ? createRankingTraceCollector(input.ranking_trace.binding)
+    ? compactTrace
+      ? createCompactRankingTraceCollector(input.ranking_trace.binding)
+      : createRankingTraceCollector(input.ranking_trace.binding)
     : null;
   const analysis = await module.analyzeRepo(input.repository_root, {
     runId: input.run_id,
@@ -31,7 +38,14 @@ try {
     throw new Error("Analyzer returned no state object.");
   }
   const rankingTraceReceipt = collector
-    ? preserveRankingTrace(input.ranking_trace, collector, analysis)
+    ? preserveRankingTrace(
+        input.ranking_trace,
+        collector,
+        analysis,
+        compactTrace
+          ? validateCompactRankingTrace
+          : validateRankingTrace
+      )
     : null;
   process.stdout.write(`${JSON.stringify({
     state: {
@@ -54,7 +68,7 @@ try {
   process.exitCode = 1;
 }
 
-function preserveRankingTrace(request, collector, analysis) {
+function preserveRankingTrace(request, collector, analysis, validateTrace) {
   try {
     if (
       !request ||
@@ -64,7 +78,7 @@ function preserveRankingTrace(request, collector, analysis) {
       throw new Error("Invalid ranking trace output request.");
     }
     const trace = collector.finalize(analysis);
-    const validation = validateRankingTrace(
+    const validation = validateTrace(
       trace,
       request.binding
     );

@@ -28,6 +28,12 @@ import { runCli } from "../src/cli.js";
 import { runWriteCli } from "../src/v1/compatibility/cli.js";
 import { inspectRepository } from "../src/v1/repository/inspect.js";
 import {
+  analyzeRepo as analyzeCompatibilityRepo
+} from "../src/v1/compatibility/refresh.js";
+import {
+  analyzeRepo as analyzeEvaluationRepo
+} from "../src/v1/evaluation/analyze.js";
+import {
   captureCli,
   fileIdentity,
   initializeGit,
@@ -710,6 +716,160 @@ test("review regressions: stable inspection preserves receipt semantics", () => 
     false
   );
   assert.equal(orient.evidence_fingerprint, verify.evidence_fingerprint);
+});
+
+test("round-seven inspection preserves instruction order and Git disablement", () => {
+  const root = makeFixture({
+    ".kanonignore": "AGENTS.md\n",
+    "AGENTS.md": "stable instruction marker\n",
+    "README.md": "# Stable instruction fixture\n",
+    "package.json": JSON.stringify({
+      name: "stable-instruction-fixture",
+      padding: "x".repeat(2_000)
+    })
+  });
+  let gitCalls = 0;
+  const inspection = inspectRepository(
+    root,
+    "inspect README.md",
+    {
+      profile: "orient",
+      inspect_git: false,
+      git_runner() {
+        gitCalls += 1;
+        throw new Error("Git must remain disabled.");
+      },
+      scan: {
+        maxTotalTextBytes: 1_024,
+        useGitIgnore: false
+      }
+    }
+  );
+  assert.equal(inspection.ok, true);
+  if (!inspection.ok) return;
+  assert.equal(gitCalls, 0);
+  assert.equal(
+    inspection.files.some((file) => file.path === "AGENTS.md"),
+    false
+  );
+  assert.deepEqual(
+    inspection.instructions.map((item) => item.path),
+    ["AGENTS.md"]
+  );
+  assert.equal(
+    inspection.instructions[0].content,
+    "stable instruction marker"
+  );
+  assert.deepEqual(
+    inspection.git.diagnostics,
+    ["Git observation was disabled by caller."]
+  );
+
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const evaluated = analyzeEvaluationRepo(root, {
+    inspectGit: false,
+    scan: { useGitIgnore: false }
+  });
+  assert.equal(evaluated.state.git.found, false);
+  assert.deepEqual(
+    evaluated.state.git.diagnostics.map((item) => item.message),
+    ["Git observation was disabled by caller."]
+  );
+});
+
+test("round-seven semantic prefixes and display excerpts stay distinct", () => {
+  const prefixRoot = makeFixture({
+    "README.md": `# Prefix purpose\n${"x".repeat(1_100)}\n`
+  });
+  const prefix = analyzeCompatibilityRepo(prefixRoot, {
+    inspectGit: false,
+    scan: {
+      maxTotalTextBytes: 1_024,
+      useGitIgnore: false
+    }
+  });
+  assert.equal(prefix.state.purpose.claim, "Prefix purpose");
+  assert.equal(prefix.state.scan.complete, false);
+  assert.equal(
+    prefix.state.scan.budgets_reached.includes("max_total_text_bytes"),
+    true
+  );
+
+  const displayRoot = makeFixture({
+    "README.md": `# Full semantic read\n${"y".repeat(9_000)}\n`
+  });
+  const display = analyzeCompatibilityRepo(displayRoot, {
+    inspectGit: false,
+    scan: { useGitIgnore: false }
+  });
+  const displayInspection = inspectRepository(
+    displayRoot,
+    "inspect README.md",
+    {
+      profile: "resume",
+      inspect_git: false,
+      scan: {
+        compatibilityPolicy: true,
+        useGitIgnore: false
+      }
+    }
+  );
+  assert.equal(displayInspection.ok, true);
+  if (!displayInspection.ok) return;
+  const readmeEvidence = displayInspection.evidence.find(
+    (item) => item.path === "README.md"
+  );
+  assert.ok(readmeEvidence);
+  assert.equal(readmeEvidence.truncated, true);
+  assert.equal(display.state.scan.complete, true);
+  assert.equal(
+    display.state.scan.budgets_reached.includes("evidence_truncated"),
+    false
+  );
+});
+
+test("round-seven compatibility ranks contracts and skips generated facts", () => {
+  const generatedImports = Array.from(
+    { length: 300 },
+    (_, index) => `from .module_${index} import value`
+  ).join("\n");
+  const root = makeFixture({
+    "README.md": "# Contract fixture\n",
+    "setup.py": "from setuptools import setup\n",
+    "requirements.txt": "pytest\n",
+    "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+    "nx.json": "{}\n",
+    "GNUmakefile": "build:\n\t@true\n",
+    "Justfile": "test:\n\t@python -m pytest\n",
+    "schema_pb2.py": `${generatedImports}\n# TODO: generated marker\n`
+  });
+  const analysis = analyzeCompatibilityRepo(root, {
+    inspectGit: false,
+    scan: { useGitIgnore: false }
+  });
+  const importantPaths = new Set(
+    analysis.state.important_files.map((item) => item.path)
+  );
+  for (const selectedPath of [
+    "setup.py",
+    "requirements.txt",
+    "pnpm-workspace.yaml",
+    "nx.json",
+    "GNUmakefile",
+    "Justfile"
+  ]) {
+    assert.equal(importantPaths.has(selectedPath), true, selectedPath);
+  }
+  assert.equal(
+    analysis.state.todos.some((item) => item.path === "schema_pb2.py"),
+    false
+  );
+  assert.equal(
+    analysis.state.scan.budgets_reached.includes("max_code_references"),
+    false
+  );
+  assert.equal(analysis.state.scan.complete, true);
 });
 
 test("review regressions: stable and compatibility ignore policies remain distinct", async () => {

@@ -180,6 +180,7 @@ const INSPECTION_TEXTS = new WeakMap();
  *   profile?: InspectionProfile,
  *   target?: string,
  *   git_runner?: import("./git.js").GitRunner,
+ *   inspect_git?: boolean,
  *   allow_filesystem_root?: boolean,
  *   scan?: {
  *     maxFiles?: number,
@@ -283,10 +284,24 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     target === undefined || explicitPaths.includes(target)
       ? explicitPaths
       : [...explicitPaths, target];
+  /** @type {string[]} */
+  let applicableInstructions = [];
+  /** @type {RepositoryEvidence[]} */
+  let instructions = [];
+  if (!limits.compatibility_policy) {
+    instructions = readStableApplicableInstructions(
+      root.root,
+      instructionPaths,
+      coverage
+    );
+    applicableInstructions = instructions.map((item) => item.path);
+  }
   const scan = scanRepository(root.root, coverage, limits, options.git_runner);
-  const applicableInstructions = selectInstructionPaths(
-    instructionPaths, scan.files, coverage
-  );
+  if (limits.compatibility_policy) {
+    applicableInstructions = selectInstructionPaths(
+      instructionPaths, scan.files, coverage
+    );
+  }
   const selected = selectEvidencePaths(
     scan.files, applicableInstructions, task, explicitPaths, profile, target
   );
@@ -294,14 +309,19 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     root.root, scan.files, coverage,
     limits.compatibility_policy
       ? null
-      : new Set([...applicableInstructions, ...selected]),
-    new Set(applicableInstructions),
+      : new Set(selected),
+    limits.compatibility_policy
+      ? new Set(applicableInstructions)
+      : new Set(),
     limits.compatibility_policy
   );
-  const instructions = readApplicableInstructions(
-    applicableInstructions, scan.files, texts, coverage
-  );
+  if (limits.compatibility_policy) {
+    instructions = readVisibleApplicableInstructions(
+      applicableInstructions, scan.files, texts, coverage
+    );
+  }
   const git = observeRepositoryGit(root.root, {
+    enabled: options.inspect_git !== false,
     ...(options.git_runner === undefined ? {} : { runner: options.git_runner }),
     timeout_ms: limits.git_timeout_ms,
     max_output_bytes: limits.git_max_output_bytes,
@@ -492,7 +512,7 @@ function selectInstructionPaths(explicitPaths, files, coverage) {
   );
 }
 /** @param {string[]} candidates @param {InspectedFile[]} files @param {Map<string, string>} texts @param {InspectionCoverage} coverage @returns {RepositoryEvidence[]} */
-function readApplicableInstructions(candidates, files, texts, coverage) {
+function readVisibleApplicableInstructions(candidates, files, texts, coverage) {
   /** @type {RepositoryEvidence[]} */
   const instructions = [];
   const byPath = new Map(files.map((file) => [file.path, file]));
@@ -543,6 +563,74 @@ function readApplicableInstructions(candidates, files, texts, coverage) {
   }
   return instructions;
 }
+/** @param {string} root @param {string[]} explicitPaths @param {InspectionCoverage} coverage @returns {RepositoryEvidence[]} */
+function readStableApplicableInstructions(root, explicitPaths, coverage) {
+  const candidates = new Set(INSTRUCTION_NAMES);
+  for (const selectedPath of explicitPaths) {
+    /** @type {string[]} */
+    const directories = [];
+    let directory = path.posix.dirname(selectedPath);
+    while (directory !== "." && directory !== "/") {
+      directories.unshift(directory);
+      const parent = path.posix.dirname(directory);
+      if (parent === directory) break;
+      directory = parent;
+    }
+    for (const applicableDirectory of directories) {
+      candidates.add(`${applicableDirectory}/AGENTS.md`);
+      candidates.add(`${applicableDirectory}/CLAUDE.md`);
+    }
+  }
+  if (candidates.size > 32) {
+    coverage.instruction_complete = false;
+    noteBudget(coverage, "max_instruction_candidates");
+  }
+  /** @type {RepositoryEvidence[]} */
+  const instructions = [];
+  for (const candidate of Array.from(candidates).slice(0, 32)) {
+    if (instructions.length >= MAX_INSTRUCTION_ITEMS) {
+      coverage.instruction_complete = false;
+      noteBudget(coverage, "max_instruction_items");
+      break;
+    }
+    const read = readBoundedRepositoryFile(
+      root,
+      candidate,
+      MAX_EXCERPT_BYTES,
+      { truncate: true }
+    );
+    if (!read.ok) {
+      if (read.status !== "missing") {
+        coverage.instruction_complete = false;
+        recordReadFailure(coverage, read);
+      }
+      continue;
+    }
+    const rawContent = read.bytes.toString("utf8");
+    const content = sanitizeDisplayText(
+      rawContent,
+      MAX_EXCERPT_BYTES,
+      { multiline: true }
+    );
+    const sanitizationTruncated =
+      Buffer.byteLength(rawContent, "utf8") > MAX_EXCERPT_BYTES;
+    const truncated = read.truncated || sanitizationTruncated;
+    instructions.push({
+      kind: "instruction",
+      path: read.relative_path,
+      size: read.size,
+      sha256: sha256(read.bytes),
+      content,
+      truncated,
+      trust: "repository-untrusted"
+    });
+    if (truncated) {
+      coverage.instruction_complete = false;
+      noteBudget(coverage, "instruction_truncated");
+    }
+  }
+  return instructions;
+}
 /** @param {string} root @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {Set<string> | null} selectedPaths @param {Set<string>} instructionPaths @param {boolean} compatibilityPolicy @returns {Map<string, string>} */
 function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instructionPaths, compatibilityPolicy) {
   const started = process.hrtime.bigint();
@@ -571,21 +659,16 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
       noteBudget(coverage, "max_scan_ms");
       break;
     }
-    const truncate = selectedPaths !== null && instructionPaths.has(file.path);
     const maximum = Math.min(
-      truncate ? MAX_EXCERPT_BYTES : coverage.limits.max_file_bytes,
+      coverage.limits.max_file_bytes,
       remaining
     );
     if (maximum < 1) { noteBudget(coverage, "max_total_text_bytes"); break; }
-    if (!truncate && file.size > maximum) {
-      noteNonterminalBudget(coverage, "max_total_text_bytes");
-      continue;
-    }
     const read = readBoundedRepositoryFile(
       root,
       file.path,
       maximum,
-      { truncate }
+      { truncate: true }
     );
     if (!read.ok) {
       recordReadFailure(coverage, read);
@@ -593,6 +676,14 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
     }
     remaining -= read.bytes.length;
     coverage.total_text_bytes_read += read.bytes.length;
+    if (read.truncated) {
+      noteNonterminalBudget(
+        coverage,
+        file.size > coverage.limits.max_file_bytes
+          ? "max_file_bytes"
+          : "max_total_text_bytes"
+      );
+    }
     const digest = sha256(read.bytes);
     if (
       read.size !== file.size ||
@@ -609,7 +700,7 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
     try {
       texts.set(
         file.path,
-        new TextDecoder("utf-8", { fatal: true }).decode(read.bytes)
+        decodeRepositoryText(read.bytes, read.truncated)
       );
     } catch {
       file.text = false;
@@ -618,6 +709,24 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
   }
   coverage.elapsed_ms += elapsedMilliseconds(started);
   return texts;
+}
+/** @param {Buffer} bytes @param {boolean} truncated */
+function decodeRepositoryText(bytes, truncated) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    if (!truncated) throw error;
+    for (let removed = 1; removed <= Math.min(3, bytes.length); removed += 1) {
+      try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(
+          bytes.subarray(0, bytes.length - removed)
+        );
+      } catch {
+        continue;
+      }
+    }
+    throw error;
+  }
 }
 /** @param {string} selectedPath @param {Set<string>} instructionPaths @param {boolean} compatibilityPolicy @returns {number} */
 function textReadPriority(selectedPath, instructionPaths, compatibilityPolicy) {
@@ -1316,6 +1425,7 @@ function readSelectedEvidence(
     if (rawContent === undefined) continue;
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
     const sanitizationTruncated =
+      file.size > Buffer.byteLength(rawContent, "utf8") ||
       Buffer.byteLength(rawContent, "utf8") > maximum;
     const content = sanitizeDisplayText(
       rawContent,
@@ -1332,9 +1442,6 @@ function readSelectedEvidence(
       truncated: sanitizationTruncated,
       trust: "repository-untrusted"
     });
-    if (sanitizationTruncated) {
-      noteNonterminalBudget(coverage, "evidence_truncated");
-    }
   }
   return evidence;
 }

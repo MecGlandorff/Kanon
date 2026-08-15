@@ -7,8 +7,8 @@ Today it can:
 
 - read bounded JavaScript/TypeScript and Python imports and rank files by
   fan-in;
-- find content-backed entrypoints such as Python `__main__`, package binaries,
-  and JavaScript executables;
+- find fixed conventional JavaScript/Python entrypoint paths and root package
+  exports or binaries;
 - extract directly declared commands from package metadata, Python project
   scripts, and bounded Poe, Make, and Just targets;
 - detect direct README/package-script contradictions and report unobserved
@@ -24,6 +24,11 @@ The v1.1 compatibility refresh intentionally does not synthesize conventional
 Cargo, Go, or Django commands or project Go/Rust import and entrypoint code
 intelligence. Their manifests and paths can still be observed as bounded
 repository evidence.
+
+The same versioned compact contract does not restore broad executable-syntax
+or nested-manifest entrypoint discovery, and it does not rank literal local-file
+references. Installed evaluation takes the first five files from the compact
+important-file projection and records only the two ranking stages that run.
 
 The visible 30-repository corpus is development and regression data. Its
 results are in-sample and are not presented as performance on unseen
