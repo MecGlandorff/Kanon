@@ -43,6 +43,8 @@ const MAX_EVIDENCE_RECORDS = 40;
 const MAX_RENDERED_EXCERPT_BYTES = 240;
 const MAX_TODO_OBSERVATIONS = 40;
 const MAX_CODE_OBSERVATIONS = 20;
+const MAX_COMMANDS_PER_GROUP = 8;
+const MAX_VERIFICATION_COMMANDS = 64;
 /**
  * @typedef {Extract<ReturnType<typeof inspectRepository>, {ok: true}>}
  *   Inspection
@@ -57,7 +59,7 @@ const MAX_CODE_OBSERVATIONS = 20;
  * @typedef {{
  *   runId: string,
  *   records: EvidenceRecord[],
- *   byPath: Map<string, string>
+ *   byClaim: Map<string, string>
  * }} EvidenceContext
  * @typedef {{
  *   claim: string,
@@ -82,6 +84,15 @@ const MAX_CODE_OBSERVATIONS = 20;
  * @typedef {{found: boolean, files: {path: string, evidence: string}[]}}
  *   ProjectSignal
  * @typedef {{
+ *   type: string,
+ *   severity: string,
+ *   conclusion: string,
+ *   claim: string,
+ *   observation: string,
+ *   evidence: string[],
+ *   suggestion?: string
+ * }} VerificationObservation
+ * @typedef {{
  *   found: boolean,
  *   valid: boolean,
  *   warning: string | null,
@@ -105,6 +116,15 @@ const MAX_CODE_OBSERVATIONS = 20;
  */
 /** Run one bounded compatibility refresh using only the v1 repository inspector and the narrow compatibility persistence modules. @param {string} root @param {{deep?: boolean}} [options] */
 export function refreshKanon(root, options = {}) {
+  const prepared = prepareRefreshAnalysis(root);
+  return persistRefresh(prepared.analysis, prepared.config, options);
+}
+/** @param {string} [root] @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1]}} [options] */
+export function analyzeRepo(root = process.cwd(), options = {}) {
+  return prepareRefreshAnalysis(root, options).analysis;
+}
+/** @param {string} root @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1]}} [options] */
+function prepareRefreshAnalysis(root, options = {}) {
   const requestedRoot = path.resolve(root);
   const configInspection = inspectKanonConfig(requestedRoot);
   const inspection = inspectRepository(
@@ -114,7 +134,7 @@ export function refreshKanon(root, options = {}) {
       profile: "resume",
       allow_filesystem_root: true,
       scan: {
-        ...scanOptionsFromConfig(configInspection.config),
+        ...scanOptionsFromConfig(configInspection.config, options.scan),
         compatibilityPolicy: true
       }
     }
@@ -122,23 +142,34 @@ export function refreshKanon(root, options = {}) {
   if (!inspection.ok) {
     throw new Error(inspection.diagnostic);
   }
-  const analysis = buildRefreshAnalysis(inspection, configInspection);
-  return persistRefresh(analysis, configInspection.config, options);
+  return {
+    analysis: buildRefreshAnalysis(
+      inspection,
+      configInspection,
+      options.runId
+    ),
+    config: configInspection.config
+  };
 }
-/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection */
-function buildRefreshAnalysis(inspection, configInspection) {
+/** @param {Inspection} inspection @param {ReturnType<typeof inspectKanonConfig>} configInspection @param {string | undefined} requestedRunId */
+function buildRefreshAnalysis(inspection, configInspection, requestedRunId) {
   const generatedAt = new Date().toISOString();
-  const runId = createRunId(generatedAt);
+  const runId = typeof requestedRunId === "string" &&
+    /^[A-Za-z0-9][A-Za-z0-9-]{13,63}$/.test(requestedRunId)
+    ? requestedRunId
+    : createRunId(generatedAt);
   const evidence = createEvidenceContext(inspection, runId);
   const texts = repositoryInspectionTexts(inspection);
   const packageInfo = readPackageEvidence(texts);
   const pyprojectInfo = readPyprojectEvidence(texts);
+  const pythonTest = detectPythonTestEvidence(texts, pyprojectInfo);
   const facts = observeRepositoryFacts(inspection, texts, packageInfo);
   const purpose = projectPurpose(
     inspection,
     packageInfo,
     pyprojectInfo,
-    evidence
+    evidence,
+    texts
   );
   const files = inspection.files;
   const testPaths = files
@@ -146,12 +177,16 @@ function buildRefreshAnalysis(inspection, configInspection) {
     .filter(isTestPath);
   const commands = projectCommands(
     packageInfo,
+    pyprojectInfo,
+    pythonTest,
     inspection,
     evidence,
     facts.texts
   );
-  const declaredTest = commands.test.length > 0;
-  const pytest = pyprojectInfo?.has_pytest === true;
+  const declaredTest = commands.test.some((command) =>
+    command.confidence === "known"
+  );
+  const pytest = pythonTest.found;
   const tests = {
     found: testPaths.length > 0 || declaredTest || pytest,
     files: testPaths.slice(0, 50),
@@ -169,12 +204,12 @@ function buildRefreshAnalysis(inspection, configInspection) {
         )]
       : declaredTest
         ? commands.test[0]?.evidence || []
-        : pytest
+        : pytest && pythonTest.path
           ? [evidenceFor(
               evidence,
-              "pyproject.toml",
+              pythonTest.path,
               "test",
-              "Pytest configuration was observed in bounded metadata."
+              "Pytest configuration or dependency evidence was observed."
             )]
           : []
   };
@@ -191,7 +226,13 @@ function buildRefreshAnalysis(inspection, configInspection) {
     evidence
   );
   const release = projectSignal(
-    files.map((file) => file.path).filter(isReleasePath),
+    files.map((file) => file.path).filter((selectedPath) =>
+      isReleasePath(selectedPath) ||
+      (
+        isCiPath(selectedPath) &&
+        hasReleaseWorkflowSignal(texts.get(selectedPath) || "")
+      )
+    ),
     "file",
     "Release/changelog evidence found.",
     evidence
@@ -199,24 +240,20 @@ function buildRefreshAnalysis(inspection, configInspection) {
   const importantFiles = projectImportantFiles(
     inspection,
     evidence,
-    facts.fan_in
+    facts
   );
   const git = projectGit(inspection, evidence);
   const scan = projectScan(inspection, facts);
-  const verificationTarget = files
-    .map((file) => file.path)
-    .find((file) => path.posix.basename(file).toLowerCase().startsWith("readme"));
-  const verification = {
-    target: verificationTarget || "README.md",
-    checked: false,
-    applicable: verificationTarget !== undefined,
-    scan_complete: scan.complete,
-    issues: [],
-    unknowns: [],
-    note:
-      "README drift conclusions are Unknown in the compact compatibility refresh projection.",
-    commands_checked: 0
-  };
+  const verification = projectReadmeVerification({
+    inspection,
+    texts,
+    packageInfo,
+    ci,
+    deployment,
+    release,
+    evidence,
+    scan
+  });
   const configurationEvidence = configInspection.warning
     ? [evidenceFor(
         evidence,
@@ -243,7 +280,8 @@ function buildRefreshAnalysis(inspection, configInspection) {
     inspection,
     configuration,
     commands,
-    facts
+    facts,
+    verification
   });
   const stateValue = {
     version: VERSION,
@@ -254,6 +292,7 @@ function buildRefreshAnalysis(inspection, configInspection) {
       root: inspection.root,
       languages: detectLanguages(
         files.map((file) => file.path),
+        packageInfo !== null,
         pyprojectInfo !== null
       ),
       files_scanned: files.length
@@ -308,7 +347,7 @@ function buildRefreshAnalysis(inspection, configInspection) {
 /** @param {Inspection} inspection @param {string} runId @returns {EvidenceContext} */
 function createEvidenceContext(inspection, runId) {
   /** @type {EvidenceContext} */
-  const context = { runId, records: [], byPath: new Map() };
+  const context = { runId, records: [], byClaim: new Map() };
   for (const item of inspection.evidence) {
     evidenceFor(
       context,
@@ -322,7 +361,8 @@ function createEvidenceContext(inspection, runId) {
 }
 /** @param {EvidenceContext} context @param {string} selectedPath @param {string} kind @param {string} claim @param {string} [excerpt] @returns {string} */
 function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
-  const existing = context.byPath.get(selectedPath);
+  const key = `${selectedPath}\0${kind}\0${claim}`;
+  const existing = context.byClaim.get(key);
   if (existing) {
     return existing;
   }
@@ -347,7 +387,7 @@ function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
     record.excerpt = selectedExcerpt;
   }
   context.records.push(record);
-  context.byPath.set(selectedPath, id);
+  context.byClaim.set(key, id);
   return id;
 }
 /** @param {Map<string, string>} texts @returns {Record<string, unknown> | null} */
@@ -368,19 +408,64 @@ function readPyprojectEvidence(texts) {
   const text = texts.get("pyproject.toml");
   if (text === undefined) return null;
   const project = tomlSection(text, "project");
+  const poetry = tomlSection(text, "tool.poetry");
   return {
-    name: tomlString(project, "name"),
-    description: tomlString(project, "description"),
-    has_pytest: /^\[tool\.pytest(?:\.[^\]]+)?\]\s*$/m.test(text)
+    name:
+      tomlString(project, "name") ||
+      tomlString(poetry, "name") ||
+      tomlString(text, "name"),
+    description:
+      tomlString(project, "description") ||
+      tomlString(poetry, "description") ||
+      tomlString(text, "description"),
+    project_scripts: tomlEntries(tomlSection(text, "project.scripts")),
+    poetry_scripts: tomlEntries(tomlSection(text, "tool.poetry.scripts")),
+    has_pytest: /^\s*\[\s*tool\.pytest(?:\.[^\]]+)?\s*\]\s*(?:#.*)?$/m.test(text)
   };
 }
 /** @param {string} section @param {string} key */
 function tomlString(section, key) {
   const match = new RegExp(
-    `^${key}\\s*=\\s*(["'])(.*?)\\1\\s*(?:#.*)?$`,
+    `^\\s*${key}\\s*=\\s*(["'])(.*?)\\1\\s*(?:#.*)?$`,
     "m"
   ).exec(section);
   return match?.[2] || null;
+}
+/** @param {string} section @returns {Record<string, string>} */
+function tomlEntries(section) {
+  /** @type {Record<string, string>} */
+  const entries = {};
+  for (const match of section.matchAll(
+    /^\s*([A-Za-z0-9_.-]+)\s*=\s*(["'])(.*?)\2\s*(?:#.*)?$/gm
+  )) {
+    if (match[1] && match[3] && Object.keys(entries).length < 64) {
+      entries[match[1]] = match[3];
+    }
+  }
+  return entries;
+}
+/** @param {Map<string, string>} texts @param {{has_pytest: boolean} | null} pyprojectInfo */
+function detectPythonTestEvidence(texts, pyprojectInfo) {
+  if (pyprojectInfo?.has_pytest) {
+    return { found: true, path: "pyproject.toml" };
+  }
+  for (const selectedPath of ["pytest.ini", "setup.cfg", "tox.ini"]) {
+    const text = texts.get(selectedPath);
+    if (
+      text !== undefined &&
+      (selectedPath === "pytest.ini" || /pytest/i.test(text))
+    ) {
+      return { found: true, path: selectedPath };
+    }
+  }
+  const requirements = texts.get("requirements.txt");
+  if (
+    requirements !== undefined &&
+    /(^|\n)\s*pytest(?:[<>=~!;\s]|$)/i.test(requirements)
+  ) {
+    return { found: true, path: "requirements.txt" };
+  }
+  return { found: false, path: null };
 }
 /** @param {Inspection} inspection @param {Map<string, string>} texts @param {Record<string, unknown> | null} packageInfo @returns {RepositoryFacts} */
 function observeRepositoryFacts(inspection, texts, packageInfo) {
@@ -526,8 +611,8 @@ function manifestTargets(packageInfo) {
   }
   return targets;
 }
-/** @param {Inspection} inspection @param {Record<string, unknown> | null} packageInfo @param {{name: string | null, description: string | null, has_pytest: boolean} | null} pyprojectInfo @param {EvidenceContext} evidence */
-function projectPurpose(inspection, packageInfo, pyprojectInfo, evidence) {
+/** @param {Inspection} inspection @param {Record<string, unknown> | null} packageInfo @param {{name: string | null, description: string | null} | null} pyprojectInfo @param {EvidenceContext} evidence @param {Map<string, string>} texts */
+function projectPurpose(inspection, packageInfo, pyprojectInfo, evidence, texts) {
   if (typeof packageInfo?.description === "string") {
     const claim = safeTerminalText(packageInfo.description);
     if (claim) {
@@ -557,22 +642,44 @@ function projectPurpose(inspection, packageInfo, pyprojectInfo, evidence) {
       trust: "repository-untrusted"
     };
   }
-  const readme = inspection.evidence.find((item) =>
-    path.posix.basename(item.path).toLowerCase().startsWith("readme")
-  );
-  const heading = readme?.content
+  const readmePath = inspection.files
+    .map((file) => file.path)
+    .find((selectedPath) =>
+      path.posix.basename(selectedPath).toLowerCase().startsWith("readme")
+    );
+  const readmeText = readmePath ? texts.get(readmePath) : undefined;
+  const heading = readmeText
+    ? readmeText
     .split("\n")
     .map((line) => line.replace(/^#+\s*/, "").trim())
-    .find(Boolean);
-  if (readme && heading) {
+    .find(Boolean)
+    : undefined;
+  if (readmePath && heading) {
     return {
       claim: safeTerminalText(heading),
       confidence: /** @type {const} */ ("likely"),
       evidence: [evidenceFor(
         evidence,
-        readme.path,
+        readmePath,
         "documentation",
         "README heading used as declared-purpose evidence."
+      )],
+      trust: "repository-untrusted"
+    };
+  }
+  const skillText = texts.get("SKILL.md");
+  const skillDescription = skillText?.match(
+    /^\s*description:\s*["']?(.+?)["']?\s*$/m
+  )?.[1];
+  if (skillDescription) {
+    return {
+      claim: safeTerminalText(skillDescription),
+      confidence: /** @type {const} */ ("likely"),
+      evidence: [evidenceFor(
+        evidence,
+        "SKILL.md",
+        "metadata",
+        "Skill description used as declared-purpose evidence."
       )],
       trust: "repository-untrusted"
     };
@@ -592,28 +699,42 @@ function repositoryName(inspection, packageInfo, pyprojectInfo) {
       ? safeTerminalText(pyprojectInfo.name)
     : path.basename(inspection.root);
 }
-/** @param {Record<string, unknown> | null} packageInfo @param {Inspection} inspection @param {EvidenceContext} evidence @param {Map<string, string>} texts @returns {CommandGroups} */
-function projectCommands(packageInfo, inspection, evidence, texts) {
+/** @param {Record<string, unknown> | null} packageInfo @param {{project_scripts: Record<string, string>, poetry_scripts: Record<string, string>} | null} pyprojectInfo @param {{found: boolean, path: string | null}} pythonTest @param {Inspection} inspection @param {EvidenceContext} evidence @param {Map<string, string>} texts @returns {CommandGroups} */
+function projectCommands(packageInfo, pyprojectInfo, pythonTest, inspection, evidence, texts) {
   /** @type {{run: CommandCandidate[], test: CommandCandidate[], build: CommandCandidate[], dev: CommandCandidate[]}} */
   const candidates = { run: [], test: [], build: [], dev: [] };
-  /** @type {(group: keyof CommandGroups, command: string, source: string, score: number, detail?: string | null) => void} */
-  const add = (group, command, source, score, detail = null) => {
+  /** @type {(group: keyof CommandGroups, command: string, source: string, score: number, detail?: string | null, confidence?: "known" | "likely" | "unknown", evidencePath?: string) => void} */
+  const add = (
+    group,
+    command,
+    source,
+    score,
+    detail = null,
+    confidence = "known",
+    evidencePath = source
+  ) => {
+    const existing = candidates[group].find((item) =>
+      item.command === command && item.cwd === "."
+    );
+    if (existing && existing.score >= score) return;
     const evidenceId = evidenceFor(
       evidence,
-      source,
+      evidencePath,
       "command",
-      "Command declaration parsed from bounded repository metadata."
+      `${group} command declaration parsed from bounded repository metadata: ${command}.`
     );
-    candidates[group].push({
+    const item = {
       command,
       cwd: ".",
       source,
-      confidence: "known",
+      confidence,
       evidence: evidenceId ? [evidenceId] : [],
       detail,
       trust: "repository-untrusted",
       score
-    });
+    };
+    if (existing) Object.assign(existing, item);
+    else candidates[group].push(item);
   };
   const scripts = packageInfo && plainRecord(packageInfo.scripts)
     ? packageInfo.scripts
@@ -660,11 +781,63 @@ function projectCommands(packageInfo, inspection, evidence, texts) {
       );
     }
   }
+  const packageBin = packageInfo?.bin;
+  if (
+    typeof packageBin === "string" &&
+    typeof packageInfo?.name === "string" &&
+    isCommandName(packageInfo.name)
+  ) {
+    add(
+      "run",
+      packageInfo.name,
+      "package.json bin",
+      188,
+      packageBin,
+      "known",
+      "package.json"
+    );
+  } else if (plainRecord(packageBin)) {
+    for (const [name, target] of Object.entries(packageBin)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .slice(0, MAX_COMMANDS_PER_GROUP)) {
+      if (typeof target === "string" && isCommandName(name)) {
+        add(
+          "run",
+          name,
+          "package.json bin",
+          188,
+          target,
+          "known",
+          "package.json"
+        );
+      }
+    }
+  }
+  for (const [section, entries] of /** @type {[string, Record<string, string> | undefined][]} */ ([
+    ["project.scripts", pyprojectInfo?.project_scripts],
+    ["tool.poetry.scripts", pyprojectInfo?.poetry_scripts]
+  ])) {
+    for (const [name, target] of Object.entries(entries || {})
+      .sort(([left], [right]) => left.localeCompare(right))
+      .slice(0, MAX_COMMANDS_PER_GROUP)) {
+      if (isCommandName(name)) {
+        add(
+          "run",
+          name,
+          `pyproject.toml [${section}]`,
+          190,
+          target,
+          "known",
+          "pyproject.toml"
+        );
+      }
+    }
+  }
   const pyproject = texts.get("pyproject.toml");
   if (pyproject !== undefined) {
     const section = tomlSection(pyproject, "tool.poe.tasks");
     const tasks = new Set();
-    for (const match of section.matchAll(/^([A-Za-z0-9_.-]+)\s*=/gm)) {
+    for (const match of section.matchAll(/^\s*([A-Za-z0-9_.-]+)\s*=/gm)) {
       const task = match[1]?.split(".")[0];
       if (task) tasks.add(task);
     }
@@ -708,11 +881,22 @@ function projectCommands(packageInfo, inspection, evidence, texts) {
       add(group, command, buildFile, score);
     }
   }
+  if (candidates.test.length === 0 && pythonTest.found && pythonTest.path) {
+    add(
+      "test",
+      "pytest",
+      pythonTest.path,
+      150,
+      null,
+      "likely",
+      pythonTest.path
+    );
+  }
   return {
-    run: selectCommandCandidate(candidates.run),
-    test: selectCommandCandidate(candidates.test),
-    build: selectCommandCandidate(candidates.build),
-    dev: selectCommandCandidate(candidates.dev)
+    run: selectCommandCandidates(candidates.run),
+    test: selectCommandCandidates(candidates.test),
+    build: selectCommandCandidates(candidates.build),
+    dev: selectCommandCandidates(candidates.dev)
   };
 }
 /** @param {"npm" | "pnpm" | "yarn" | "bun"} manager @param {string} name */
@@ -728,17 +912,18 @@ function packageCommandName(manager, name) {
           : `npm run ${name}`;
 }
 /** @param {CommandCandidate[]} candidates @returns {Command[]} */
-function selectCommandCandidate(candidates) {
-  const selected = [...candidates].sort((left, right) =>
+function selectCommandCandidates(candidates) {
+  return [...candidates].sort((left, right) =>
     right.score - left.score ||
     left.command.length - right.command.length ||
     left.command.localeCompare(right.command)
-  )[0];
-  if (!selected) {
-    return [];
-  }
-  const { score: _score, ...command } = selected;
-  return [command];
+  ).slice(0, MAX_COMMANDS_PER_GROUP).map(({ score: _score, ...command }) =>
+    command
+  );
+}
+/** @param {string} value @returns {boolean} */
+function isCommandName(value) {
+  return /^[A-Za-z0-9@][A-Za-z0-9@/_.:-]{0,127}$/.test(value);
 }
 /** @param {string} text @returns {Set<string>} */
 function parseBuildTargets(text) {
@@ -752,13 +937,16 @@ function parseBuildTargets(text) {
 /** @param {string} text @param {string} name @returns {string} */
 function tomlSection(text, name) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const heading = new RegExp(`^\\[${escaped}\\]\\s*$`, "m");
+  const heading = new RegExp(
+    `^\\s*\\[\\s*${escaped}\\s*\\]\\s*(?:#.*)?$`,
+    "m"
+  );
   const match = heading.exec(text);
   if (!match) {
     return "";
   }
   const rest = text.slice(match.index + match[0].length);
-  const nextSection = rest.search(/^\[/m);
+  const nextSection = rest.search(/^\s*\[/m);
   return nextSection === -1 ? rest : rest.slice(0, nextSection);
 }
 /** @param {string[]} paths @param {string} kind @param {string} claim @param {EvidenceContext} evidence @returns {ProjectSignal} */
@@ -771,30 +959,48 @@ function projectSignal(paths, kind, claim, evidence) {
     }))
   };
 }
-/** @param {Inspection} inspection @param {EvidenceContext} evidence @param {Map<string, number>} fanIn @returns {ImportantFile[]} */
-function projectImportantFiles(inspection, evidence, fanIn) {
-  const selected = new Map(
-    inspection.evidence.map((item) => [item.path, item.kind])
-  );
+/** @param {Inspection} inspection @param {EvidenceContext} evidence @param {RepositoryFacts} facts @returns {ImportantFile[]} */
+function projectImportantFiles(inspection, evidence, facts) {
+  /** @type {Map<string, {kind: string, reason: string}>} */
+  const selected = new Map();
+  /** @param {string} selectedPath @param {string} kind @param {string} reason */
+  const add = (selectedPath, kind, reason) => {
+    if (!selected.has(selectedPath)) selected.set(selectedPath, { kind, reason });
+  };
+  for (const item of inspection.evidence.filter((item) =>
+    item.kind === "instruction"
+  ).slice(0, 4)) {
+    add(
+      item.path,
+      item.kind,
+      "applicable repository instruction; content remains untrusted"
+    );
+  }
   for (const file of inspection.files) {
-    if (selected.size >= 16) {
-      break;
-    }
     if (isBaselinePath(file.path)) {
-      selected.set(file.path, "artifact");
+      add(file.path, "artifact", "root project metadata or documentation");
     }
   }
-  return Array.from(selected.entries()).slice(0, 16).map(([selectedPath, kind]) => ({
+  for (const item of facts.code_intelligence.entrypoints.slice(0, 8)) {
+    add(item.path, "source", `entrypoint: ${item.reason}`);
+  }
+  for (const item of facts.code_intelligence.top_fan_in.slice(0, 8)) {
+    add(item.path, "source", `imported by ${item.fan_in} local file(s)`);
+  }
+  for (const item of inspection.evidence) {
+    add(item.path, item.kind, "selected by the bounded v1 repository inspector");
+  }
+  return Array.from(selected.entries()).slice(0, 16).map(([
+    selectedPath,
+    selectedValue
+  ]) => ({
     path: selectedPath,
-    reason:
-      kind === "instruction"
-        ? "applicable repository instruction; content remains untrusted"
-        : "selected by the bounded v1 repository inspector",
-    fan_in: fanIn.get(selectedPath) || 0,
+    reason: selectedValue.reason,
+    fan_in: facts.fan_in.get(selectedPath) || 0,
     evidence: [evidenceFor(
       evidence,
       selectedPath,
-      kind,
+      selectedValue.kind,
       "Important file selected from bounded repository evidence."
     )].filter(Boolean)
   }));
@@ -883,7 +1089,292 @@ function projectScan(inspection, facts) {
     git_diagnostic: coverage.git_ignore_diagnostic
   };
 }
-/** @param {{ purpose: ReturnType<typeof projectPurpose>, tests: {found: boolean, files: string[], count: number, frameworks: string[], evidence: string[]}, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, importantFiles: ImportantFile[], inspection: Inspection, configuration: ConfigurationState, commands: CommandGroups, facts: RepositoryFacts }} input */
+/** @param {{inspection: Inspection, texts: Map<string, string>, packageInfo: Record<string, unknown> | null, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, evidence: EvidenceContext, scan: ReturnType<typeof projectScan>}} input */
+function projectReadmeVerification(input) {
+  const target = input.inspection.files
+    .map((file) => file.path)
+    .find((selectedPath) =>
+      path.posix.basename(selectedPath).toLowerCase().startsWith("readme")
+    );
+  if (!target) {
+    if (input.texts.has("SKILL.md")) {
+      return {
+        target: "README.md",
+        checked: false,
+        applicable: false,
+        scan_complete: input.scan.complete,
+        note:
+          "README verification is not applicable to a self-contained skill package with SKILL.md.",
+        issues: [],
+        unknowns: [],
+        commands_checked: 0
+      };
+    }
+    return {
+      target: "README.md",
+      checked: false,
+      applicable: true,
+      scan_complete: input.scan.complete,
+      issues: [],
+      unknowns: [{
+        type: "missing_readme",
+        severity: "info",
+        conclusion: "unknown",
+        claim: "No README file found at README.md.",
+        observation:
+          "Kanon could not verify README claims because README.md was not detected.",
+        evidence: []
+      }],
+      commands_checked: 0
+    };
+  }
+  const readme = input.texts.get(target);
+  if (readme === undefined) {
+    return {
+      target,
+      checked: false,
+      applicable: true,
+      scan_complete: input.scan.complete,
+      issues: [],
+      unknowns: [{
+        type: "unavailable_readme",
+        severity: "info",
+        conclusion: "unknown",
+        claim: `README verification for ${target} is Unknown.`,
+        observation: "The bounded text read did not make the README available.",
+        evidence: []
+      }],
+      commands_checked: 0
+    };
+  }
+  const files = new Set(input.inspection.files.map((file) => file.path));
+  const scripts = plainRecord(input.packageInfo?.scripts)
+    ? input.packageInfo.scripts
+    : {};
+  const availableScripts = Object.keys(scripts);
+  /** @type {VerificationObservation[]} */
+  const issues = [];
+  /** @type {VerificationObservation[]} */
+  const unknowns = [];
+  const commands = extractDocumentedCommands(readme);
+  for (const command of commands) {
+    const readmeEvidence = evidenceFor(
+      input.evidence,
+      target,
+      "documentation",
+      `README documents command ${command}.`,
+      command
+    );
+    const expectation = packageScriptExpectation(command);
+    if (expectation && input.packageInfo) {
+      if (typeof scripts[expectation.script] !== "string") {
+        issues.push({
+          type: "command_drift",
+          severity: "warning",
+          conclusion: "contradiction",
+          claim: `README says to run \`${command}\`.`,
+          observation:
+            `package.json has no \`${expectation.script}\` script; available scripts: ${availableScripts.length ? availableScripts.join(", ") : "(none)"}.`,
+          evidence: [
+            readmeEvidence,
+            evidenceFor(
+              input.evidence,
+              "package.json",
+              "metadata",
+              "Package scripts used to verify documented commands."
+            )
+          ].filter(Boolean),
+          suggestion:
+            "Resolve this direct declaration contradiction before relying on the documented command."
+        });
+      }
+      continue;
+    }
+    const targetPath = documentedCommandTarget(command);
+    if (targetPath && !files.has(targetPath)) {
+      unknowns.push({
+        type: "command_drift",
+        severity: "info",
+        conclusion: "unknown",
+        claim: `README says to run \`${command}\`.`,
+        observation:
+          `The current bounded checks did not observe ${targetPath}. This non-observation is not a direct contradiction.${input.scan.complete ? "" : " The scan was incomplete."}`,
+        evidence: [readmeEvidence].filter(Boolean),
+        suggestion: "Update the documented command or add the referenced file."
+      });
+    }
+  }
+  addReadmeNonObservations(input, target, readme, unknowns);
+  return {
+    target,
+    checked: true,
+    applicable: true,
+    scan_complete: input.scan.complete,
+    commands_checked: commands.length,
+    issues,
+    unknowns
+  };
+}
+/** @param {string} markdown @returns {string[]} */
+function extractDocumentedCommands(markdown) {
+  const commands = new Set();
+  /** @param {string} raw */
+  const add = (raw) => {
+    if (commands.size >= MAX_VERIFICATION_COMMANDS) return;
+    const command = raw.replace(/\s+#.*$/, "").replace(/\s+&&.*$/, "").trim();
+    if (
+      command &&
+      command.length <= 512 &&
+      !command.startsWith("git clone") &&
+      !command.startsWith("cd ")
+    ) commands.add(command);
+  };
+  for (const match of markdown.matchAll(/^\s*\$\s+(.+)$/gm)) {
+    if (match[1]) add(match[1]);
+  }
+  const inline = /`(((?:(?:npm|npx|pnpm|yarn|pytest|python3?|node|docker)\b)|kanon(?=\s|$))[^`\n]*)`/gi;
+  for (const match of markdown.matchAll(inline)) {
+    if (match[1] && !isNegatedAt(markdown, match.index || 0, match[0].length)) {
+      add(match[1]);
+    }
+  }
+  const commandLine = /^\s*(((?:(?:npm|npx|pnpm|yarn|pytest|python3?|node|docker)\b)|kanon(?=\s|$))[^\n]*)$/i;
+  for (const fence of markdown.matchAll(/```[A-Za-z0-9_-]*\n([\s\S]*?)```/g)) {
+    for (const line of (fence[1] || "").split(/\r?\n/)) {
+      const match = line.match(commandLine);
+      if (match?.[1]) add(match[1]);
+    }
+  }
+  return Array.from(commands);
+}
+/** @param {string} command */
+function packageScriptExpectation(command) {
+  const direct = command.trim().match(/^(npm|pnpm)\s+(start|test|build|dev)$/);
+  if (direct?.[1] && direct[2]) {
+    return { manager: direct[1], script: direct[2] };
+  }
+  const run = command.trim().match(
+    /^(npm|pnpm)\s+run\s+([A-Za-z0-9:_-]+)/
+  );
+  if (run?.[1] && run[2]) return { manager: run[1], script: run[2] };
+  const yarn = command.trim().match(/^yarn\s+([A-Za-z0-9:_-]+)/);
+  return yarn?.[1] && !["install", "add"].includes(yarn[1])
+    ? { manager: "yarn", script: yarn[1] }
+    : null;
+}
+/** @param {string} command @returns {string | null} */
+function documentedCommandTarget(command) {
+  const match = command.match(
+    /^(?:node\s+([^\s]+)|python(?:3)?\s+([^\s-][^\s]*\.py))(?:\s|$)/
+  );
+  const selected = (match?.[1] || match?.[2] || "")
+    .replaceAll("\\", "/")
+    .replace(/^\.\//, "");
+  if (!selected) return null;
+  const normalized = path.posix.normalize(selected);
+  return normalized === ".." || normalized.startsWith("../") ||
+    path.posix.isAbsolute(normalized)
+    ? null
+    : normalized;
+}
+/** @param {Parameters<typeof projectReadmeVerification>[0]} input @param {string} target @param {string} readme @param {VerificationObservation[]} unknowns */
+function addReadmeNonObservations(input, target, readme, unknowns) {
+  /** @param {RegExp} pattern @param {string} claim @param {string} observation */
+  const add = (pattern, claim, observation) => {
+    if (!hasAffirmedMatch(readme, pattern)) return;
+    unknowns.push({
+      type: "non_observation",
+      severity: "info",
+      conclusion: "unknown",
+      claim,
+      observation:
+        `${observation}${input.scan.complete ? "" : " The repository scan was incomplete."}`,
+      evidence: [evidenceFor(
+        input.evidence,
+        target,
+        "documentation",
+        claim,
+        excerptAround(readme, pattern)
+      )].filter(Boolean)
+    });
+  };
+  if (
+    hasAffirmedMatch(readme, /\bpdf\b|pdf export|export.*pdf/i) &&
+    !Array.from(input.texts).some(([selectedPath, text]) =>
+      selectedPath !== target && /pdf/i.test(text)
+    )
+  ) {
+    add(
+      /\bpdf\b|pdf export|export.*pdf/i,
+      "README declares PDF-related behavior.",
+      "Current bounded checks did not observe a non-README literal PDF reference. This is not evidence that PDF support is absent."
+    );
+  }
+  if (
+    !input.deployment.files.some((file) => /docker|compose/i.test(file.path))
+  ) {
+    add(
+      /\bdocker(?:file)?\b|\bdocker\s+compose\b|\bcontainers?\b/i,
+      "README declares Docker or container behavior.",
+      "Current checks did not find a conventional Dockerfile or compose path. This non-observation is not a contradiction."
+    );
+  }
+  if (!input.ci.found) {
+    add(
+      /\bci\b|continuous integration/i,
+      "README declares CI behavior.",
+      "Current checks did not find conventional CI configuration. This non-observation is not a contradiction."
+    );
+  }
+  add(
+    /production[-\s]ready|ready for production/i,
+    "README declares production readiness.",
+    "Kanon does not verify production readiness; conventional operational files are only observations."
+  );
+  if (!input.release.found) {
+    add(
+      /\breleases?\b/i,
+      "README declares a release process.",
+      "Current checks did not find a conventional release workflow or changelog. This non-observation is not a contradiction."
+    );
+  }
+}
+/** @param {string} text @param {RegExp} pattern */
+function hasAffirmedMatch(text, pattern) {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+  for (const match of text.matchAll(new RegExp(pattern.source, flags))) {
+    if (!isNegatedAt(text, match.index || 0, match[0].length)) return true;
+  }
+  return false;
+}
+/** @param {string} text @param {number} index @param {number} length */
+function isNegatedAt(text, index, length) {
+  const sentenceStart = Math.max(
+    text.lastIndexOf("\n", index - 1),
+    text.lastIndexOf(".", index - 1),
+    text.lastIndexOf("!", index - 1),
+    text.lastIndexOf("?", index - 1)
+  );
+  const endings = ["\n", ".", "!", "?"]
+    .map((value) => text.indexOf(value, index + length))
+    .filter((value) => value >= 0);
+  const sentenceEnd = endings.length
+    ? Math.min(...endings)
+    : Math.min(text.length, index + length + 100);
+  const clause = text.slice(
+    Math.max(sentenceStart + 1, index - 100),
+    sentenceEnd
+  ).toLowerCase();
+  return /\b(?:no|not|never|without|lacks?|lacking|unsupported|doesn't|does not|isn't|is not|aren't|are not|won't|will not)\b/.test(clause);
+}
+/** @param {string} text @param {RegExp} pattern */
+function excerptAround(text, pattern) {
+  const match = text.match(pattern);
+  return match?.index === undefined
+    ? ""
+    : text.slice(Math.max(0, match.index - 80), Math.min(text.length, match.index + 160));
+}
+/** @param {{ purpose: ReturnType<typeof projectPurpose>, tests: {found: boolean, files: string[], count: number, frameworks: string[], evidence: string[]}, ci: ProjectSignal, deployment: ProjectSignal, release: ProjectSignal, importantFiles: ImportantFile[], inspection: Inspection, configuration: ConfigurationState, commands: CommandGroups, facts: RepositoryFacts, verification: ReturnType<typeof projectReadmeVerification> }} input */
 function projectCurrentState(input) {
   /** @type {Claim[]} */
   const known = [];
@@ -891,6 +1382,8 @@ function projectCurrentState(input) {
   const likely = [];
   /** @type {Claim[]} */
   const unknown = [];
+  /** @type {Claim[]} */
+  const staleSuspicious = [];
   /** @type {Claim[]} */
   const suggested = [];
   if (input.purpose.confidence === "likely") {
@@ -915,6 +1408,15 @@ function projectCurrentState(input) {
   }
   if (input.ci.found) {
     known.push(signalClaim("CI configuration found", input.ci));
+  }
+  if (input.deployment.found) {
+    known.push(signalClaim(
+      "Deployment/runtime configuration found",
+      input.deployment
+    ));
+  }
+  if (input.release.found) {
+    known.push(signalClaim("Release/changelog evidence found", input.release));
   }
   if (input.inspection.git.observation_complete) {
     known.push({
@@ -987,11 +1489,22 @@ function projectCurrentState(input) {
       });
     }
   }
-  unknown.push({
-    claim: "README drift is Unknown.",
-    reason:
-      "Compact refresh preserves the checkpoint boundary without recreating the legacy verifier."
-  });
+  for (const issue of input.verification.issues) {
+    staleSuspicious.push({
+      claim: issue.claim,
+      reason: issue.observation,
+      evidence: issue.evidence,
+      trust: "repository-untrusted"
+    });
+  }
+  for (const observation of input.verification.unknowns) {
+    unknown.push({
+      claim: observation.claim,
+      reason: observation.observation,
+      evidence: observation.evidence,
+      trust: "repository-untrusted"
+    });
+  }
   if (!input.inspection.coverage.complete || !input.facts.complete) {
     unknown.push({
       claim: "Repository scan was incomplete.",
@@ -1011,6 +1524,15 @@ function projectCurrentState(input) {
       trust: "kanon-generated"
     });
   }
+  if (input.inspection.coverage.sensitive_files_excluded > 0) {
+    unknown.push({
+      claim:
+        `${input.inspection.coverage.sensitive_files_excluded} sensitive file(s) were intentionally excluded.`,
+      reason:
+        "Kanon does not read, hash, cite, or persist likely secret-bearing files.",
+      trust: "kanon-generated"
+    });
+  }
   suggested.push({
     claim: "Review repository command declarations before any execution.",
     reason:
@@ -1027,11 +1549,19 @@ function projectCurrentState(input) {
       trust: "kanon-generated"
     });
   }
+  if (input.verification.issues.length > 0) {
+    suggested.push({
+      claim: "Fix or confirm README drift before trusting setup instructions.",
+      reason:
+        `${input.verification.issues.length} suspicious README claim(s) were detected.`,
+      trust: "kanon-generated"
+    });
+  }
   return {
     known,
     likely,
     unknown,
-    stale_suspicious: /** @type {Claim[]} */ ([]),
+    stale_suspicious: staleSuspicious,
     suggested
   };
 }
@@ -1229,6 +1759,14 @@ function renderBrief(analysis, options) {
   appendClaimList(lines, "Stale / Suspicious", state.current_state.stale_suspicious, options.deep ? 12 : 6);
   appendClaimList(lines, "Unknown", state.current_state.unknown, options.deep ? 12 : 6);
   appendClaimList(lines, "Suggested", state.current_state.suggested, options.deep ? 12 : 6);
+  if (state.todos.length) {
+    lines.push("", "## TODO / FIXME");
+    for (const todo of state.todos.slice(0, options.deep ? 20 : 8)) {
+      lines.push(
+        `- ${codeSpan(`${todo.path}:${todo.line}`)} ${escapeMarkdownText(todo.text)}`
+      );
+    }
+  }
   lines.push("", "## Evidence Used");
   for (const item of analysis.evidence.slice(0, options.deep ? 40 : 16)) {
     lines.push(
@@ -1398,10 +1936,10 @@ function formatEvidenceRefs(evidence) {
   const refs = (evidence || []).filter(Boolean).map(safeEvidenceId);
   return refs.length ? ` [${refs.join(", ")}]` : "";
 }
-/** @param {string[]} paths @param {boolean} hasPyproject */
-function detectLanguages(paths, hasPyproject) {
+/** @param {string[]} paths @param {boolean} hasPackage @param {boolean} hasPyproject */
+function detectLanguages(paths, hasPackage, hasPyproject) {
   const languages = [];
-  if (paths.some((file) => /\.[cm]?[jt]sx?$/.test(file))) {
+  if (hasPackage || paths.some((file) => /\.[cm]?[jt]sx?$/.test(file))) {
     languages.push("JavaScript/TypeScript");
   }
   if (hasPyproject || paths.some((file) => /\.py$/.test(file))) {
@@ -1435,9 +1973,22 @@ function isReleasePath(selectedPath) {
     /^CHANGELOG\.md$/i.test(selectedPath) ||
     /^\.releaserc/.test(selectedPath);
 }
+/** @param {string} text */
+function hasReleaseWorkflowSignal(text) {
+  return (
+    /\brefs\/tags\//.test(text) ||
+    (
+      /(?:^|\n)\s*push:\s*(?:\n|$)/m.test(text) &&
+      /(?:^|\n)\s*tags:\s*(?:\n|$)/m.test(text)
+    ) ||
+    /\b(?:npm publish|gh release)\b/.test(text) ||
+    /\b(?:action-gh-release|release-drafter)\b/i.test(text)
+  );
+}
 /** @param {string} selectedPath */
 function isBaselinePath(selectedPath) {
-  return /^(?:README(?:\.md)?|package\.json|pyproject\.toml|Cargo\.toml|go\.mod|Makefile|CHANGELOG\.md|RELEASING\.md)$/.test(selectedPath);
+  return /^README(?:\.[^/]+)?$/i.test(selectedPath) ||
+    /^(?:package\.json|pyproject\.toml|Cargo\.toml|go\.mod|Makefile|CHANGELOG\.md|RELEASING\.md)$/.test(selectedPath);
 }
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 function plainRecord(value) {

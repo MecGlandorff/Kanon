@@ -539,35 +539,26 @@ test("analysis workers inherit no arbitrary parent secret environment", () => {
 test("artifact-bound development evaluation loads the shipped runtime path", () => {
   const root = makeFixture({}, "kanon-development-artifact-");
   const artifactRoot = path.join(root, "artifact-root");
-  const analyzerDirectory = path.join(
-    artifactRoot,
-    "runtime",
-    "src"
-  );
   const cacheRoot = path.join(root, "cache");
-  fs.mkdirSync(analyzerDirectory, { recursive: true });
+  const build = spawnSync(
+    process.execPath,
+    ["scripts/build-package.js", "--output", artifactRoot],
+    commandOptions(30_000)
+  );
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+  assert.equal(
+    fs.existsSync(path.join(
+      artifactRoot,
+      "runtime",
+      "src",
+      "v1",
+      "compatibility",
+      "refresh.js"
+    )),
+    true
+  );
   fs.mkdirSync(cacheRoot);
   const item = corpus.cases[0];
-  const acceptedRun = item.labels.run?.accepted?.[0];
-  const acceptedTest = item.labels.test?.accepted?.[0];
-  fs.writeFileSync(
-    path.join(analyzerDirectory, "analyze.js"),
-    `export function analyzeRepo() {
-      return ${JSON.stringify({
-        state: {
-          version: "1.0.0",
-          important_files: item.labels.important_files.map(
-            (label) => ({ path: label.path })
-          ),
-          commands: {
-            run: acceptedRun ? [acceptedRun] : [],
-            test: acceptedTest ? [acceptedTest] : []
-          },
-          scan: { complete: true }
-        }
-      })};
-    }\n`
-  );
   const cached = path.join(
     cacheRoot,
     repositoryCacheName(item.repository, item.revision)

@@ -351,9 +351,6 @@ export function isSensitiveRepositoryPath(relativePath) {
   }
   const lower = relativePath.toLowerCase();
   const basename = path.posix.basename(lower);
-  if ([".env.example", ".env.sample", ".env.template"].includes(basename)) {
-    return false;
-  }
   return (
     basename === ".npmrc" ||
     basename === ".pypirc" ||
@@ -369,6 +366,21 @@ export function isSensitiveRepositoryPath(relativePath) {
       basename
     )
   );
+}
+
+/**
+ * @param {unknown} relativePath
+ * @returns {boolean}
+ */
+export function isCompatibilitySensitiveRepositoryPath(relativePath) {
+  if (typeof relativePath !== "string") {
+    return true;
+  }
+  const basename = path.posix.basename(relativePath.toLowerCase());
+  if ([".env.example", ".env.sample", ".env.template"].includes(basename)) {
+    return false;
+  }
+  return basename === "auth.json" || isSensitiveRepositoryPath(relativePath);
 }
 
 /**

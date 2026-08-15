@@ -15,6 +15,7 @@ import {
 } from "./git.js";
 import {
   canonicalizeRepositoryRoot,
+  isCompatibilitySensitiveRepositoryPath,
   isSafeRelativePath,
   isSensitiveRepositoryPath,
   readBoundedRepositoryFile,
@@ -78,6 +79,13 @@ const TEXT_EXTENSIONS = new Set([
   ".xml",
   ".yaml",
   ".yml"
+]);
+const COMPATIBILITY_TEXT_EXTENSIONS = new Set([
+  ".adoc", ".cjs", ".csv", ".cts", ".lock", ".mdx", ".properties",
+  ".rst", ".svelte", ".vue"
+]);
+const COMPATIBILITY_TEXT_NAMES = new Set([
+  ".gitignore", "go.mod", "README", "requirements.txt"
 ]);
 const INSTRUCTION_NAMES = Object.freeze([
   "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md",
@@ -301,7 +309,8 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
   const git = observeRepositoryGit(root.root, {
     ...(options.git_runner === undefined ? {} : { runner: options.git_runner }),
     timeout_ms: limits.git_timeout_ms,
-    max_output_bytes: limits.git_max_output_bytes
+    max_output_bytes: limits.git_max_output_bytes,
+    compatibility_sensitive_paths: limits.compatibility_policy
   });
   const receiptPaths = selectEvidencePaths(
     scan.files, applicableInstructions, task, explicitPaths, "orient", undefined
@@ -334,12 +343,7 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     git,
     coverage,
     evidence_fingerprint: evidenceFingerprint,
-    evidence_complete:
-      coverage.complete &&
-      git.observation_complete &&
-      coverage.fixed_directories_excluded === 0 &&
-      coverage.ignore_entries_excluded === 0 &&
-      coverage.sensitive_files_excluded === 0,
+    evidence_complete: coverage.complete && git.observation_complete,
     current_state: buildContinuityState(
       root.root,
       evidence,
@@ -787,7 +791,7 @@ function scanRepository(root, coverage, limits, gitRunner) {
         coverage.ignore_entries_excluded += 1;
         continue;
       }
-      if (isSensitiveRepositoryPath(relative)) {
+      if (isSensitiveInspectionPath(relative, limits.compatibility_policy)) {
         coverage.sensitive_files_excluded += 1;
         continue;
       }
@@ -812,7 +816,7 @@ function scanRepository(root, coverage, limits, gitRunner) {
   }
   /** @param {string} relative @returns {boolean} */
   function addFile(relative) {
-    if (isSensitiveRepositoryPath(relative)) {
+    if (isSensitiveInspectionPath(relative, limits.compatibility_policy)) {
       coverage.sensitive_files_excluded += 1;
       return true;
     }
@@ -830,7 +834,7 @@ function scanRepository(root, coverage, limits, gitRunner) {
       return true;
     }
     let digest = null;
-    let text = isTextPath(relative);
+    let text = isTextPath(relative, limits.compatibility_policy);
     let observedSize = selected.stat.size;
     let observedMtime =
       Number.isFinite(selected.stat.mtimeMs) &&
@@ -974,7 +978,7 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
     const unrootedPattern = portablePattern.replace(/^\//, "");
     if (
       rules.length >= MAX_IGNORE_RULES ||
-      unrootedPattern.includes("..") ||
+      hasTraversalSegment(unrootedPattern) ||
       portablePattern.startsWith("//") ||
       /^[A-Za-z]:\//.test(portablePattern) ||
       pattern.length === 0 ||
@@ -1048,6 +1052,10 @@ function ignoreRule(rule, negated) {
     anchored: rooted || body.includes("/"),
     negated
   };
+}
+/** @param {string} pattern @returns {boolean} */
+function hasTraversalSegment(pattern) {
+  return pattern.split("/").some((segment) => segment === "..");
 }
 /** @param {string} relative @param {boolean} directory @param {IgnoreRule[]} rules @param {IgnoreMatchBudget} budget @param {InspectionCoverage} coverage @returns {boolean} */
 function matchesIgnore(relative, directory, rules, budget, coverage) {
@@ -1327,19 +1335,11 @@ function fingerprintEvidence(
     coverage: {
       complete: coverage.complete,
       instruction_complete: coverage.instruction_complete,
-      strategy: coverage.strategy,
       entries_visited: coverage.entries_visited,
       files_observed: coverage.files_observed,
-      total_bytes_hashed: coverage.total_bytes_hashed,
-      total_text_bytes_read: coverage.total_text_bytes_read,
       fixed_directories_excluded: coverage.fixed_directories_excluded,
       ignore_entries_excluded: coverage.ignore_entries_excluded,
       sensitive_files_excluded: coverage.sensitive_files_excluded,
-      symlinks_skipped: coverage.symlinks_skipped,
-      outside_root_paths: coverage.outside_root_paths,
-      missing_tracked_files: coverage.missing_tracked_files,
-      git_ignore_observation_failed:
-        coverage.git_ignore_observation_failed,
       rejected_paths: coverage.rejected_paths,
       unreadable_paths: coverage.unreadable_paths,
       rejected_path_samples: coverage.rejected_path_samples,
@@ -1468,13 +1468,20 @@ function tokens(task) {
     )
   ).slice(0, 24);
 }
-/** @param {string} relativePath @returns {boolean} */
-function isTextPath(relativePath) {
+/** @param {string} relativePath @param {boolean} compatibilityPolicy @returns {boolean} */
+function isTextPath(relativePath, compatibilityPolicy) {
   const basename = path.posix.basename(relativePath);
   const extension = path.posix.extname(basename).toLowerCase();
   return (
-    [".env.example", ".env.sample", ".env.template"].includes(
-      basename.toLowerCase()
+    (
+      compatibilityPolicy &&
+      (
+        [".env.example", ".env.sample", ".env.template"].includes(
+          basename.toLowerCase()
+        ) ||
+        COMPATIBILITY_TEXT_NAMES.has(basename) ||
+        COMPATIBILITY_TEXT_EXTENSIONS.has(extension)
+      )
     ) ||
     (
       !basename.startsWith(".") &&
@@ -1671,6 +1678,12 @@ function hasFixedExcludedDirectory(relativePath, compatibilityPolicy) {
   return relativePath
     .split("/")
     .some((part) => isFixedExcludedDirectory(part, compatibilityPolicy));
+}
+/** @param {string} relativePath @param {boolean} compatibilityPolicy */
+function isSensitiveInspectionPath(relativePath, compatibilityPolicy) {
+  return compatibilityPolicy
+    ? isCompatibilitySensitiveRepositoryPath(relativePath)
+    : isSensitiveRepositoryPath(relativePath);
 }
 /** @param {bigint} started */
 function elapsedMilliseconds(started) {

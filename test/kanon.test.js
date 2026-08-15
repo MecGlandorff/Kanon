@@ -531,14 +531,25 @@ test("compatibility refresh preserves bounded structured command declarations", 
       name: "commands",
       padding: "x".repeat(9_000),
       main: "src/main.js",
+      bin: { "commands-cli": "src/main.js" },
       scripts: {
         build: "node build.js",
-        dev: "node src/main.js"
+        dev: "node src/main.js",
+        start: "node src/main.js",
+        serve: "node src/main.js"
       }
     }),
     "Makefile": "run:\n\t@node src/main.js\ntest:\n\t@node --test\nbuild:\n\t@node build.js\n",
     "Justfile": "test:\n\t@node --test\n",
-    "pyproject.toml": "[tool.poe.tasks]\nstart = \"python -m demo\"\n",
+    "pyproject.toml": [
+      "[project.scripts]",
+      "project-cli = \"demo:main\"",
+      "[tool.poetry.scripts]",
+      "poetry-cli = \"demo:main\"",
+      "[tool.poe.tasks]",
+      "start = \"python -m demo\"",
+      ""
+    ].join("\n"),
     "src/main.js": "import './shared.js';\n// FIXME: verify commands\n",
     "src/shared.js": "export const shared = true;\n"
   });
@@ -547,13 +558,22 @@ test("compatibility refresh preserves bounded structured command declarations", 
   const state = readJson(path.join(root, ".kanon", "STATE.json"));
 
   assert.deepEqual(state.commands.run.map((item) => item.command), [
-    "poe start"
+    "poe start",
+    "make run",
+    "npm start",
+    "npm run dev",
+    "npm run serve",
+    "poetry-cli",
+    "project-cli",
+    "commands-cli"
   ]);
   assert.deepEqual(state.commands.test.map((item) => item.command), [
-    "just test"
+    "just test",
+    "make test"
   ]);
   assert.deepEqual(state.commands.build.map((item) => item.command), [
-    "npm run build"
+    "npm run build",
+    "make"
   ]);
   assert.deepEqual(state.commands.dev.map((item) => item.command), [
     "npm run dev"
@@ -588,16 +608,17 @@ test("compatibility refresh preserves pyproject facts and policy completeness", 
     ".kanonignore": "AGENTS.md\n/generated/\n",
     "AGENTS.md": "IGNORED_PYPROJECT_INSTRUCTION\n",
     "pyproject.toml": [
-      "[project]",
+      "  [tool.poetry]  ",
       "name = \"python-demo\"",
       "description = \"Bounded Python purpose\"",
-      "[tool.pytest.ini_options]",
+      "  [tool.pytest.ini_options]  ",
       "addopts = \"-q\"",
       ""
     ].join("\n"),
     "Justfile": "test:\n\t@python -m pytest\n",
     ".env.example": "MODE=example\n",
     ".env.secret": "excluded fixture value\n",
+    "auth.json": "excluded authentication fixture\n",
     "vendor/dependency.py": "value = 1\n",
     "build/result.py": "value = 2\n",
     ".venv/runtime.py": "value = 3\n",
@@ -605,6 +626,7 @@ test("compatibility refresh preserves pyproject facts and policy completeness", 
   });
   const initialized = initializeGit(root);
   assert.equal(initialized.status, 0, initialized.stderr);
+  writeFixtureFile(root, "auth.json", "modified authentication fixture\n");
 
   await captureCli(runWriteCli, ["refresh", "--root", root]);
   const state = readJson(path.join(root, ".kanon", "STATE.json"));
@@ -620,8 +642,14 @@ test("compatibility refresh preserves pyproject facts and policy completeness", 
   assert.equal(state.scan.truncated, false);
   assert.equal(state.scan.ignored_directories >= 3, true);
   assert.equal(state.scan.kanon_ignored_entries >= 2, true);
-  assert.equal(state.scan.sensitive_files_skipped, 1);
+  assert.equal(state.scan.sensitive_files_skipped, 2);
   assert.equal(fingerprints.includes(".env.example"), true);
+  assert.equal(fingerprints.includes("auth.json"), false);
+  assert.equal(state.git.sensitive_changes_skipped, 1);
+  assert.equal(
+    state.git.changes.some((change) => change.path === "auth.json"),
+    false
+  );
   assert.equal(fingerprints.includes("generated/drop.py"), false);
   const output = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8") +
     fs.readFileSync(path.join(root, ".kanon", "EVIDENCE.jsonl"), "utf8");
@@ -645,6 +673,177 @@ test("compatibility refresh enforces configured file limits", async () => {
   assert.equal(state.repo.files_scanned, 1);
   assert.equal(state.files.fingerprints.length, 1);
   assert.equal(state.scan.budgets_reached.includes("max_files"), true);
+});
+
+test("review regressions: stable inspection preserves receipt semantics", () => {
+  const root = makeFixture({
+    ".kanonignore": "coverage..json\n",
+    ".env.example": "SAFE_TEMPLATE=true\n",
+    "README.md": "# Receipt fixture\n",
+    "coverage..json": "{}\n",
+    "src/index.js": "export const value = true;\n"
+  });
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  writeFixtureFile(root, ".env.example", "MODIFIED_TEMPLATE=true\n");
+
+  const task = "inspect stable receipt evidence";
+  const orient = inspectRepository(root, task, { profile: "orient" });
+  const verify = inspectRepository(root, task, { profile: "verify" });
+  assert.equal(orient.ok, true);
+  assert.equal(verify.ok, true);
+  if (!orient.ok || !verify.ok) return;
+
+  assert.equal(orient.evidence_complete, true);
+  assert.equal(verify.evidence_complete, true);
+  assert.equal(orient.coverage.fixed_directories_excluded >= 1, true);
+  assert.equal(orient.coverage.ignore_entries_excluded, 1);
+  assert.equal(orient.coverage.sensitive_files_excluded, 1);
+  assert.equal(orient.git.sensitive_changes_skipped, 1);
+  assert.equal(
+    orient.files.some((file) => file.path === ".env.example"),
+    false
+  );
+  assert.equal(
+    orient.files.some((file) => file.path === "coverage..json"),
+    false
+  );
+  assert.equal(orient.evidence_fingerprint, verify.evidence_fingerprint);
+});
+
+test("review regressions: compatibility refresh retains bounded public facts", async () => {
+  const root = makeFixture({
+    "README.rst": [
+      "Rich compatibility fixture",
+      "==========================",
+      "",
+      "Run `npm run missing`.",
+      ""
+    ].join("\n"),
+    "package.json": JSON.stringify({
+      name: "rich-compatibility",
+      main: "src/main.js",
+      bin: { "rich-cli": "src/main.js" },
+      scripts: {
+        start: "node src/main.js",
+        serve: "node src/main.js"
+      }
+    }),
+    "pyproject.toml": [
+      "  [tool.poetry]  ",
+      "  name = \"rich-python\"",
+      "  description = \"Poetry compatibility purpose\"",
+      "  [project.scripts]  ",
+      "  project-cli = \"demo:main\"",
+      "  [tool.poetry.scripts]  ",
+      "  poetry-cli = \"demo:main\"",
+      ""
+    ].join("\n"),
+    "requirements.txt": "pytest>=8\n",
+    "Dockerfile": "FROM scratch\n",
+    ".github/workflows/publish.yml": [
+      "name: publish",
+      "on: workflow_dispatch",
+      "jobs:",
+      "  publish:",
+      "    steps:",
+      "      - run: npm publish",
+      ""
+    ].join("\n"),
+    "src/main.js": "import './shared.js';\n// TODO: verify release\n",
+    "src/other.js": "import './shared.js';\n",
+    "src/shared.js": "export const shared = true;\n",
+    ".env.example": "MODE=example\n",
+    ".env.secret": "excluded fixture value\n",
+    "auth.json": "excluded authentication fixture\n"
+  });
+
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+  const fingerprints = state.files.fingerprints.map((file) => file.path);
+
+  assert.equal(state.repo.name, "rich-compatibility");
+  assert.deepEqual(state.repo.languages, ["JavaScript/TypeScript", "Python"]);
+  assert.equal(state.purpose.claim, "Poetry compatibility purpose");
+  assert.equal(state.verification.target, "README.rst");
+  assert.equal(state.verification.issues.length, 1);
+  assert.equal(state.current_state.stale_suspicious.length, 1);
+  assert.deepEqual(state.commands.test.map((item) => item.command), ["pytest"]);
+  assert.equal(state.commands.test[0].confidence, "likely");
+  assert.deepEqual(state.commands.run.map((item) => item.command), [
+    "npm start",
+    "npm run serve",
+    "poetry-cli",
+    "project-cli",
+    "rich-cli"
+  ]);
+  assert.deepEqual(state.tests.frameworks, ["pytest"]);
+  assert.equal(state.deployment.found, true);
+  assert.equal(state.release.found, true);
+  assert.equal(
+    state.current_state.known.some((item) =>
+      item.claim.startsWith("Deployment/runtime configuration found:")
+    ),
+    true
+  );
+  assert.equal(
+    state.current_state.unknown.some((item) =>
+      item.claim === "2 sensitive file(s) were intentionally excluded."
+    ),
+    true
+  );
+  assert.equal(fingerprints.includes(".env.example"), true);
+  assert.equal(fingerprints.includes(".env.secret"), false);
+  assert.equal(fingerprints.includes("auth.json"), false);
+  assert.equal(
+    state.important_files.some((file) => file.path === "src/main.js"),
+    true
+  );
+  assert.equal(
+    state.important_files.some((file) =>
+      file.path === "src/shared.js" && file.fan_in === 2
+    ),
+    true
+  );
+
+  const brief = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8");
+  assert.match(brief, /## TODO \/ FIXME/);
+  assert.match(brief, /src\/main\.js:2/);
+  const ledger = fs.readFileSync(
+    path.join(root, ".kanon", "EVIDENCE.jsonl"),
+    "utf8"
+  ).trim().split("\n").map((line) => JSON.parse(line));
+  const packageClaims = ledger
+    .filter((record) => record.path === "package.json")
+    .map((record) => record.claim);
+  assert.equal(new Set(packageClaims).size >= 3, true);
+  assert.equal(
+    packageClaims.some((claim) => /run command declaration/.test(claim)),
+    true
+  );
+
+  const readmeRoot = makeFixture({
+    "README.rst": "Standalone RST purpose\n======================\n"
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", readmeRoot]);
+  const readmeState = readJson(
+    path.join(readmeRoot, ".kanon", "STATE.json")
+  );
+  assert.equal(readmeState.purpose.claim, "Standalone RST purpose");
+
+  const skillRoot = makeFixture({
+    "SKILL.md": [
+      "---",
+      "name: fixture-skill",
+      "description: \"Skill-only compatibility purpose\"",
+      "---",
+      ""
+    ].join("\n")
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", skillRoot]);
+  const skillState = readJson(path.join(skillRoot, ".kanon", "STATE.json"));
+  assert.equal(skillState.purpose.claim, "Skill-only compatibility purpose");
+  assert.equal(skillState.verification.applicable, false);
 });
 
 test("repository inspection exposes compatibility filesystem-root policy", () => {

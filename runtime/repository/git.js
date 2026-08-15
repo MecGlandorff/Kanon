@@ -9,6 +9,7 @@ import {
   sanitizeDisplayText
 } from "../core/trust.js";
 import {
+  isCompatibilitySensitiveRepositoryPath,
   isSafeRelativePath,
   isSensitiveRepositoryPath
 } from "./read.js";
@@ -73,7 +74,8 @@ const MAX_PATH_ENTRIES = 128;
  * @param {{
  *   runner?: GitRunner,
  *   timeout_ms?: number,
- *   max_output_bytes?: number
+ *   max_output_bytes?: number,
+ *   compatibility_sensitive_paths?: boolean
  * }} [options]
  * @returns {GitObservation}
  */
@@ -129,7 +131,10 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
     "."
   ]);
   const parsedStatus = statusResult.ok
-    ? parseStatus(statusResult.stdout)
+    ? parseStatus(
+        statusResult.stdout,
+        options.compatibility_sensitive_paths === true
+      )
     : null;
   const parsedLog = logResult.ok
     ? parseLog(logResult.stdout)
@@ -537,6 +542,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
 
 /**
  * @param {string} output
+ * @param {boolean} [compatibilitySensitivePaths]
  * @returns {{
  *   change_count: number,
  *   changes: GitObservation["changes"],
@@ -545,7 +551,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
  *   complete: boolean
  * }}
  */
-function parseStatus(output) {
+function parseStatus(output, compatibilitySensitivePaths = false) {
   const entries = output.split("\0");
   /** @type {GitObservation["changes"]} */
   const changes = [];
@@ -581,7 +587,11 @@ function parseStatus(output) {
       }
     }
     changeCount += 1;
-    if (isSensitiveRepositoryPath(selectedPath)) {
+    if (
+      compatibilitySensitivePaths
+        ? isCompatibilitySensitiveRepositoryPath(selectedPath)
+        : isSensitiveRepositoryPath(selectedPath)
+    ) {
       sensitiveSkipped += 1;
       continue;
     }
