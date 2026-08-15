@@ -1,9 +1,12 @@
+import crypto from "node:crypto";
 import path from "node:path";
+import { TextDecoder } from "node:util";
 import {
   buildContinuityArtifactMetadata,
   buildContinuityReport
 } from "#kanon-continuity";
 import { inspectRepository } from "#kanon-repository-inspect";
+import { readBoundedRepositoryFile } from "#kanon-repository-read";
 import {
   DEFAULT_CONFIG,
   inspectKanonConfig,
@@ -39,6 +42,8 @@ import {
 
 const MAX_EVIDENCE_RECORDS = 40;
 const MAX_RENDERED_EXCERPT_BYTES = 240;
+const MAX_TODO_OBSERVATIONS = 40;
+const MAX_CODE_OBSERVATIONS = 20;
 
 /**
  * @typedef {Extract<ReturnType<typeof inspectRepository>, {ok: true}>}
@@ -74,7 +79,7 @@ const MAX_RENDERED_EXCERPT_BYTES = 240;
  * }} Command
  * @typedef {{run: Command[], test: Command[], build: Command[], dev: Command[]}}
  *   CommandGroups
- * @typedef {{path: string, reason: string, fan_in: number | null, evidence: string[]}}
+ * @typedef {{path: string, reason: string, fan_in: number, evidence: string[]}}
  *   ImportantFile
  * @typedef {{found: boolean, files: {path: string, evidence: string}[]}}
  *   ProjectSignal
@@ -86,6 +91,21 @@ const MAX_RENDERED_EXCERPT_BYTES = 240;
  *   command_execution: "ask" | "never",
  *   evidence: string[]
  * }} ConfigurationState
+ * @typedef {{
+ *   texts: Map<string, string>,
+ *   bytes_read: number,
+ *   elapsed_ms: number,
+ *   complete: boolean,
+ *   budgets_reached: string[],
+ *   fan_in: Map<string, number>,
+ *   code_intelligence: {
+ *     files_with_inbound_imports: number,
+ *     entrypoints: {path: string, confidence: "known" | "likely" | "unknown", reason: string}[],
+ *     top_fan_in: {path: string, fan_in: number}[]
+ *   },
+ *   todos: {path: string, line: number, text: string, trust: string}[]
+ * }} RepositoryFacts
+ * @typedef {Command & {score: number}} CommandCandidate
  */
 
 /**
@@ -122,19 +142,28 @@ function buildRefreshAnalysis(inspection, configInspection) {
   const generatedAt = new Date().toISOString();
   const runId = createRunId(generatedAt);
   const evidence = createEvidenceContext(inspection, runId);
-  const packageInfo = readPackageEvidence(inspection);
+  const facts = observeRepositoryFacts(
+    inspection,
+    configInspection.config
+  );
+  const packageInfo = readPackageEvidence(facts.texts);
   const purpose = projectPurpose(inspection, packageInfo, evidence);
   const files = inspection.files;
   const testPaths = files
     .map((file) => file.path)
     .filter(isTestPath);
-  const commands = projectCommands(packageInfo, inspection, evidence);
-  const packageTest = commands.test.length > 0;
+  const commands = projectCommands(
+    packageInfo,
+    inspection,
+    evidence,
+    facts.texts
+  );
+  const declaredTest = commands.test.length > 0;
   const tests = {
-    found: testPaths.length > 0 || packageTest,
+    found: testPaths.length > 0 || declaredTest,
     files: testPaths.slice(0, 50),
     count: testPaths.length,
-    frameworks: packageTest ? ["package test script"] : [],
+    frameworks: declaredTest ? ["declared test command"] : [],
     evidence: testPaths[0]
       ? [evidenceFor(
           evidence,
@@ -142,7 +171,7 @@ function buildRefreshAnalysis(inspection, configInspection) {
           "test",
           `${testPaths.length} test-like file(s) found.`
         )]
-      : packageTest
+      : declaredTest
         ? commands.test[0]?.evidence || []
         : []
   };
@@ -164,9 +193,13 @@ function buildRefreshAnalysis(inspection, configInspection) {
     "Release/changelog evidence found.",
     evidence
   );
-  const importantFiles = projectImportantFiles(inspection, evidence);
+  const importantFiles = projectImportantFiles(
+    inspection,
+    evidence,
+    facts.fan_in
+  );
   const git = projectGit(inspection, evidence);
-  const scan = projectScan(inspection);
+  const scan = projectScan(inspection, facts);
   const verificationTarget = files
     .map((file) => file.path)
     .find((file) => path.posix.basename(file).toLowerCase().startsWith("readme"));
@@ -174,7 +207,7 @@ function buildRefreshAnalysis(inspection, configInspection) {
     target: verificationTarget || "README.md",
     checked: false,
     applicable: verificationTarget !== undefined,
-    scan_complete: inspection.coverage.complete,
+    scan_complete: scan.complete,
     issues: [],
     unknowns: [],
     note:
@@ -206,7 +239,8 @@ function buildRefreshAnalysis(inspection, configInspection) {
     importantFiles,
     inspection,
     configuration,
-    commands
+    commands,
+    facts
   });
   const stateValue = {
     version: VERSION,
@@ -223,16 +257,12 @@ function buildRefreshAnalysis(inspection, configInspection) {
     purpose,
     commands,
     important_files: importantFiles,
-    code_intelligence: {
-      files_with_inbound_imports: null,
-      entrypoints: null,
-      top_fan_in: null
-    },
+    code_intelligence: facts.code_intelligence,
     tests,
     ci,
     deployment,
     release,
-    todos: null,
+    todos: facts.todos,
     current_state: currentState,
     verification,
     configuration,
@@ -329,20 +359,474 @@ function evidenceFor(context, selectedPath, kind, claim, excerpt = "") {
 }
 
 /**
- * @param {Inspection} inspection
+ * @param {Map<string, string>} texts
  * @returns {Record<string, unknown> | null}
  */
-function readPackageEvidence(inspection) {
-  const item = inspection.evidence.find((entry) => entry.path === "package.json");
-  if (!item) {
+function readPackageEvidence(texts) {
+  const text = texts.get("package.json");
+  if (text === undefined) {
     return null;
   }
   try {
-    const parsed = JSON.parse(item.content);
+    const parsed = JSON.parse(text);
     return plainRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * @param {Inspection} inspection
+ * @param {typeof DEFAULT_CONFIG} config
+ * @returns {RepositoryFacts}
+ */
+function observeRepositoryFacts(inspection, config) {
+  const started = Date.now();
+  const texts = new Map();
+  const budgets = new Set();
+  let complete = true;
+  let bytesRead = 0;
+  let remaining = Math.max(
+    0,
+    config.scan.max_total_text_bytes -
+      inspection.coverage.total_text_bytes_read
+  );
+  const remainingMilliseconds = Math.max(
+    0,
+    config.scan.max_elapsed_ms - inspection.coverage.elapsed_ms
+  );
+  const deadline = started + remainingMilliseconds;
+  const priority = new Map([
+    ["package.json", 0],
+    ["pyproject.toml", 1],
+    ["Makefile", 2],
+    ["makefile", 2],
+    ["GNUmakefile", 2]
+  ]);
+  const files = [...inspection.files].sort((left, right) =>
+    (priority.get(left.path) ?? 3) - (priority.get(right.path) ?? 3) ||
+    left.path.localeCompare(right.path)
+  );
+  for (const file of files) {
+    if (!file.text) {
+      continue;
+    }
+    if (Date.now() > deadline) {
+      complete = false;
+      budgets.add("max_elapsed_ms");
+      break;
+    }
+    if (file.size > config.scan.max_file_bytes) {
+      complete = false;
+      budgets.add("max_file_bytes");
+      continue;
+    }
+    if (file.size > remaining) {
+      complete = false;
+      budgets.add("max_total_text_bytes");
+      continue;
+    }
+    const read = readBoundedRepositoryFile(
+      inspection.root,
+      file.path,
+      config.scan.max_file_bytes
+    );
+    if (!read.ok) {
+      complete = false;
+      budgets.add("repository_read_incomplete");
+      continue;
+    }
+    bytesRead += read.bytes.length;
+    remaining -= read.bytes.length;
+    const digest = crypto.createHash("sha256").update(read.bytes).digest("hex");
+    if (
+      read.size !== file.size ||
+      (read.mtime_ms !== null &&
+        file.mtime_ms !== null &&
+        read.mtime_ms !== file.mtime_ms) ||
+      (file.sha256 !== null && digest !== file.sha256)
+    ) {
+      complete = false;
+      budgets.add("repository_changed");
+      continue;
+    }
+    try {
+      texts.set(
+        file.path,
+        new TextDecoder("utf-8", { fatal: true }).decode(read.bytes)
+      );
+    } catch {
+      complete = false;
+      budgets.add("invalid_text");
+    }
+  }
+  const packageInfo = readPackageEvidence(texts);
+  const fanInObservation = measureFanIn(
+    texts,
+    inspection.files.map((file) => file.path)
+  );
+  const fanIn = fanInObservation.fan_in;
+  if (!fanInObservation.complete) {
+    complete = false;
+    budgets.add("max_code_references");
+  }
+  const entrypoints = measureEntrypoints(
+    texts,
+    inspection.files.map((file) => file.path),
+    packageInfo
+  );
+  const topFanIn = Array.from(fanIn, ([selectedPath, count]) => ({
+    path: selectedPath,
+    fan_in: count
+  }))
+    .sort((left, right) =>
+      right.fan_in - left.fan_in || left.path.localeCompare(right.path)
+    )
+    .slice(0, MAX_CODE_OBSERVATIONS);
+  return {
+    texts,
+    bytes_read: bytesRead,
+    elapsed_ms: Math.max(0, Date.now() - started),
+    complete,
+    budgets_reached: Array.from(budgets),
+    fan_in: fanIn,
+    code_intelligence: {
+      files_with_inbound_imports: fanIn.size,
+      entrypoints,
+      top_fan_in: topFanIn
+    },
+    todos: measureTodos(texts)
+  };
+}
+
+/**
+ * @param {Map<string, string>} texts
+ * @param {string[]} paths
+ * @returns {{fan_in: Map<string, number>, complete: boolean}}
+ */
+function measureFanIn(texts, paths) {
+  const files = new Set(paths);
+  /** @type {Map<string, Set<string>>} */
+  const importers = new Map();
+  let work = 0;
+  let complete = true;
+  scan:
+  for (const [importer, text] of texts) {
+    const observation = extractLocalImports(importer, text);
+    if (!observation.complete) {
+      complete = false;
+    }
+    for (const specifier of observation.imports) {
+      work += 1;
+      if (work > 100_000) {
+        complete = false;
+        break scan;
+      }
+      const target = resolveLocalImport(importer, specifier, files);
+      if (!target || target === importer) {
+        continue;
+      }
+      const observed = importers.get(target) || new Set();
+      observed.add(importer);
+      importers.set(target, observed);
+    }
+  }
+  return {
+    fan_in: new Map(
+      Array.from(importers, ([selectedPath, observed]) => [
+        selectedPath,
+        observed.size
+      ])
+    ),
+    complete
+  };
+}
+
+/**
+ * @param {string} importer
+ * @param {string} text
+ * @returns {{imports: string[], complete: boolean}}
+ */
+function extractLocalImports(importer, text) {
+  const extension = path.posix.extname(importer).toLowerCase();
+  const imports = [];
+  let complete = true;
+  if ([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"].includes(extension)) {
+    for (const match of text.matchAll(
+      /\b(?:import|export)\s+(?:[^"'()]+?\s+from\s+)?["']([^"']+)["']/g
+    )) {
+      if (match[1]?.startsWith(".")) imports.push(match[1]);
+      if (imports.length >= 256) {
+        complete = false;
+        break;
+      }
+    }
+    if (imports.length < 256) {
+      for (const match of text.matchAll(
+        /\b(?:require|import)\(\s*["']([^"']+)["']\s*\)/g
+      )) {
+        if (match[1]?.startsWith(".")) imports.push(match[1]);
+        if (imports.length >= 256) {
+          complete = false;
+          break;
+        }
+      }
+    }
+  } else if (extension === ".py") {
+    for (const match of text.matchAll(/^\s*from\s+([.\w]+)\s+import\b/gm)) {
+      if (match[1]) imports.push(match[1]);
+      if (imports.length >= 256) {
+        complete = false;
+        break;
+      }
+    }
+    if (imports.length < 256) {
+      for (const match of text.matchAll(/^\s*import\s+([A-Za-z_][\w.]*)/gm)) {
+        if (match[1]) imports.push(match[1]);
+        if (imports.length >= 256) {
+          complete = false;
+          break;
+        }
+      }
+    }
+  }
+  return { imports, complete };
+}
+
+/**
+ * @param {string} importer
+ * @param {string} specifier
+ * @param {Set<string>} files
+ * @returns {string | null}
+ */
+function resolveLocalImport(importer, specifier, files) {
+  const extension = path.posix.extname(importer).toLowerCase();
+  if (extension === ".py") {
+    const dots = specifier.match(/^\.+/)?.[0].length ?? 0;
+    let directory = dots > 0 ? path.posix.dirname(importer) : "";
+    for (let index = 1; index < dots; index += 1) {
+      directory = path.posix.dirname(directory);
+    }
+    const modulePath = specifier.slice(dots).replaceAll(".", "/");
+    const direct = resolveModulePath(
+      path.posix.join(directory, modulePath),
+      files,
+      [".py"]
+    );
+    if (direct || dots > 0) {
+      return direct;
+    }
+    return resolveModulePath(
+      path.posix.join(path.posix.dirname(importer), modulePath),
+      files,
+      [".py"]
+    );
+  }
+  return resolveModulePath(
+    path.posix.join(path.posix.dirname(importer), specifier),
+    files,
+    [".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".json"]
+  );
+}
+
+/**
+ * @param {string} input
+ * @param {Set<string>} files
+ * @param {string[]} extensions
+ * @returns {string | null}
+ */
+function resolveModulePath(input, files, extensions) {
+  const base = path.posix.normalize(input).replace(/^(\.\/)+/, "");
+  if (!base || base === "." || base === ".." || base.startsWith("../")) {
+    return null;
+  }
+  const candidates = [base];
+  for (const extension of extensions) {
+    candidates.push(`${base}${extension}`, `${base}/index${extension}`);
+    if (extension === ".py") {
+      candidates.push(`${base}/__init__.py`);
+    }
+  }
+  return candidates.find((candidate) => files.has(candidate)) || null;
+}
+
+/**
+ * @param {Map<string, string>} texts
+ * @param {string[]} paths
+ * @param {Record<string, unknown> | null} packageInfo
+ * @returns {{path: string, confidence: "known" | "likely" | "unknown", reason: string}[]}
+ */
+function measureEntrypoints(texts, paths, packageInfo) {
+  const files = new Set(paths);
+  /** @type {Map<string, {path: string, confidence: "known" | "likely" | "unknown", reason: string, score: number}>} */
+  const found = new Map();
+  /**
+   * @param {string} selectedPath
+   * @param {"known" | "likely" | "unknown"} confidence
+   * @param {string} reason
+   * @param {number} score
+   */
+  function add(selectedPath, confidence, reason, score) {
+    const existing = found.get(selectedPath);
+    if (files.has(selectedPath) && (!existing || score > existing.score)) {
+      found.set(selectedPath, { path: selectedPath, confidence, reason, score });
+    }
+  }
+  for (const [target, binary] of packageTargets(packageInfo)) {
+    const resolved = resolveManifestTarget(target, files);
+    if (resolved) {
+      add(
+        resolved,
+        "known",
+        binary ? "declared package binary" : "declared package export",
+        binary ? 110 : 96
+      );
+    }
+  }
+  for (const [selectedPath, text] of texts) {
+    const extension = path.posix.extname(selectedPath).toLowerCase();
+    if (
+      extension === ".py" &&
+      /if\s+__name__\s*==\s*["']__main__["']\s*:/.test(text)
+    ) {
+      add(selectedPath, "known", "executable Python module", 62);
+    } else if (
+      extension === ".go" &&
+      /^\s*package\s+main\b/m.test(text) &&
+      /\bfunc\s+main\s*\(/.test(text)
+    ) {
+      add(selectedPath, "known", "Go package main with func main", 72);
+    } else if (
+      extension === ".rs" &&
+      /(?:^|\/)src\/(?:bin\/[^/]+\/)?main\.rs$/.test(selectedPath) &&
+      /\bfn\s+main\s*\(\s*\)/.test(text)
+    ) {
+      add(selectedPath, "known", "Rust binary main function", 72);
+    } else if (
+      [".js", ".mjs", ".cjs", ".ts"].includes(extension) &&
+      /^#!.*\bnode\b/m.test(text)
+    ) {
+      add(selectedPath, "known", "executable Node script", 75);
+    }
+  }
+  for (const selectedPath of [
+    "src/cli.js",
+    "src/index.js",
+    "src/index.ts",
+    "src/run.py",
+    "src/main.py",
+    "main.py"
+  ]) {
+    add(selectedPath, "likely", "conventional entrypoint path", 35);
+  }
+  return Array.from(found.values())
+    .sort((left, right) =>
+      right.score - left.score || left.path.localeCompare(right.path)
+    )
+    .slice(0, MAX_CODE_OBSERVATIONS)
+    .map(({ path: selectedPath, confidence, reason }) => ({
+      path: selectedPath,
+      confidence,
+      reason
+    }));
+}
+
+/**
+ * @param {Record<string, unknown> | null} packageInfo
+ * @returns {[string, boolean][]}
+ */
+function packageTargets(packageInfo) {
+  if (!packageInfo) {
+    return [];
+  }
+  /** @type {[string, boolean][]} */
+  const targets = [];
+  const bin = packageInfo.bin;
+  if (typeof bin === "string") {
+    targets.push([bin, true]);
+  } else if (plainRecord(bin)) {
+    for (const target of Object.values(bin).slice(0, 256)) {
+      if (typeof target === "string") targets.push([target, true]);
+    }
+  }
+  for (const field of ["main", "module"]) {
+    if (typeof packageInfo[field] === "string") {
+      targets.push([packageInfo[field], false]);
+    }
+  }
+  collectExportTargets(packageInfo.exports, targets);
+  return targets;
+}
+
+/**
+ * @param {unknown} value
+ * @param {[string, boolean][]} output
+ * @param {number} [depth]
+ */
+function collectExportTargets(value, output, depth = 0) {
+  if (depth > 16 || output.length >= 256) {
+    return;
+  }
+  if (typeof value === "string") {
+    output.push([value, false]);
+  } else if (plainRecord(value)) {
+    for (const nested of Object.values(value)) {
+      collectExportTargets(nested, output, depth + 1);
+      if (output.length >= 256) break;
+    }
+  }
+}
+
+/**
+ * @param {string} target
+ * @param {Set<string>} files
+ * @returns {string | null}
+ */
+function resolveManifestTarget(target, files) {
+  const normalized = path.posix.normalize(target.replace(/^(\.\/)+/, ""));
+  if (!normalized || normalized === ".." || normalized.startsWith("../")) {
+    return null;
+  }
+  return resolveModulePath(
+    normalized,
+    files,
+    [".js", ".mjs", ".cjs", ".ts", ".tsx", ".json"]
+  );
+}
+
+/**
+ * @param {Map<string, string>} texts
+ * @returns {{path: string, line: number, text: string, trust: string}[]}
+ */
+function measureTodos(texts) {
+  const todos = [];
+  for (const [selectedPath, text] of texts) {
+    if (
+      todos.length >= MAX_TODO_OBSERVATIONS ||
+      !/\.(?:js|jsx|mjs|cjs|ts|tsx|mts|cts|py|md|toml|yaml|yml|json|sh)$/i.test(selectedPath)
+    ) {
+      continue;
+    }
+    const lines = text.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] || "";
+      if (
+        /(?:^|\s)(?:\/\/|#|\/\*|\*)\s*\b(?:TODO|FIXME)\b(?::|\s)/i.test(line) ||
+        /^\s*-\s*\b(?:TODO|FIXME)\b(?::|\s)/i.test(line)
+      ) {
+        todos.push({
+          path: selectedPath,
+          line: index + 1,
+          text: line.trim().slice(0, 180),
+          trust: "repository-untrusted"
+        });
+      }
+      if (todos.length >= MAX_TODO_OBSERVATIONS) {
+        break;
+      }
+    }
+  }
+  return todos;
 }
 
 /**
@@ -410,16 +894,16 @@ function repositoryName(inspection, packageInfo) {
  * @param {Record<string, unknown> | null} packageInfo
  * @param {Inspection} inspection
  * @param {EvidenceContext} evidence
+ * @param {Map<string, string>} texts
  * @returns {CommandGroups}
  */
-function projectCommands(packageInfo, inspection, evidence) {
-  /** @type {CommandGroups} */
-  const commands = { run: [], test: [], build: [], dev: [] };
-  if (!packageInfo || !plainRecord(packageInfo.scripts)) {
-    return commands;
-  }
-  const scripts = packageInfo.scripts;
-  const declared = typeof packageInfo.packageManager === "string"
+function projectCommands(packageInfo, inspection, evidence, texts) {
+  /** @type {{run: CommandCandidate[], test: CommandCandidate[], build: CommandCandidate[], dev: CommandCandidate[]}} */
+  const candidates = { run: [], test: [], build: [], dev: [] };
+  const scripts = packageInfo && plainRecord(packageInfo.scripts)
+    ? packageInfo.scripts
+    : null;
+  const declared = typeof packageInfo?.packageManager === "string"
     ? packageInfo.packageManager.split("@")[0] ?? ""
     : "";
   const files = new Set(inspection.files.map((file) => file.path));
@@ -433,35 +917,114 @@ function projectCommands(packageInfo, inspection, evidence) {
   const manager = /** @type {"npm" | "pnpm" | "yarn" | "bun"} */ (
     ["npm", "pnpm", "yarn", "bun"].includes(declared) ? declared : detected
   );
-  const evidenceId = evidenceFor(
-    evidence,
-    "package.json",
-    "command",
-    "Package command declarations were parsed from bounded metadata."
-  );
-  /** @type {[keyof CommandGroups, string[]][]} */
-  const groups = [
-    ["test", ["test"]],
-    ["build", ["build"]],
-    ["dev", ["dev", "watch"]],
-    ["run", ["start", "dev", "serve", "watch"]]
-  ];
-  for (const [group, names] of groups) {
-    const name = names.find((candidate) =>
-      typeof scripts[candidate] === "string"
+  if (scripts) {
+    const evidenceId = evidenceFor(
+      evidence,
+      "package.json",
+      "command",
+      "Package command declarations were parsed from bounded metadata."
     );
-    const detail = name ? scripts[name] : null;
-    if (
-      !name ||
-      typeof detail !== "string" ||
-      (group === "test" &&
-        /(?:no test specified|not implemented|exit\s+1)/i.test(detail))
-    ) {
+    /** @type {[keyof CommandGroups, [string, number][]][]} */
+    const groups = [
+      ["test", [["test", 205]]],
+      ["build", [["build", 200]]],
+      ["dev", [["dev", 202], ["watch", 194]]],
+      ["run", [["start", 205], ["dev", 202], ["serve", 198], ["watch", 194]]]
+    ];
+    for (const [group, names] of groups) {
+      for (const [name, score] of names) {
+        const detail = scripts[name];
+        if (
+          typeof detail !== "string" ||
+          (group === "test" &&
+            /(?:no test specified|not implemented|exit\s+1)/i.test(detail))
+        ) {
+          continue;
+        }
+        addCommandCandidate(
+          candidates[group],
+          packageCommand(manager, name, detail, evidenceId),
+          score
+        );
+      }
+    }
+  }
+  const pyproject = texts.get("pyproject.toml");
+  if (pyproject !== undefined) {
+    const section = tomlSection(pyproject, "tool.poe.tasks");
+    const tasks = new Set();
+    for (const match of section.matchAll(/^([A-Za-z0-9_.-]+)\s*=/gm)) {
+      const task = match[1]?.split(".")[0];
+      if (task) tasks.add(task);
+    }
+    const prefix = files.has("uv.lock") ? "uv run " : "";
+    const evidenceId = evidenceFor(
+      evidence,
+      "pyproject.toml",
+      "command",
+      "Poe task declarations were parsed from bounded metadata."
+    );
+    if (tasks.has("start")) {
+      addCommandCandidate(
+        candidates.run,
+        declaredCommand(`${prefix}poe start`, "pyproject.toml", evidenceId),
+        220
+      );
+    }
+    if (tasks.has("test")) {
+      addCommandCandidate(
+        candidates.test,
+        declaredCommand(`${prefix}poe test`, "pyproject.toml", evidenceId),
+        220
+      );
+    }
+  }
+  for (const buildFile of ["Makefile", "makefile", "GNUmakefile"]) {
+    const text = texts.get(buildFile);
+    if (text === undefined) {
       continue;
     }
-    commands[group].push(packageCommand(manager, name, detail, evidenceId));
+    const targets = parseBuildTargets(text);
+    const evidenceId = evidenceFor(
+      evidence,
+      buildFile,
+      "command",
+      "Make target declarations were parsed from bounded metadata."
+    );
+    if (targets.has("run")) {
+      addCommandCandidate(
+        candidates.run,
+        declaredCommand("make run", buildFile, evidenceId),
+        215
+      );
+    } else if (targets.has("serve")) {
+      addCommandCandidate(
+        candidates.run,
+        declaredCommand("make serve", buildFile, evidenceId),
+        210
+      );
+    }
+    if (targets.has("test")) {
+      addCommandCandidate(
+        candidates.test,
+        declaredCommand("make test", buildFile, evidenceId),
+        215
+      );
+    }
+    if (targets.has("build")) {
+      addCommandCandidate(
+        candidates.build,
+        declaredCommand("make", buildFile, evidenceId),
+        190
+      );
+    }
   }
-  return commands;
+  return {
+    run: selectCommandCandidate(candidates.run),
+    test: selectCommandCandidate(candidates.test),
+    build: selectCommandCandidate(candidates.build),
+    dev: selectCommandCandidate(candidates.dev)
+  };
 }
 
 /**
@@ -493,6 +1056,73 @@ function packageCommand(manager, name, detail, evidenceId) {
 }
 
 /**
+ * @param {string} command
+ * @param {string} source
+ * @param {string} evidenceId
+ * @returns {Command}
+ */
+function declaredCommand(command, source, evidenceId) {
+  return {
+    command,
+    cwd: ".",
+    source,
+    confidence: "known",
+    evidence: evidenceId ? [evidenceId] : [],
+    detail: null,
+    trust: "repository-untrusted"
+  };
+}
+
+/** @param {CommandCandidate[]} target @param {Command} command @param {number} score */
+function addCommandCandidate(target, command, score) {
+  const existing = target.find((item) =>
+    item.command === command.command && item.cwd === command.cwd
+  );
+  if (!existing) {
+    target.push({ ...command, score });
+  } else if (score > existing.score) {
+    Object.assign(existing, command, { score });
+  }
+}
+
+/** @param {CommandCandidate[]} candidates @returns {Command[]} */
+function selectCommandCandidate(candidates) {
+  const selected = [...candidates].sort((left, right) =>
+    right.score - left.score ||
+    left.command.length - right.command.length ||
+    left.command.localeCompare(right.command)
+  )[0];
+  if (!selected) {
+    return [];
+  }
+  const { score: _score, ...command } = selected;
+  return [command];
+}
+
+/** @param {string} text @returns {Set<string>} */
+function parseBuildTargets(text) {
+  const targets = new Set();
+  for (const match of text.matchAll(/^([A-Za-z0-9_.-]+)\s*(?::[^=]|:=)/gm)) {
+    if (match[1]) targets.add(match[1]);
+    if (targets.size >= 256) break;
+  }
+  return targets;
+}
+
+/** @param {string} text @param {string} name @returns {string} */
+function tomlSection(text, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const heading = new RegExp(`^\\[${escaped}\\]\\s*$`, "m");
+  const match = heading.exec(text);
+  if (!match) {
+    return "";
+  }
+  const rest = text.slice(match.index + match[0].length);
+  const nextSection = rest.search(/^\[/m);
+  return nextSection === -1 ? rest : rest.slice(0, nextSection);
+}
+
+/**
  * @param {string[]} paths
  * @param {string} kind
  * @param {string} claim
@@ -512,9 +1142,10 @@ function projectSignal(paths, kind, claim, evidence) {
 /**
  * @param {Inspection} inspection
  * @param {EvidenceContext} evidence
+ * @param {Map<string, number>} fanIn
  * @returns {ImportantFile[]}
  */
-function projectImportantFiles(inspection, evidence) {
+function projectImportantFiles(inspection, evidence, fanIn) {
   const selected = new Map(
     inspection.evidence.map((item) => [item.path, item.kind])
   );
@@ -532,7 +1163,7 @@ function projectImportantFiles(inspection, evidence) {
       kind === "instruction"
         ? "applicable repository instruction; content remains untrusted"
         : "selected by the bounded v1 repository inspector",
-    fan_in: null,
+    fan_in: fanIn.get(selectedPath) || 0,
     evidence: [evidenceFor(
       evidence,
       selectedPath,
@@ -579,8 +1210,8 @@ function projectGit(inspection, evidence) {
   };
 }
 
-/** @param {Inspection} inspection */
-function projectScan(inspection) {
+/** @param {Inspection} inspection @param {RepositoryFacts} facts */
+function projectScan(inspection, facts) {
   const coverage = inspection.coverage;
   const limits = coverage.limits;
   const pathFailures = [
@@ -598,7 +1229,7 @@ function projectScan(inspection) {
     }))
   ].slice(0, 16);
   return {
-    complete: coverage.complete,
+    complete: coverage.complete && facts.complete,
     strategy: coverage.strategy,
     max_files: limits.max_files,
     max_entries: limits.max_entries,
@@ -608,9 +1239,10 @@ function projectScan(inspection) {
     max_elapsed_ms: limits.max_scan_ms,
     entries_visited: coverage.entries_visited,
     total_bytes_hashed: coverage.total_bytes_hashed,
-    total_text_bytes_read: coverage.total_text_bytes_read,
-    elapsed_ms: coverage.elapsed_ms,
-    truncated: !coverage.complete,
+    total_text_bytes_read:
+      coverage.total_text_bytes_read + facts.bytes_read,
+    elapsed_ms: coverage.elapsed_ms + facts.elapsed_ms,
+    truncated: !coverage.complete || !facts.complete,
     unreadable_entries: coverage.unreadable_paths,
     missing_tracked_files: coverage.missing_tracked_files,
     ignored_directories: coverage.fixed_directories_excluded,
@@ -622,7 +1254,10 @@ function projectScan(inspection) {
     path_failures: pathFailures,
     path_failures_truncated:
       coverage.rejected_paths + coverage.unreadable_paths > pathFailures.length,
-    budgets_reached: coverage.budgets_reached,
+    budgets_reached: Array.from(new Set([
+      ...coverage.budgets_reached,
+      ...facts.budgets_reached
+    ])),
     git_observation_failed: coverage.git_ignore_observation_failed,
     git_diagnostic: coverage.git_ignore_diagnostic
   };
@@ -638,7 +1273,8 @@ function projectScan(inspection) {
  *   importantFiles: ImportantFile[],
  *   inspection: Inspection,
  *   configuration: ConfigurationState,
- *   commands: CommandGroups
+ *   commands: CommandGroups,
+ *   facts: RepositoryFacts
  * }} input
  */
 function projectCurrentState(input) {
@@ -710,10 +1346,26 @@ function projectCurrentState(input) {
       reason: "No bounded command declaration was observed."
     });
   }
-  unknown.push({
-    claim: "Code-intelligence and TODO observations are Unknown.",
-    reason: "The compact refresh projection does not perform those analyses."
-  });
+  if (input.facts.code_intelligence.entrypoints.length > 0) {
+    known.push({
+      claim:
+        `${input.facts.code_intelligence.entrypoints.length} bounded entrypoint observation(s) found.`,
+      trust: "repository-untrusted"
+    });
+  }
+  if (input.facts.todos.length > 0) {
+    known.push({
+      claim: `${input.facts.todos.length} TODO/FIXME marker(s) found.`,
+      trust: "repository-untrusted"
+    });
+  }
+  if (!input.facts.complete) {
+    unknown.push({
+      claim: "Code-intelligence and TODO observations are incomplete.",
+      reason:
+        `Reached: ${input.facts.budgets_reached.join(", ") || "a bounded analysis limit"}.`
+    });
+  }
   for (const [label, signal] of /** @type {[string, ProjectSignal][]} */ ([
     ["CI", input.ci],
     ["deployment", input.deployment],
@@ -733,12 +1385,15 @@ function projectCurrentState(input) {
     reason:
       "Compact refresh preserves the checkpoint boundary without recreating the legacy verifier."
   });
-  if (!input.inspection.coverage.complete) {
+  if (!input.inspection.coverage.complete || !input.facts.complete) {
     unknown.push({
       claim: "Repository scan was incomplete.",
       reason:
         input.inspection.coverage.diagnostics.join(" ") ||
-        `Reached: ${input.inspection.coverage.budgets_reached.join(", ") || "an inspection limit"}.`
+        `Reached: ${[
+          ...input.inspection.coverage.budgets_reached,
+          ...input.facts.budgets_reached
+        ].join(", ") || "an inspection limit"}.`
     });
   }
   if (input.configuration.warning) {

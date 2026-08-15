@@ -93,7 +93,7 @@ const REQUIRED_FIELDS = [
   ["ci", "object"],
   ["deployment", "object"],
   ["release", "object"],
-  ["todos", "nullable-array"],
+  ["todos", "array"],
   ["current_state", "object"],
   ["verification", "object"],
   ["configuration", "object"],
@@ -264,20 +264,20 @@ const CURRENT_FIELD_RULES = {
   important_files: arrayRule(recordRule({
     path: STRING,
     reason: STRING,
-    fan_in: NULLABLE_NONNEGATIVE_INTEGER,
+    fan_in: NONNEGATIVE_INTEGER,
     evidence: STRINGS
   }, { trust: STRING })),
   code_intelligence: recordRule({
-    files_with_inbound_imports: NULLABLE_NONNEGATIVE_INTEGER,
+    files_with_inbound_imports: NONNEGATIVE_INTEGER,
     entrypoints: arrayRule(recordRule({
       path: STRING,
       confidence: CONFIDENCE,
       reason: STRING
-    }), true),
+    })),
     top_fan_in: arrayRule(recordRule({
       path: STRING,
       fan_in: NONNEGATIVE_INTEGER
-    }), true)
+    }))
   }),
   tests: recordRule({
     found: BOOLEAN,
@@ -293,7 +293,7 @@ const CURRENT_FIELD_RULES = {
     path: STRING,
     line: POSITIVE_INTEGER,
     text: STRING
-  }, { trust: STRING }), true),
+  }, { trust: STRING })),
   current_state: recordRule({
     known: CLAIMS,
     likely: CLAIMS,

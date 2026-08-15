@@ -19,6 +19,7 @@ import {
   renderBrief,
   renderResume,
   renderVerify,
+  validatePersistedState,
   validateConfig,
   writeKanonOutputs
 } from "../src/index.js";
@@ -422,6 +423,7 @@ test("compatibility refresh applies scan policy and persists bounded observation
   const root = makeFixture({
     "README.md": "# Demo\n",
     ".gitignore": "ignored.js\n",
+    ".kanonignore": "private/\ngenerated/**\n!generated/keep.md\n",
     ".kanon/config.json": `${JSON.stringify(config)}\n`,
     "package.json": JSON.stringify({
       name: "demo",
@@ -434,6 +436,9 @@ test("compatibility refresh applies scan policy and persists bounded observation
     }),
     "src/entry.js": "import './dep.js';\n// TODO: verify projection\n",
     "src/dep.js": "export const value = 1;\n",
+    "private/README.md": "# Private\n",
+    "generated/drop.js": "export const dropped = true;\n",
+    "generated/keep.md": "# Retained\n",
     "ignored.js": "export const ignored = true;\n"
   });
   let linked = false;
@@ -464,6 +469,9 @@ test("compatibility refresh applies scan policy and persists bounded observation
   assert.equal(state.scan.elapsed_ms > 0, true);
   assert.equal(state.scan.total_text_bytes_read > 0, true);
   assert.equal(fingerprints.includes("ignored.js"), false);
+  assert.equal(fingerprints.includes("private/README.md"), false);
+  assert.equal(fingerprints.includes("generated/drop.js"), false);
+  assert.equal(fingerprints.includes("generated/keep.md"), true);
   assert.deepEqual(state.commands.test.map((item) => item.command), [
     "npm test"
   ]);
@@ -474,15 +482,22 @@ test("compatibility refresh applies scan policy and persists bounded observation
     "npm run dev"
   ]);
   assert.deepEqual(state.code_intelligence, {
-    files_with_inbound_imports: null,
-    entrypoints: null,
-    top_fan_in: null
+    files_with_inbound_imports: 1,
+    entrypoints: [{
+      path: "src/entry.js",
+      confidence: "known",
+      reason: "declared package export"
+    }],
+    top_fan_in: [{ path: "src/dep.js", fan_in: 1 }]
   });
-  assert.equal(state.todos, null);
+  assert.deepEqual(state.todos, [{
+    path: "src/entry.js",
+    line: 2,
+    text: "// TODO: verify projection",
+    trust: "repository-untrusted"
+  }]);
   assert.equal(
-    state.current_state.unknown.some((item) =>
-      /Code-intelligence and TODO observations are Unknown/.test(item.claim)
-    ),
+    state.important_files.every((file) => Number.isInteger(file.fan_in)),
     true
   );
   if (linked) {
@@ -492,6 +507,64 @@ test("compatibility refresh applies scan policy and persists bounded observation
   assert.match(brief, /declared candidate: `npm test`/);
   assert.match(brief, /declared candidate: `npm run build`/);
   assert.doesNotMatch(brief, /no command declaration found/);
+});
+
+test("compatibility refresh preserves bounded structured command declarations", async () => {
+  const root = makeFixture({
+    "README.md": "# Commands\n",
+    "package.json": JSON.stringify({
+      name: "commands",
+      padding: "x".repeat(9_000),
+      main: "src/main.js",
+      scripts: {
+        build: "node build.js",
+        dev: "node src/main.js"
+      }
+    }),
+    "Makefile": "run:\n\t@node src/main.js\ntest:\n\t@node --test\nbuild:\n\t@node build.js\n",
+    "pyproject.toml": "[tool.poe.tasks]\nstart = \"python -m demo\"\n",
+    "src/main.js": "import './shared.js';\n// FIXME: verify commands\n",
+    "src/shared.js": "export const shared = true;\n"
+  });
+
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+
+  assert.deepEqual(state.commands.run.map((item) => item.command), [
+    "poe start"
+  ]);
+  assert.deepEqual(state.commands.test.map((item) => item.command), [
+    "make test"
+  ]);
+  assert.deepEqual(state.commands.build.map((item) => item.command), [
+    "npm run build"
+  ]);
+  assert.deepEqual(state.commands.dev.map((item) => item.command), [
+    "npm run dev"
+  ]);
+  assert.equal(state.code_intelligence.files_with_inbound_imports, 1);
+  assert.deepEqual(state.code_intelligence.top_fan_in, [
+    { path: "src/shared.js", fan_in: 1 }
+  ]);
+  assert.equal(Array.isArray(state.code_intelligence.entrypoints), true);
+  assert.equal(state.todos.length, 1);
+  assert.equal(
+    state.important_files.every((file) => Number.isInteger(file.fan_in)),
+    true
+  );
+  assert.equal(validatePersistedState(state).valid, true);
+  for (const mutate of [
+    (value) => { value.todos = null; },
+    (value) => { value.code_intelligence.entrypoints = null; },
+    (value) => { value.important_files[0].fan_in = null; }
+  ]) {
+    const invalid = structuredClone(state);
+    mutate(invalid);
+    assert.equal(validatePersistedState(invalid).valid, false);
+  }
+  const brief = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8");
+  assert.match(brief, /declared candidate: `poe start`/);
+  assert.match(brief, /declared candidate: `make test`/);
 });
 
 test("compatibility refresh enforces configured file limits", async () => {

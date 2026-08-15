@@ -232,7 +232,8 @@ const BASELINE_PATHS = new Map([
  * @typedef {{
  *   tokens: IgnoreToken[],
  *   directory_only: boolean,
- *   anchored: boolean
+ *   anchored: boolean,
+ *   negated: boolean
  * }} IgnoreRule
  * @typedef {{
  *   remaining: number,
@@ -748,7 +749,9 @@ function scanRepository(root, coverage, limits, gitRunner) {
         }
         if (ignored) {
           coverage.ignore_entries_excluded += 1;
-          continue;
+          if (!ignoreRules.some((rule) => rule.negated)) {
+            continue;
+          }
         }
         const selected = resolveRepositoryPath(root, relative, "directory");
         if (!selected.ok) {
@@ -984,14 +987,16 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
     if (!selected || selected.startsWith("#")) {
       continue;
     }
+    const negated = selected.startsWith("!");
+    const pattern = negated ? selected.slice(1) : selected;
     if (
       rules.length >= MAX_IGNORE_RULES ||
-      selected.startsWith("!") ||
-      selected.includes("..") ||
-      path.isAbsolute(selected) ||
-      selected.length > 512 ||
+      pattern.includes("..") ||
+      path.isAbsolute(pattern) ||
+      pattern.length === 0 ||
+      pattern.length > 512 ||
       /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(
-        selected
+        pattern
       )
     ) {
       return incompleteIgnoreRules(
@@ -1002,7 +1007,7 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
         "The repository ignore file contained an invalid, unsupported, or over-limit rule; repository content scanning was stopped."
       );
     }
-    const parsed = ignoreRule(selected);
+    const parsed = ignoreRule(pattern, negated);
     if (parsed === null) {
       return incompleteIgnoreRules(
         coverage,
@@ -1029,9 +1034,10 @@ function incompleteIgnoreRules(coverage, budget, diagnostic) {
 
 /**
  * @param {string} rule
+ * @param {boolean} negated
  * @returns {IgnoreRule | null}
  */
-function ignoreRule(rule) {
+function ignoreRule(rule, negated) {
   const normalized = rule.replaceAll("\\", "/").replace(/^\/+/, "");
   const directoryOnly = normalized.endsWith("/");
   const body = normalized.replace(/\/+$/, "");
@@ -1064,7 +1070,8 @@ function ignoreRule(rule) {
   return {
     tokens,
     directory_only: directoryOnly,
-    anchored: body.includes("/")
+    anchored: body.includes("/"),
+    negated
   };
 }
 
@@ -1077,27 +1084,49 @@ function ignoreRule(rule) {
  * @returns {boolean}
  */
 function matchesIgnore(relative, directory, rules, budget, coverage) {
+  let ignored = false;
+  const ancestors = ancestorDirectories(relative, directory);
   for (const rule of rules) {
-    if (rule.directory_only && !directory) {
-      continue;
-    }
-    const candidate = rule.anchored
-      ? relative
-      : relative.slice(relative.lastIndexOf("/") + 1);
-    const matched = matchIgnoreTokens(
-      rule.tokens,
-      candidate,
-      budget,
-      coverage
-    );
-    if (matched === null) {
-      return false;
-    }
-    if (matched) {
-      return true;
+    const candidates = rule.directory_only
+      ? ancestors
+      : directory
+        ? ancestors
+        : [relative, ...ancestors];
+    for (const selected of candidates) {
+      const candidate = rule.anchored
+        ? selected
+        : selected.slice(selected.lastIndexOf("/") + 1);
+      const matched = matchIgnoreTokens(
+        rule.tokens,
+        candidate,
+        budget,
+        coverage
+      );
+      if (matched === null) {
+        return false;
+      }
+      if (matched) {
+        ignored = !rule.negated;
+        break;
+      }
     }
   }
-  return false;
+  return ignored;
+}
+
+/**
+ * @param {string} relative
+ * @param {boolean} directory
+ * @returns {string[]}
+ */
+function ancestorDirectories(relative, directory) {
+  const parts = relative.split("/");
+  const length = directory ? parts.length : parts.length - 1;
+  const ancestors = [];
+  for (let index = 1; index <= length; index += 1) {
+    ancestors.push(parts.slice(0, index).join("/"));
+  }
+  return ancestors;
 }
 
 /**
