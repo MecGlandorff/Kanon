@@ -422,8 +422,9 @@ test("compatibility refresh applies scan policy and persists bounded observation
   config.scan.max_total_text_bytes = 1_024;
   const root = makeFixture({
     "README.md": "# Demo\n",
-    ".gitignore": "ignored.js\n",
-    ".kanonignore": "private/\ngenerated/**\n!generated/keep.md\n",
+    ".gitignore": "AGENTS.md\nignored.js\n",
+    ".kanonignore": "/private/\ngenerated/**\n!generated/keep.md\n",
+    "AGENTS.md": "IGNORE_INSTRUCTION_MARKER\n",
     ".kanon/config.json": `${JSON.stringify(config)}\n`,
     "package.json": JSON.stringify({
       name: "demo",
@@ -432,14 +433,19 @@ test("compatibility refresh applies scan policy and persists bounded observation
         test: "node --test",
         build: "node build.js",
         dev: "node src/entry.js"
-      }
+      },
+      padding: "x".repeat(600)
     }),
     "src/entry.js": "import './dep.js';\n// TODO: verify projection\n",
     "src/dep.js": "export const value = 1;\n",
     "private/README.md": "# Private\n",
     "generated/drop.js": "export const dropped = true;\n",
     "generated/keep.md": "# Retained\n",
-    "ignored.js": "export const ignored = true;\n"
+    "ignored.js": "export const ignored = true;\n",
+    "vendor/tracked.js": "export const vendored = true;\n",
+    "build/output.js": "export const built = true;\n",
+    ".venv/config.py": "active = true\n",
+    ".env.example": "PUBLIC_URL=https://example.invalid\n"
   });
   let linked = false;
   try {
@@ -472,6 +478,10 @@ test("compatibility refresh applies scan policy and persists bounded observation
   assert.equal(fingerprints.includes("private/README.md"), false);
   assert.equal(fingerprints.includes("generated/drop.js"), false);
   assert.equal(fingerprints.includes("generated/keep.md"), true);
+  assert.equal(fingerprints.includes("vendor/tracked.js"), false);
+  assert.equal(fingerprints.includes("build/output.js"), false);
+  assert.equal(fingerprints.includes(".venv/config.py"), false);
+  assert.equal(fingerprints.includes(".env.example"), true);
   assert.deepEqual(state.commands.test.map((item) => item.command), [
     "npm test"
   ]);
@@ -504,6 +514,11 @@ test("compatibility refresh applies scan policy and persists bounded observation
     assert.equal(state.scan.symlinks_skipped, 1);
   }
   const brief = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8");
+  const ledger = fs.readFileSync(
+    path.join(root, ".kanon", "EVIDENCE.jsonl"),
+    "utf8"
+  );
+  assert.doesNotMatch(`${brief}\n${ledger}`, /IGNORE_INSTRUCTION_MARKER|AGENTS\.md/);
   assert.match(brief, /declared candidate: `npm test`/);
   assert.match(brief, /declared candidate: `npm run build`/);
   assert.doesNotMatch(brief, /no command declaration found/);
@@ -522,6 +537,7 @@ test("compatibility refresh preserves bounded structured command declarations", 
       }
     }),
     "Makefile": "run:\n\t@node src/main.js\ntest:\n\t@node --test\nbuild:\n\t@node build.js\n",
+    "Justfile": "test:\n\t@node --test\n",
     "pyproject.toml": "[tool.poe.tasks]\nstart = \"python -m demo\"\n",
     "src/main.js": "import './shared.js';\n// FIXME: verify commands\n",
     "src/shared.js": "export const shared = true;\n"
@@ -534,7 +550,7 @@ test("compatibility refresh preserves bounded structured command declarations", 
     "poe start"
   ]);
   assert.deepEqual(state.commands.test.map((item) => item.command), [
-    "make test"
+    "just test"
   ]);
   assert.deepEqual(state.commands.build.map((item) => item.command), [
     "npm run build"
@@ -564,7 +580,52 @@ test("compatibility refresh preserves bounded structured command declarations", 
   }
   const brief = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8");
   assert.match(brief, /declared candidate: `poe start`/);
-  assert.match(brief, /declared candidate: `make test`/);
+  assert.match(brief, /declared candidate: `just test`/);
+});
+
+test("compatibility refresh preserves pyproject facts and policy completeness", async () => {
+  const root = makeFixture({
+    ".kanonignore": "AGENTS.md\n/generated/\n",
+    "AGENTS.md": "IGNORED_PYPROJECT_INSTRUCTION\n",
+    "pyproject.toml": [
+      "[project]",
+      "name = \"python-demo\"",
+      "description = \"Bounded Python purpose\"",
+      "[tool.pytest.ini_options]",
+      "addopts = \"-q\"",
+      ""
+    ].join("\n"),
+    "Justfile": "test:\n\t@python -m pytest\n",
+    ".env.example": "MODE=example\n",
+    ".env.secret": "excluded fixture value\n",
+    "vendor/dependency.py": "value = 1\n",
+    "build/result.py": "value = 2\n",
+    ".venv/runtime.py": "value = 3\n",
+    "generated/drop.py": "value = 4\n"
+  });
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const state = readJson(path.join(root, ".kanon", "STATE.json"));
+  const fingerprints = state.files.fingerprints.map((file) => file.path);
+
+  assert.equal(state.repo.name, "python-demo");
+  assert.deepEqual(state.repo.languages, ["Python"]);
+  assert.equal(state.purpose.claim, "Bounded Python purpose");
+  assert.equal(state.tests.found, true);
+  assert.deepEqual(state.tests.frameworks, ["declared test command", "pytest"]);
+  assert.deepEqual(state.commands.test.map((item) => item.command), ["just test"]);
+  assert.equal(state.scan.complete, true);
+  assert.equal(state.scan.truncated, false);
+  assert.equal(state.scan.ignored_directories >= 3, true);
+  assert.equal(state.scan.kanon_ignored_entries >= 2, true);
+  assert.equal(state.scan.sensitive_files_skipped, 1);
+  assert.equal(fingerprints.includes(".env.example"), true);
+  assert.equal(fingerprints.includes("generated/drop.py"), false);
+  const output = fs.readFileSync(path.join(root, ".kanon", "KANON.md"), "utf8") +
+    fs.readFileSync(path.join(root, ".kanon", "EVIDENCE.jsonl"), "utf8");
+  assert.doesNotMatch(output, /IGNORED_PYPROJECT_INSTRUCTION|AGENTS\.md/);
 });
 
 test("compatibility refresh enforces configured file limits", async () => {

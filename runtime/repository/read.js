@@ -351,6 +351,9 @@ export function isSensitiveRepositoryPath(relativePath) {
   }
   const lower = relativePath.toLowerCase();
   const basename = path.posix.basename(lower);
+  if ([".env.example", ".env.sample", ".env.template"].includes(basename)) {
+    return false;
+  }
   return (
     basename === ".npmrc" ||
     basename === ".pypirc" ||

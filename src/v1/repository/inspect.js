@@ -20,7 +20,6 @@ import {
   readBoundedRepositoryFile,
   resolveRepositoryPath
 } from "./read.js";
-
 const MAX_FILES = 2_500;
 const MAX_ENTRIES = 10_000;
 const MAX_FILE_BYTES = 750_000;
@@ -36,14 +35,12 @@ const MAX_EVIDENCE_BYTES = 64 * 1024;
 const MAX_EXCERPT_BYTES = 8 * 1024;
 const MAX_DIAGNOSTIC_PATHS = 16;
 const FIXED_EXCLUDED_DIRECTORIES = new Set([
-  ".git",
-  ".hg",
-  ".svn",
-  ".kanon",
-  "node_modules",
-  "coverage",
-  ".nyc_output",
-  "dist"
+  ".git", ".hg", ".svn", ".kanon", "node_modules", "coverage",
+  ".nyc_output", "dist"
+]);
+const COMPATIBILITY_EXCLUDED_DIRECTORIES = new Set([
+  "vendor", "build", ".next", ".nuxt", ".cache", ".venv", "venv",
+  "__pycache__", ".pytest_cache", ".mypy_cache", ".tox"
 ]);
 const TEXT_EXTENSIONS = new Set([
   "",
@@ -83,23 +80,22 @@ const TEXT_EXTENSIONS = new Set([
   ".yml"
 ]);
 const INSTRUCTION_NAMES = Object.freeze([
-  "AGENTS.md",
-  "CLAUDE.md",
-  "CONTRIBUTING.md",
+  "AGENTS.md", "CLAUDE.md", "CONTRIBUTING.md",
   ".github/copilot-instructions.md"
 ]);
 const BASELINE_PATHS = new Map([
-  ["README.md", 100],
-  ["README", 98],
-  ["package.json", 96],
-  ["pyproject.toml", 94],
-  ["Cargo.toml", 94],
-  ["go.mod", 94],
-  ["Makefile", 90],
-  ["CHANGELOG.md", 72],
-  ["RELEASING.md", 72]
+  ["README.md", 100], ["README", 98], ["package.json", 96],
+  ["pyproject.toml", 94], ["Cargo.toml", 94], ["go.mod", 94],
+  ["Makefile", 90], ["CHANGELOG.md", 72], ["RELEASING.md", 72]
 ]);
-
+const TEXT_READ_PRIORITY = new Map(/** @type {[string, number][]} */ ([
+  ["package.json", 0], ["pyproject.toml", 1],
+  ["Makefile", 2], ["makefile", 2], ["GNUmakefile", 2],
+  ["Justfile", 2], ["justfile", 2],
+  ...INSTRUCTION_NAMES.map((name) => [name, 3])
+]));
+/** @type {WeakMap<object, Map<string, string>>} */
+const INSPECTION_TEXTS = new WeakMap();
 /**
  * @typedef {"orient" | "resume" | "steer" | "verify"} InspectionProfile
  * @typedef {{
@@ -193,7 +189,8 @@ const BASELINE_PATHS = new Map([
  *     maxIgnoreBytes?: number,
  *     gitTimeoutMs?: number,
  *     gitMaxOutputBytes?: number,
- *     useGitIgnore?: boolean
+ *     useGitIgnore?: boolean,
+ *     compatibilityPolicy?: boolean
  *   }
  * }} InspectOptions
  * @typedef {{
@@ -206,7 +203,8 @@ const BASELINE_PATHS = new Map([
  *   max_ignore_bytes: number,
  *   git_timeout_ms: number,
  *   git_max_output_bytes: number,
- *   use_git_ignore: boolean
+ *   use_git_ignore: boolean,
+ *   compatibility_policy: boolean
  * }} InspectionLimits
  * @typedef {{
  *   previous: unknown | null,
@@ -248,17 +246,7 @@ const BASELINE_PATHS = new Map([
  *   rules: []
  * }} IgnoreLoadResult
  */
-
-/**
- * Inspect a repository in a fixed order: canonical root, applicable
- * instructions, bounded metadata scan, bounded Git observation, then selected
- * evidence reads.
- *
- * @param {unknown} rootInput
- * @param {unknown} taskInput
- * @param {InspectOptions} [options]
- * @returns {RepositoryInspection}
- */
+/** @param {unknown} rootInput @param {unknown} taskInput @param {InspectOptions} [options] @returns {RepositoryInspection} */
 export function inspectRepository(rootInput, taskInput, options = {}) {
   const profile = options.profile || "orient";
   const limits = inspectionLimits(options.scan);
@@ -283,7 +271,6 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
   if (!root.ok) {
     return invalidInspection(root.diagnostic);
   }
-
   const coverage = createCoverage(limits);
   const explicitPaths = extractTaskPaths(task);
   const target =
@@ -294,52 +281,34 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     target === undefined || explicitPaths.includes(target)
       ? explicitPaths
       : [...explicitPaths, target];
-
-  // Applicable repository instructions are the first repository file content
-  // read after canonicalization.
-  const instructions = readApplicableInstructions(
-    root.root,
-    instructionPaths,
-    coverage
+  const scan = scanRepository(root.root, coverage, limits, options.git_runner);
+  const applicableInstructions = selectInstructionPaths(
+    instructionPaths, scan.files, coverage
   );
-  const scan = scanRepository(
-    root.root,
-    coverage,
-    limits,
-    options.git_runner
+  const selected = selectEvidencePaths(
+    scan.files, applicableInstructions, task, explicitPaths, profile, target
+  );
+  const texts = readVisibleRepositoryTexts(
+    root.root, scan.files, coverage,
+    limits.compatibility_policy
+      ? null
+      : new Set([...applicableInstructions, ...selected]),
+    new Set(applicableInstructions)
+  );
+  const instructions = readApplicableInstructions(
+    applicableInstructions, scan.files, texts, coverage
   );
   const git = observeRepositoryGit(root.root, {
-    ...(options.git_runner === undefined
-      ? {}
-      : { runner: options.git_runner }),
+    ...(options.git_runner === undefined ? {} : { runner: options.git_runner }),
     timeout_ms: limits.git_timeout_ms,
     max_output_bytes: limits.git_max_output_bytes
   });
-  const selected = selectEvidencePaths(
-    scan.files,
-    instructions.map((item) => item.path),
-    task,
-    explicitPaths,
-    profile,
-    target
-  );
   const receiptPaths = selectEvidencePaths(
-    scan.files,
-    instructions.map((item) => item.path),
-    task,
-    explicitPaths,
-    "orient",
-    undefined
+    scan.files, applicableInstructions, task, explicitPaths, "orient", undefined
   );
   const evidence = [
     ...instructions,
-    ...readSelectedEvidence(
-      root.root,
-      scan.files,
-      selected,
-      instructions,
-      coverage
-    )
+    ...readSelectedEvidence(scan.files, selected, instructions, texts, coverage)
   ].slice(0, MAX_EVIDENCE_ITEMS);
   finishCoverage(coverage, scan.files.length, git);
   const evidenceFingerprint = fingerprintEvidence(
@@ -351,7 +320,8 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     coverage,
     git
   );
-  return {
+  /** @type {Extract<RepositoryInspection, {ok: true}>} */
+  const result = {
     schema: "kanon-repository-inspection-v1",
     ok: true,
     status: "Known",
@@ -365,7 +335,11 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     coverage,
     evidence_fingerprint: evidenceFingerprint,
     evidence_complete:
-      coverage.complete && git.observation_complete,
+      coverage.complete &&
+      git.observation_complete &&
+      coverage.fixed_directories_excluded === 0 &&
+      coverage.ignore_entries_excluded === 0 &&
+      coverage.sensitive_files_excluded === 0,
     current_state: buildContinuityState(
       root.root,
       evidence,
@@ -375,16 +349,14 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     ),
     trust: "repository-untrusted"
   };
+  INSPECTION_TEXTS.set(result, texts);
+  return result;
 }
-
-/**
- * Read only the existing v0.4 continuity checkpoint and handoff metadata.
- * Missing state is ordinary Unknown input, while malformed or unsafe state is
- * diagnosed and discarded.
- *
- * @param {string} canonicalRoot
- * @returns {PersistedContinuity}
- */
+/** @param {object} inspection @returns {Map<string, string>} */
+export function repositoryInspectionTexts(inspection) {
+  return new Map(INSPECTION_TEXTS.get(inspection) || []);
+}
+/** Read only the existing v0.4 continuity checkpoint and handoff metadata. Missing state is ordinary Unknown input, while malformed or unsafe state is diagnosed and discarded. @param {string} canonicalRoot @returns {PersistedContinuity} */
 export function inspectPersistedContinuity(canonicalRoot) {
   const previousRead = readBoundedRepositoryFile(
     canonicalRoot,
@@ -406,7 +378,6 @@ export function inspectPersistedContinuity(canonicalRoot) {
     previousWarning =
       "Prior continuity state was unavailable or unsafe and was ignored.";
   }
-
   const handoffRead = readBoundedRepositoryFile(
     canonicalRoot,
     ".kanon/HANDOFF.md",
@@ -454,34 +425,7 @@ export function inspectPersistedContinuity(canonicalRoot) {
       "Prior handoff evidence was unavailable or unsafe and was ignored."
   };
 }
-
-/**
- * @param {RepositoryInspection} inspection
- * @returns {{
- *   repository: {
- *     root: import("../core/trust.js").RepositoryValue
- *   },
- *   task: string,
- *   instructions: {
- *     status: "Known" | "Unknown",
- *     values: ReturnType<typeof publicEvidence>[]
- *   },
- *   git: {
- *     status: "Known" | "Unknown",
- *     branch: import("../core/trust.js").RepositoryValue | null,
- *     head: import("../core/trust.js").RepositoryValue | null,
- *     dirty: boolean | null,
- *     change_count: number | null,
- *     recent_commits: {
- *       hash: import("../core/trust.js").RepositoryValue,
- *       date: import("../core/trust.js").RepositoryValue,
- *       subject: import("../core/trust.js").RepositoryValue
- *     }[]
- *   },
- *   evidence: ReturnType<typeof publicEvidence>[],
- *   coverage: ReturnType<typeof publicCoverage>
- * } | null}
- */
+/** @param {RepositoryInspection} inspection @returns {{ repository: { root: import("../core/trust.js").RepositoryValue }, task: string, instructions: { status: "Known" | "Unknown", values: ReturnType<typeof publicEvidence>[] }, git: { status: "Known" | "Unknown", branch: import("../core/trust.js").RepositoryValue | null, head: import("../core/trust.js").RepositoryValue | null, dirty: boolean | null, change_count: number | null, recent_commits: { hash: import("../core/trust.js").RepositoryValue, date: import("../core/trust.js").RepositoryValue, subject: import("../core/trust.js").RepositoryValue }[] }, evidence: ReturnType<typeof publicEvidence>[], coverage: ReturnType<typeof publicCoverage> } | null} */
 export function publicInspection(inspection) {
   if (!inspection.ok) {
     return null;
@@ -519,14 +463,8 @@ export function publicInspection(inspection) {
     coverage: publicCoverage(inspection.coverage)
   };
 }
-
-/**
- * @param {string} root
- * @param {string[]} explicitPaths
- * @param {InspectionCoverage} coverage
- * @returns {RepositoryEvidence[]}
- */
-function readApplicableInstructions(root, explicitPaths, coverage) {
+/** @param {string[]} explicitPaths @param {InspectedFile[]} files @param {InspectionCoverage} coverage @returns {string[]} */
+function selectInstructionPaths(explicitPaths, files, coverage) {
   const candidates = new Set(INSTRUCTION_NAMES);
   for (const selectedPath of explicitPaths) {
     /** @type {string[]} */
@@ -549,67 +487,132 @@ function readApplicableInstructions(root, explicitPaths, coverage) {
     coverage.instruction_complete = false;
     noteBudget(coverage, "max_instruction_candidates");
   }
+  const visible = new Set(files.map((file) => file.path));
+  return Array.from(candidates).slice(0, 32).filter((candidate) =>
+    visible.has(candidate)
+  );
+}
+/** @param {string[]} candidates @param {InspectedFile[]} files @param {Map<string, string>} texts @param {InspectionCoverage} coverage @returns {RepositoryEvidence[]} */
+function readApplicableInstructions(candidates, files, texts, coverage) {
   /** @type {RepositoryEvidence[]} */
   const instructions = [];
-  for (const candidate of Array.from(candidates).slice(0, 32)) {
+  const byPath = new Map(files.map((file) => [file.path, file]));
+  let renderedBytes = 0;
+  for (const candidate of candidates) {
     if (instructions.length >= MAX_INSTRUCTION_ITEMS) {
       coverage.instruction_complete = false;
       noteBudget(coverage, "max_instruction_items");
       break;
     }
-    const remaining =
-      coverage.limits.max_evidence_bytes - coverage.total_text_bytes_read;
+    const file = byPath.get(candidate);
+    if (!file) {
+      continue;
+    }
+    const contentText = texts.get(candidate);
+    if (contentText === undefined) {
+      coverage.instruction_complete = false;
+      continue;
+    }
+    const remaining = coverage.limits.max_evidence_bytes - renderedBytes;
     if (remaining < 1) {
       noteBudget(coverage, "max_total_text_bytes");
       break;
     }
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
-    const read = readBoundedRepositoryFile(
-      root,
-      candidate,
-      maximum,
-      { truncate: true }
-    );
-    if (!read.ok) {
-      if (read.status !== "missing") {
-        coverage.instruction_complete = false;
-        recordReadFailure(coverage, read);
-      }
-      continue;
-    }
-    coverage.total_text_bytes_read += read.bytes.length;
-    const rawContent = read.bytes.toString("utf8");
     const sanitizationTruncated =
-      Buffer.byteLength(rawContent, "utf8") > maximum;
+      file.size > Buffer.byteLength(contentText) ||
+      Buffer.byteLength(contentText) > maximum;
     const content = sanitizeDisplayText(
-      rawContent,
+      contentText,
       maximum,
       { multiline: true }
     );
+    renderedBytes += Buffer.byteLength(content);
     instructions.push({
       kind: "instruction",
-      path: read.relative_path,
-      size: read.size,
-      sha256: sha256(read.bytes),
+      path: candidate,
+      size: file.size,
+      sha256: file.sha256 || sha256(Buffer.from(contentText)),
       content,
-      truncated: read.truncated || sanitizationTruncated,
+      truncated: sanitizationTruncated,
       trust: "repository-untrusted"
     });
-    if (read.truncated || sanitizationTruncated) {
+    if (sanitizationTruncated) {
       coverage.instruction_complete = false;
       noteBudget(coverage, "instruction_truncated");
     }
   }
   return instructions;
 }
-
-/**
- * @param {string} root
- * @param {InspectionCoverage} coverage
- * @param {InspectionLimits} limits
- * @param {import("./git.js").GitRunner | undefined} gitRunner
- * @returns {{files: InspectedFile[]}}
- */
+/** @param {string} root @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {Set<string> | null} selectedPaths @param {Set<string>} instructionPaths @returns {Map<string, string>} */
+function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instructionPaths) {
+  const started = process.hrtime.bigint();
+  const deadline = Date.now() + Math.max(
+    0,
+    coverage.limits.max_scan_ms - coverage.elapsed_ms
+  );
+  let remaining = coverage.limits.max_total_text_bytes;
+  /** @type {Map<string, string>} */ const texts = new Map();
+  const selectedFiles = [...files].sort((left, right) =>
+    (TEXT_READ_PRIORITY.get(left.path) ?? 4) -
+      (TEXT_READ_PRIORITY.get(right.path) ?? 4) ||
+    compareText(left.path, right.path)
+  );
+  for (const file of selectedFiles) {
+    if (!file.text || (selectedPaths && !selectedPaths.has(file.path))) continue;
+    if (Date.now() > deadline) {
+      noteBudget(coverage, "max_scan_ms");
+      break;
+    }
+    const truncate = selectedPaths !== null && instructionPaths.has(file.path);
+    const maximum = Math.min(
+      truncate ? MAX_EXCERPT_BYTES : coverage.limits.max_file_bytes,
+      remaining
+    );
+    if (maximum < 1) { noteBudget(coverage, "max_total_text_bytes"); break; }
+    if (!truncate && file.size > maximum) {
+      noteNonterminalBudget(coverage, "max_total_text_bytes");
+      continue;
+    }
+    const read = readBoundedRepositoryFile(
+      root,
+      file.path,
+      maximum,
+      { truncate }
+    );
+    if (!read.ok) {
+      recordReadFailure(coverage, read);
+      continue;
+    }
+    remaining -= read.bytes.length;
+    coverage.total_text_bytes_read += read.bytes.length;
+    const digest = sha256(read.bytes);
+    if (
+      read.size !== file.size ||
+      read.mtime_ms !== file.mtime_ms ||
+      (file.sha256 !== null && !read.truncated && digest !== file.sha256)
+    ) {
+      coverage.unreadable_paths += 1;
+      samplePath(coverage.unreadable_path_samples, file.path);
+      coverage.diagnostics.push(
+        "A repository file changed between metadata and bounded text inspection."
+      );
+      continue;
+    }
+    try {
+      texts.set(
+        file.path,
+        new TextDecoder("utf-8", { fatal: true }).decode(read.bytes)
+      );
+    } catch {
+      file.text = false;
+      noteNonterminalBudget(coverage, "invalid_text");
+    }
+  }
+  coverage.elapsed_ms += elapsedMilliseconds(started);
+  return texts;
+}
+/** @param {string} root @param {InspectionCoverage} coverage @param {InspectionLimits} limits @param {import("./git.js").GitRunner | undefined} gitRunner @returns {{files: InspectedFile[]}} */
 function scanRepository(root, coverage, limits, gitRunner) {
   const started = process.hrtime.bigint();
   const deadline = Date.now() + limits.max_scan_ms;
@@ -628,7 +631,6 @@ function scanRepository(root, coverage, limits, gitRunner) {
   /** @type {InspectedFile[]} */
   const files = [];
   let hashedBytes = 0;
-
   if (limits.use_git_ignore) {
     const listing = listGitVisibleFiles(root, {
       ...(gitRunner === undefined ? {} : { runner: gitRunner }),
@@ -641,7 +643,10 @@ function scanRepository(root, coverage, limits, gitRunner) {
         if (!visitEntryBudget()) {
           break;
         }
-        if (hasFixedExcludedDirectory(relative)) {
+        if (hasFixedExcludedDirectory(
+          relative,
+          limits.compatibility_policy
+        )) {
           coverage.fixed_directories_excluded += 1;
           continue;
         }
@@ -671,7 +676,6 @@ function scanRepository(root, coverage, limits, gitRunner) {
     coverage.git_ignore_diagnostic = diagnostic;
     coverage.diagnostics.push(diagnostic);
   }
-
   /** @type {{absolute: string, relative: string}[]} */
   const pending = [{ absolute: root, relative: "" }];
   while (pending.length > 0 && !terminalBudgetReached(coverage)) {
@@ -733,7 +737,10 @@ function scanRepository(root, coverage, limits, gitRunner) {
         continue;
       }
       if (entry.isDirectory()) {
-        if (FIXED_EXCLUDED_DIRECTORIES.has(entry.name)) {
+        if (isFixedExcludedDirectory(
+          entry.name,
+          limits.compatibility_policy
+        )) {
           coverage.fixed_directories_excluded += 1;
           continue;
         }
@@ -790,7 +797,6 @@ function scanRepository(root, coverage, limits, gitRunner) {
     }
   }
   return finish();
-
   /** @returns {boolean} */
   function visitEntryBudget() {
     if (Date.now() > deadline) {
@@ -804,7 +810,6 @@ function scanRepository(root, coverage, limits, gitRunner) {
     }
     return true;
   }
-
   /** @param {string} relative @returns {boolean} */
   function addFile(relative) {
     if (isSensitiveRepositoryPath(relative)) {
@@ -863,7 +868,6 @@ function scanRepository(root, coverage, limits, gitRunner) {
     });
     return true;
   }
-
   /** @returns {{files: InspectedFile[]}} */
   function finish() {
     coverage.total_bytes_hashed = hashedBytes;
@@ -872,24 +876,7 @@ function scanRepository(root, coverage, limits, gitRunner) {
     return { files };
   }
 }
-
-/**
- * Read at most the remaining global entry budget plus one sentinel. Directory
- * enumeration therefore cannot allocate in proportion to an unbounded
- * repository-controlled directory.
- *
- * @param {string} directory
- * @param {number} maximumEntries
- * @param {number} deadline
- * @returns {{
- *   ok: true,
- *   entries: import("node:fs").Dirent[],
- *   truncated: boolean,
- *   timed_out: boolean
- * } | {
- *   ok: false
- * }}
- */
+/** Read at most the remaining global entry budget plus one sentinel. Directory enumeration therefore cannot allocate in proportion to an unbounded repository-controlled directory. @param {string} directory @param {number} maximumEntries @param {number} deadline @returns {{ ok: true, entries: import("node:fs").Dirent[], truncated: boolean, timed_out: boolean } | { ok: false }} */
 function readBoundedDirectory(directory, maximumEntries, deadline) {
   if (
     !Number.isSafeInteger(maximumEntries) ||
@@ -944,13 +931,7 @@ function readBoundedDirectory(directory, maximumEntries, deadline) {
     return { ok: false };
   }
 }
-
-/**
- * @param {string} root
- * @param {InspectionCoverage} coverage
- * @param {number} maximumBytes
- * @returns {IgnoreLoadResult}
- */
+/** @param {string} root @param {InspectionCoverage} coverage @param {number} maximumBytes @returns {IgnoreLoadResult} */
 function loadIgnoreRules(root, coverage, maximumBytes) {
   const read = readBoundedRepositoryFile(
     root,
@@ -989,10 +970,13 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
     }
     const negated = selected.startsWith("!");
     const pattern = negated ? selected.slice(1) : selected;
+    const portablePattern = pattern.replaceAll("\\", "/");
+    const unrootedPattern = portablePattern.replace(/^\//, "");
     if (
       rules.length >= MAX_IGNORE_RULES ||
-      pattern.includes("..") ||
-      path.isAbsolute(pattern) ||
+      unrootedPattern.includes("..") ||
+      portablePattern.startsWith("//") ||
+      /^[A-Za-z]:\//.test(portablePattern) ||
       pattern.length === 0 ||
       pattern.length > 512 ||
       /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(
@@ -1019,26 +1003,17 @@ function loadIgnoreRules(root, coverage, maximumBytes) {
   }
   return { complete: true, rules };
 }
-
-/**
- * @param {InspectionCoverage} coverage
- * @param {string} budget
- * @param {string} diagnostic
- * @returns {Extract<IgnoreLoadResult, {complete: false}>}
- */
+/** @param {InspectionCoverage} coverage @param {string} budget @param {string} diagnostic @returns {Extract<IgnoreLoadResult, {complete: false}>} */
 function incompleteIgnoreRules(coverage, budget, diagnostic) {
   noteNonterminalBudget(coverage, budget);
   coverage.diagnostics.push(diagnostic);
   return { complete: false, rules: [] };
 }
-
-/**
- * @param {string} rule
- * @param {boolean} negated
- * @returns {IgnoreRule | null}
- */
+/** @param {string} rule @param {boolean} negated @returns {IgnoreRule | null} */
 function ignoreRule(rule, negated) {
-  const normalized = rule.replaceAll("\\", "/").replace(/^\/+/, "");
+  const portable = rule.replaceAll("\\", "/");
+  const rooted = portable.startsWith("/");
+  const normalized = portable.replace(/^\/+/, "");
   const directoryOnly = normalized.endsWith("/");
   const body = normalized.replace(/\/+$/, "");
   const wildcardCount = Array.from(body).filter(
@@ -1070,19 +1045,11 @@ function ignoreRule(rule, negated) {
   return {
     tokens,
     directory_only: directoryOnly,
-    anchored: body.includes("/"),
+    anchored: rooted || body.includes("/"),
     negated
   };
 }
-
-/**
- * @param {string} relative
- * @param {boolean} directory
- * @param {IgnoreRule[]} rules
- * @param {IgnoreMatchBudget} budget
- * @param {InspectionCoverage} coverage
- * @returns {boolean}
- */
+/** @param {string} relative @param {boolean} directory @param {IgnoreRule[]} rules @param {IgnoreMatchBudget} budget @param {InspectionCoverage} coverage @returns {boolean} */
 function matchesIgnore(relative, directory, rules, budget, coverage) {
   let ignored = false;
   const ancestors = ancestorDirectories(relative, directory);
@@ -1113,12 +1080,7 @@ function matchesIgnore(relative, directory, rules, budget, coverage) {
   }
   return ignored;
 }
-
-/**
- * @param {string} relative
- * @param {boolean} directory
- * @returns {string[]}
- */
+/** @param {string} relative @param {boolean} directory @returns {string[]} */
 function ancestorDirectories(relative, directory) {
   const parts = relative.split("/");
   const length = directory ? parts.length : parts.length - 1;
@@ -1128,18 +1090,7 @@ function ancestorDirectories(relative, directory) {
   }
   return ancestors;
 }
-
-/**
- * Deterministic NFA-style glob matching. `star` never crosses a path
- * separator, while `globstar` may. Work and wall-clock limits are shared by
- * the complete repository scan.
- *
- * @param {IgnoreToken[]} tokens
- * @param {string} candidate
- * @param {IgnoreMatchBudget} budget
- * @param {InspectionCoverage} coverage
- * @returns {boolean | null}
- */
+/** Deterministic NFA-style glob matching. `star` never crosses a path separator, while `globstar` may. Work and wall-clock limits are shared by the complete repository scan. @param {IgnoreToken[]} tokens @param {string} candidate @param {IgnoreMatchBudget} budget @param {InspectionCoverage} coverage @returns {boolean | null} */
 function matchIgnoreTokens(tokens, candidate, budget, coverage) {
   let states = ignoreEpsilonClosure(
     new Set([0]),
@@ -1190,14 +1141,7 @@ function matchIgnoreTokens(tokens, candidate, budget, coverage) {
   }
   return states.has(tokens.length);
 }
-
-/**
- * @param {Set<number>} initial
- * @param {IgnoreToken[]} tokens
- * @param {IgnoreMatchBudget} budget
- * @param {InspectionCoverage} coverage
- * @returns {Set<number> | null}
- */
+/** @param {Set<number>} initial @param {IgnoreToken[]} tokens @param {IgnoreMatchBudget} budget @param {InspectionCoverage} coverage @returns {Set<number> | null} */
 function ignoreEpsilonClosure(initial, tokens, budget, coverage) {
   const states = new Set(initial);
   const pending = Array.from(initial);
@@ -1220,12 +1164,7 @@ function ignoreEpsilonClosure(initial, tokens, budget, coverage) {
   }
   return states;
 }
-
-/**
- * @param {IgnoreMatchBudget} budget
- * @param {InspectionCoverage} coverage
- * @returns {boolean}
- */
+/** @param {IgnoreMatchBudget} budget @param {InspectionCoverage} coverage @returns {boolean} */
 function consumeIgnoreMatchWork(budget, coverage) {
   if (budget.exhausted) {
     return false;
@@ -1249,16 +1188,7 @@ function consumeIgnoreMatchWork(budget, coverage) {
   budget.remaining -= 1;
   return true;
 }
-
-/**
- * @param {InspectedFile[]} files
- * @param {string[]} instructionPaths
- * @param {string} task
- * @param {string[]} explicitPaths
- * @param {InspectionProfile} profile
- * @param {string | undefined} target
- * @returns {string[]}
- */
+/** @param {InspectedFile[]} files @param {string[]} instructionPaths @param {string} task @param {string[]} explicitPaths @param {InspectionProfile} profile @param {string | undefined} target @returns {string[]} */
 function selectEvidencePaths(
   files,
   instructionPaths,
@@ -1307,26 +1237,22 @@ function selectEvidencePaths(
     .slice(0, Math.max(0, MAX_EVIDENCE_ITEMS - instructionPaths.length))
     .map((item) => item.path);
 }
-
-/**
- * @param {string} root
- * @param {InspectedFile[]} files
- * @param {string[]} selectedPaths
- * @param {RepositoryEvidence[]} instructions
- * @param {InspectionCoverage} coverage
- * @returns {RepositoryEvidence[]}
- */
+/** @param {InspectedFile[]} files @param {string[]} selectedPaths @param {RepositoryEvidence[]} instructions @param {Map<string, string>} texts @param {InspectionCoverage} coverage @returns {RepositoryEvidence[]} */
 function readSelectedEvidence(
-  root,
   files,
   selectedPaths,
   instructions,
+  texts,
   coverage
 ) {
   const instructionPaths = new Set(instructions.map((item) => item.path));
   const byPath = new Map(files.map((file) => [file.path, file]));
   /** @type {RepositoryEvidence[]} */
   const evidence = [];
+  let renderedBytes = instructions.reduce(
+    (total, item) => total + Buffer.byteLength(item.content),
+    0
+  );
   for (const selectedPath of selectedPaths) {
     if (instructionPaths.has(selectedPath)) {
       continue;
@@ -1335,47 +1261,14 @@ function readSelectedEvidence(
     if (!file) {
       continue;
     }
-    const remaining =
-      coverage.limits.max_evidence_bytes - coverage.total_text_bytes_read;
+    const remaining = coverage.limits.max_evidence_bytes - renderedBytes;
     if (remaining < 1) {
       noteBudget(coverage, "max_total_text_bytes");
       break;
     }
-    if (file.sha256 !== null && file.size > remaining) {
-      noteNonterminalBudget(coverage, "max_total_text_bytes");
-      continue;
-    }
+    const rawContent = texts.get(selectedPath);
+    if (rawContent === undefined) continue;
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
-    const readMaximum =
-      file.sha256 === null ? maximum : coverage.limits.max_file_bytes;
-    const read = readBoundedRepositoryFile(
-      root,
-      selectedPath,
-      readMaximum,
-      { truncate: true }
-    );
-    if (!read.ok) {
-      recordReadFailure(coverage, read);
-      continue;
-    }
-    coverage.total_text_bytes_read += read.bytes.length;
-    const currentDigest = sha256(read.bytes);
-    if (
-      read.size !== file.size ||
-      read.mtime_ms !== file.mtime_ms ||
-      (
-        file.sha256 !== null &&
-        currentDigest !== file.sha256
-      )
-    ) {
-      coverage.unreadable_paths += 1;
-      samplePath(coverage.unreadable_path_samples, selectedPath);
-      coverage.diagnostics.push(
-        "A selected evidence file changed between the repository scan and its bounded evidence read."
-      );
-      continue;
-    }
-    const rawContent = read.bytes.toString("utf8");
     const sanitizationTruncated =
       Buffer.byteLength(rawContent, "utf8") > maximum;
     const content = sanitizeDisplayText(
@@ -1383,32 +1276,23 @@ function readSelectedEvidence(
       maximum,
       { multiline: true }
     );
+    renderedBytes += Buffer.byteLength(content);
     evidence.push({
       kind: evidenceKind(selectedPath),
       path: selectedPath,
-      size: read.size,
-      sha256: file.sha256 || currentDigest,
+      size: file.size,
+      sha256: file.sha256 || sha256(Buffer.from(rawContent)),
       content,
-      truncated: read.truncated || sanitizationTruncated,
+      truncated: sanitizationTruncated,
       trust: "repository-untrusted"
     });
-    if (read.truncated || sanitizationTruncated) {
+    if (sanitizationTruncated) {
       noteNonterminalBudget(coverage, "evidence_truncated");
     }
   }
   return evidence;
 }
-
-/**
- * @param {string} root
- * @param {string} task
- * @param {RepositoryEvidence[]} instructions
- * @param {string[]} selectedPaths
- * @param {InspectedFile[]} files
- * @param {InspectionCoverage} coverage
- * @param {import("./git.js").GitObservation} git
- * @returns {string}
- */
+/** @param {string} root @param {string} task @param {RepositoryEvidence[]} instructions @param {string[]} selectedPaths @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {import("./git.js").GitObservation} git @returns {string} */
 function fingerprintEvidence(
   root,
   task,
@@ -1486,15 +1370,7 @@ function fingerprintEvidence(
   };
   return sha256(Buffer.from(JSON.stringify(stable), "utf8"));
 }
-
-/**
- * @param {string} root
- * @param {RepositoryEvidence[]} evidence
- * @param {InspectedFile[]} files
- * @param {InspectionCoverage} coverage
- * @param {import("./git.js").GitObservation} git
- * @returns {Record<string, unknown>}
- */
+/** @param {string} root @param {RepositoryEvidence[]} evidence @param {InspectedFile[]} files @param {InspectionCoverage} coverage @param {import("./git.js").GitObservation} git @returns {Record<string, unknown>} */
 function buildContinuityState(root, evidence, files, coverage, git) {
   const purpose = purposeClaim(evidence);
   return {
@@ -1516,11 +1392,7 @@ function buildContinuityState(root, evidence, files, coverage, git) {
     verification: { issues: [] }
   };
 }
-
-/**
- * @param {RepositoryEvidence[]} evidence
- * @returns {string | null}
- */
+/** @param {RepositoryEvidence[]} evidence @returns {string | null} */
 function purposeClaim(evidence) {
   const packageEvidence = evidence.find((item) => item.path === "package.json");
   if (packageEvidence) {
@@ -1554,11 +1426,7 @@ function purposeClaim(evidence) {
     .find(Boolean);
   return heading ? sanitizeDisplayText(heading, 2_000) : null;
 }
-
-/**
- * @param {unknown} task
- * @returns {string[]}
- */
+/** @param {unknown} task @returns {string[]} */
 function extractTaskPaths(task) {
   if (typeof task !== "string") {
     return [];
@@ -1573,11 +1441,7 @@ function extractTaskPaths(task) {
     )
   );
 }
-
-/**
- * @param {string} task
- * @returns {string[]}
- */
+/** @param {string} task @returns {string[]} */
 function tokens(task) {
   const stop = new Set([
     "about",
@@ -1604,27 +1468,24 @@ function tokens(task) {
     )
   ).slice(0, 24);
 }
-
-/**
- * @param {string} relativePath
- * @returns {boolean}
- */
+/** @param {string} relativePath @returns {boolean} */
 function isTextPath(relativePath) {
   const basename = path.posix.basename(relativePath);
   const extension = path.posix.extname(basename).toLowerCase();
   return (
+    [".env.example", ".env.sample", ".env.template"].includes(
+      basename.toLowerCase()
+    ) ||
     (
       !basename.startsWith(".") &&
       TEXT_EXTENSIONS.has(extension)
     ) ||
-    /^(?:Dockerfile|Makefile|Procfile|LICENSE)$/i.test(basename)
+    /^(?:Dockerfile|Makefile|GNUmakefile|Justfile|Procfile|LICENSE)$/i.test(
+      basename
+    )
   );
 }
-
-/**
- * @param {string} relativePath
- * @returns {boolean}
- */
+/** @param {string} relativePath @returns {boolean} */
 function isDocumentationPath(relativePath) {
   const lower = relativePath.toLowerCase();
   return (
@@ -1634,21 +1495,13 @@ function isDocumentationPath(relativePath) {
     lower === "changelog.md"
   );
 }
-
-/**
- * @param {string} relativePath
- * @returns {boolean}
- */
+/** @param {string} relativePath @returns {boolean} */
 function isArtifactPath(relativePath) {
   return /^(?:reports|briefings|evals\/reports|sample_outputs)\//i.test(
     relativePath
   );
 }
-
-/**
- * @param {string} relativePath
- * @returns {boolean}
- */
+/** @param {string} relativePath @returns {boolean} */
 function isVerificationPath(relativePath) {
   return (
     isDocumentationPath(relativePath) ||
@@ -1659,11 +1512,7 @@ function isVerificationPath(relativePath) {
     relativePath === "MANIFEST.sha256"
   );
 }
-
-/**
- * @param {string} relativePath
- * @returns {boolean}
- */
+/** @param {string} relativePath @returns {boolean} */
 function isGeneratedPairPath(relativePath) {
   return (
     relativePath.startsWith("src/v1/") ||
@@ -1672,11 +1521,7 @@ function isGeneratedPairPath(relativePath) {
     relativePath.startsWith("runtime/src/continuity/")
   );
 }
-
-/**
- * @param {string} relativePath
- * @returns {RepositoryEvidence["kind"]}
- */
+/** @param {string} relativePath @returns {RepositoryEvidence["kind"]} */
 function evidenceKind(relativePath) {
   if (isDocumentationPath(relativePath)) return "documentation";
   if (
@@ -1697,18 +1542,7 @@ function evidenceKind(relativePath) {
   }
   return "source";
 }
-
-/**
- * @param {RepositoryEvidence} evidence
- * @returns {{
- *   kind: RepositoryEvidence["kind"],
- *   path: import("../core/trust.js").RepositoryValue,
- *   size: number,
- *   sha256: string,
- *   excerpt: import("../core/trust.js").RepositoryValue,
- *   truncated: boolean
- * }}
- */
+/** @param {RepositoryEvidence} evidence @returns {{ kind: RepositoryEvidence["kind"], path: import("../core/trust.js").RepositoryValue, size: number, sha256: string, excerpt: import("../core/trust.js").RepositoryValue, truncated: boolean }} */
 function publicEvidence(evidence) {
   return {
     kind: evidence.kind,
@@ -1719,20 +1553,7 @@ function publicEvidence(evidence) {
     truncated: evidence.truncated
   };
 }
-
-/**
- * Keep repository-derived diagnostic paths explicitly trust-labeled in
- * structured output while retaining numeric limits and generic diagnostics.
- *
- * @param {InspectionCoverage} coverage
- * @returns {Omit<
- *   InspectionCoverage,
- *   "rejected_path_samples" | "unreadable_path_samples"
- * > & {
- *   rejected_path_samples: import("../core/trust.js").RepositoryValue[],
- *   unreadable_path_samples: import("../core/trust.js").RepositoryValue[]
- * }}
- */
+/** Keep repository-derived diagnostic paths explicitly trust-labeled in structured output while retaining numeric limits and generic diagnostics. @param {InspectionCoverage} coverage @returns {Omit< InspectionCoverage, "rejected_path_samples" | "unreadable_path_samples" > & { rejected_path_samples: import("../core/trust.js").RepositoryValue[], unreadable_path_samples: import("../core/trust.js").RepositoryValue[] }} */
 function publicCoverage(coverage) {
   return {
     ...coverage,
@@ -1744,11 +1565,7 @@ function publicCoverage(coverage) {
     )
   };
 }
-
-/**
- * @param {InspectionLimits} limits
- * @returns {InspectionCoverage}
- */
+/** @param {InspectionLimits} limits @returns {InspectionCoverage} */
 function createCoverage(limits) {
   return {
     complete: true,
@@ -1790,13 +1607,7 @@ function createCoverage(limits) {
     }
   };
 }
-
-/**
- * @param {InspectionCoverage} coverage
- * @param {number} fileCount
- * @param {import("./git.js").GitObservation} git
- * @returns {void}
- */
+/** @param {InspectionCoverage} coverage @param {number} fileCount @param {import("./git.js").GitObservation} git @returns {void} */
 function finishCoverage(coverage, fileCount, git) {
   coverage.files_observed = fileCount;
   coverage.diagnostics = boundedDiagnostics(
@@ -1812,38 +1623,19 @@ function finishCoverage(coverage, fileCount, git) {
     coverage.budgets_reached.length === 0 &&
     coverage.rejected_paths === 0 &&
     coverage.unreadable_paths === 0 &&
-    !coverage.git_ignore_observation_failed &&
-    coverage.sensitive_files_excluded === 0 &&
-    coverage.ignore_entries_excluded === 0;
+    !coverage.git_ignore_observation_failed && coverage.missing_tracked_files === 0;
 }
-
-/**
- * @param {InspectionCoverage} coverage
- * @param {string} name
- * @returns {void}
- */
+/** @param {InspectionCoverage} coverage @param {string} name @returns {void} */
 function noteBudget(coverage, name) {
   if (!coverage.budgets_reached.includes(name)) {
     coverage.budgets_reached.push(name);
   }
 }
-
-/**
- * Record a limit that affects individual evidence without terminating the
- * directory walk.
- *
- * @param {InspectionCoverage} coverage
- * @param {string} name
- * @returns {void}
- */
+/** Record a limit that affects individual evidence without terminating the directory walk. @param {InspectionCoverage} coverage @param {string} name @returns {void} */
 function noteNonterminalBudget(coverage, name) {
   noteBudget(coverage, name);
 }
-
-/**
- * @param {InspectionCoverage} coverage
- * @returns {boolean}
- */
+/** @param {InspectionCoverage} coverage @returns {boolean} */
 function terminalBudgetReached(coverage) {
   return coverage.budgets_reached.some((name) =>
     name === "max_entries" ||
@@ -1852,12 +1644,7 @@ function terminalBudgetReached(coverage) {
     name === "max_ignore_match_work"
   );
 }
-
-/**
- * @param {InspectionCoverage} coverage
- * @param {{status: string, relative_path: string | null, diagnostic: string}} result
- * @returns {void}
- */
+/** @param {InspectionCoverage} coverage @param {{status: string, relative_path: string | null, diagnostic: string}} result @returns {void} */
 function recordReadFailure(coverage, result) {
   if (result.status === "rejected" || result.status === "outside-root") {
     coverage.rejected_paths += 1;
@@ -1874,20 +1661,22 @@ function recordReadFailure(coverage, result) {
   }
   coverage.diagnostics.push(result.diagnostic);
 }
-
-/** @param {string} relativePath */
-function hasFixedExcludedDirectory(relativePath) {
+/** @param {string} name @param {boolean} compatibilityPolicy */
+function isFixedExcludedDirectory(name, compatibilityPolicy) {
+  return FIXED_EXCLUDED_DIRECTORIES.has(name) ||
+    (compatibilityPolicy && COMPATIBILITY_EXCLUDED_DIRECTORIES.has(name));
+}
+/** @param {string} relativePath @param {boolean} compatibilityPolicy */
+function hasFixedExcludedDirectory(relativePath, compatibilityPolicy) {
   return relativePath
     .split("/")
-    .some((part) => FIXED_EXCLUDED_DIRECTORIES.has(part));
+    .some((part) => isFixedExcludedDirectory(part, compatibilityPolicy));
 }
-
 /** @param {bigint} started */
 function elapsedMilliseconds(started) {
   const nanoseconds = process.hrtime.bigint() - started;
   return Math.max(1, Math.ceil(Number(nanoseconds) / 1_000_000));
 }
-
 /** @param {InspectOptions["scan"]} input @returns {InspectionLimits} */
 function inspectionLimits(input = {}) {
   return {
@@ -1910,16 +1699,11 @@ function inspectionLimits(input = {}) {
     git_max_output_bytes: boundedInteger(
       input.gitMaxOutputBytes, 8 * 1024 * 1024, 1_024, 32 * 1024 * 1024
     ),
-    use_git_ignore: input.useGitIgnore === true
+    use_git_ignore: input.useGitIgnore === true,
+    compatibility_policy: input.compatibilityPolicy === true
   };
 }
-
-/**
- * @param {unknown} value
- * @param {number} fallback
- * @param {number} minimum
- * @param {number} maximum
- */
+/** @param {unknown} value @param {number} fallback @param {number} minimum @param {number} maximum */
 function boundedInteger(value, fallback, minimum, maximum) {
   return typeof value === "number" &&
     Number.isInteger(value) &&
@@ -1928,12 +1712,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
     ? value
     : fallback;
 }
-
-/**
- * @param {string[]} values
- * @param {string} value
- * @returns {void}
- */
+/** @param {string[]} values @param {string} value @returns {void} */
 function samplePath(values, value) {
   if (values.length >= MAX_DIAGNOSTIC_PATHS) {
     return;
@@ -1943,31 +1722,15 @@ function samplePath(values, value) {
     values.push(selected);
   }
 }
-
-/**
- * @param {Buffer} bytes
- * @returns {string}
- */
+/** @param {Buffer} bytes @returns {string} */
 function sha256(bytes) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
-
-/**
- * Locale-independent ordering keeps evidence selection and fingerprints
- * stable across host locale settings.
- *
- * @param {string} left
- * @param {string} right
- * @returns {-1 | 0 | 1}
- */
+/** Locale-independent ordering keeps evidence selection and fingerprints stable across host locale settings. @param {string} left @param {string} right @returns {-1 | 0 | 1} */
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
-
-/**
- * @param {string} diagnostic
- * @returns {RepositoryInspection}
- */
+/** @param {string} diagnostic @returns {RepositoryInspection} */
 function invalidInspection(diagnostic) {
   return {
     schema: "kanon-repository-inspection-v1",
