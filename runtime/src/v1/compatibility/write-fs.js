@@ -6,53 +6,17 @@ import {
   isSafeRelativePath,
   resolveRepositoryPath
 } from "#kanon-repository-read";
+const APPEND_WAIT = new Int32Array(new SharedArrayBuffer(4));
 
 /**
- * @typedef {{
- *   ok: true,
- *   status: "ok",
- *   root: string,
- *   path: string,
- *   relativePath: string,
- *   stat: fs.Stats
- * }} ContainedPathSuccess
- * @typedef {{
- *   ok: false,
- *   status: "missing" | "outside-root" | "rejected" | "unreadable",
- *   root: string | null,
- *   path: string | null,
- *   relativePath: string | null,
- *   reason: string,
- *   code: string
- * }} ContainedPathFailure
+ * @typedef {{ok: true, status: "ok", root: string, path: string, relativePath: string, stat: fs.Stats}} ContainedPathSuccess
+ * @typedef {{ok: false, status: "missing" | "outside-root" | "rejected" | "unreadable", root: string | null, path: string | null, relativePath: string | null, reason: string, code: string}} ContainedPathFailure
  * @typedef {ContainedPathSuccess | ContainedPathFailure} ContainedPathResult
- * @typedef {ContainedPathSuccess |
- *   (ContainedPathFailure & {
- *     status: "missing",
- *     path: string
- *   })} PreparedDestination
- * @typedef {{
- *   ok: true,
- *   status: "ok",
- *   relativePath: string,
- *   text: string,
- *   bytes: number,
- *   truncated: boolean,
- *   size: number
- * } | ContainedPathFailure | {
- *   ok: false,
- *   status: "budget-exceeded",
- *   relativePath: string,
- *   reason: string,
- *   code: "INPUT_SIZE_LIMIT"
- * }} ContainedTextResult
+ * @typedef {ContainedPathSuccess | (ContainedPathFailure & {status: "missing", path: string})} PreparedDestination
+ * @typedef {{ok: true, status: "ok", relativePath: string, text: string, bytes: number, truncated: boolean, size: number} | ContainedPathFailure | {ok: false, status: "budget-exceeded", relativePath: string, reason: string, code: "INPUT_SIZE_LIMIT"}} ContainedTextResult
  */
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @returns {ContainedPathResult}
- */
+/** @param {string} root @param {string} relativePath @returns {ContainedPathResult} */
 export function ensureContainedDirectory(root, relativePath) {
   const parts = relativePath.replaceAll("\\", "/").split("/").filter(Boolean);
   let current = "";
@@ -89,14 +53,15 @@ export function ensureContainedDirectory(root, relativePath) {
   return resolveContainedPath(root, relativePath, { type: "directory" });
 }
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @param {string} contents
- * @returns {void}
- */
+/** @param {string} root @param {string} relativePath @param {string | null} contents */
 export function atomicWriteContained(root, relativePath, contents) {
   const destination = prepareDestination(root, relativePath);
+  if (contents === null) {
+    if (destination.ok) {
+      fs.unlinkSync(destination.path);
+    }
+    return;
+  }
   const parentRelative = path.posix.dirname(
     relativePath.replaceAll("\\", "/")
   );
@@ -143,24 +108,46 @@ export function atomicWriteContained(root, relativePath, contents) {
   }
 }
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @param {string} contents
- * @returns {void}
- */
-export function appendContained(root, relativePath, contents) {
+/** @param {string} root @param {string} relativePath @param {string} contents
+ * @param {{maximumBytes: number, maximumRecords: number, publish: () => void}} [transaction] */
+export function appendContained(root, relativePath, contents, transaction) {
+  let reservation;
+  let reservationFd;
+  if (transaction) {
+    const deadline = Date.now() + 5_000;
+    for (;;) {
+      reservation = prepareDestination(root, `${relativePath}.tmp`);
+      try {
+        reservationFd = fs.openSync(
+          reservation.path,
+          fs.constants.O_CREAT |
+            fs.constants.O_EXCL |
+            fs.constants.O_WRONLY |
+            (Number(fs.constants.O_NOFOLLOW) || 0),
+          0o600
+        );
+        break;
+      } catch (error) {
+        if (errorCode(error) !== "EEXIST" || Date.now() >= deadline) {
+          throw error;
+        }
+        Atomics.wait(APPEND_WAIT, 0, 0, 10);
+      }
+    }
+  }
   const destination = prepareDestination(root, relativePath);
   const noFollow = Number(fs.constants.O_NOFOLLOW) || 0;
-  const fd = fs.openSync(
-    destination.path,
-    fs.constants.O_APPEND |
-      fs.constants.O_CREAT |
-      fs.constants.O_WRONLY |
-      noFollow,
-    0o600
-  );
+  let fd;
+  let originalSize;
   try {
+    fd = fs.openSync(
+      destination.path,
+      fs.constants.O_APPEND |
+        fs.constants.O_CREAT |
+        (transaction ? fs.constants.O_RDWR : fs.constants.O_WRONLY) |
+        noFollow,
+      0o600
+    );
     const stat = fs.fstatSync(fd);
     if (
       !stat.isFile() ||
@@ -178,22 +165,50 @@ export function appendContained(root, relativePath, contents) {
         `${relativePath}: append target changed after containment validation.`
       );
     }
+    originalSize = stat.size;
+    if (transaction) {
+      const existing = stat.size
+        ? fs.readFileSync(fd, "utf8")
+        : "";
+      const currentRecords = existing
+        .split(/\r?\n/)
+        .filter(Boolean).length;
+      const incomingRecords = contents
+        .split(/\r?\n/)
+        .filter(Boolean).length;
+      if (
+        stat.size + Buffer.byteLength(contents) > transaction.maximumBytes ||
+        currentRecords + incomingRecords > transaction.maximumRecords
+      ) {
+        throw new Error(
+          "Evidence retention changed before refresh publication."
+        );
+      }
+    }
     fs.writeFileSync(fd, contents, "utf8");
     fs.fsyncSync(fd);
+    transaction?.publish();
+  } catch (error) {
+    if (transaction && fd !== undefined && originalSize !== undefined) {
+      fs.ftruncateSync(fd, originalSize);
+      fs.fsyncSync(fd);
+    }
+    throw error;
   } finally {
-    fs.closeSync(fd);
+    if (fd !== undefined) {
+      fs.closeSync(fd);
+    }
+    if (reservationFd !== undefined && reservation) {
+      fs.closeSync(reservationFd);
+      try {
+        fs.unlinkSync(reservation.path);
+      } catch {}
+    }
   }
 }
 
-/**
- * Read one fixed contained file without importing the repository scanner.
- *
- * @param {string} root
- * @param {string} relativePath
- * @param {number} maximumBytes
- * @param {{optional?: boolean}} [options]
- * @returns {ContainedTextResult}
- */
+/** @param {string} root @param {string} relativePath @param {number} maximumBytes
+ * @param {{optional?: boolean}} [options] @returns {ContainedTextResult} */
 export function readContainedText(
   root,
   relativePath,
@@ -265,11 +280,7 @@ export function readContainedText(
   }
 }
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @returns {fs.Dirent[]}
- */
+/** @param {string} root @param {string} relativePath @returns {fs.Dirent[]} */
 export function listContainedDirectory(root, relativePath) {
   const directory = resolveContainedPath(root, relativePath, {
     type: "directory"
@@ -280,12 +291,7 @@ export function listContainedDirectory(root, relativePath) {
   return fs.readdirSync(directory.path, { withFileTypes: true });
 }
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @param {{optional?: boolean}} [options]
- * @returns {ContainedPathResult}
- */
+/** @param {string} root @param {string} relativePath @param {{optional?: boolean}} [options] @returns {ContainedPathResult} */
 export function containedFileStat(root, relativePath, options = {}) {
   const result = resolveContainedPath(root, relativePath, { type: "file" });
   if (!result.ok && !(options.optional && result.status === "missing")) {
@@ -294,11 +300,7 @@ export function containedFileStat(root, relativePath, options = {}) {
   return result;
 }
 
-/**
- * @param {string} root
- * @param {string} relativePath
- * @returns {PreparedDestination}
- */
+/** @param {string} root @param {string} relativePath @returns {PreparedDestination} */
 function prepareDestination(root, relativePath) {
   const normalized = relativePath.replaceAll("\\", "/");
   const parent = path.posix.dirname(normalized);
@@ -329,16 +331,8 @@ function prepareDestination(root, relativePath) {
   throw pathError(normalized, destination);
 }
 
-/**
- * Adapt the shipped v1 repository path walk for fixed compatibility-write
- * targets. Missing leaves are allowed only below a currently contained
- * directory; all existing components retain the v1 link and reparse checks.
- *
- * @param {unknown} root
- * @param {unknown} relativePath
- * @param {{allowRoot?: boolean, type?: "file" | "directory"}} [policy]
- * @returns {ContainedPathResult}
- */
+/** @param {unknown} root @param {unknown} relativePath
+ * @param {{allowRoot?: boolean, type?: "file" | "directory"}} [policy] @returns {ContainedPathResult} */
 function resolveContainedPath(root, relativePath, policy = {}) {
   const canonicalRoot = resolveWriteRoot(root);
   if (!canonicalRoot.ok) {
@@ -429,11 +423,7 @@ function pathFailure(root, relativePath, reason, code, status = "rejected") {
   };
 }
 
-/**
- * @param {fs.Stats} before
- * @param {fs.Stats} after
- * @returns {boolean}
- */
+/** @param {fs.Stats} before @param {fs.Stats} after @returns {boolean} */
 function fileIdentityChanged(before, after) {
   return (
     before.dev !== undefined &&
@@ -447,10 +437,7 @@ function fileIdentityChanged(before, after) {
   );
 }
 
-/**
- * @param {string} relativePath
- * @param {ContainedPathFailure} result
- */
+/** @param {string} relativePath @param {ContainedPathFailure} result */
 function pathError(relativePath, result) {
   return Object.assign(
     new Error(
@@ -463,10 +450,7 @@ function pathError(relativePath, result) {
   );
 }
 
-/**
- * @param {unknown} error
- * @returns {string}
- */
+/** @param {unknown} error @returns {string} */
 function errorCode(error) {
   return (
     error &&

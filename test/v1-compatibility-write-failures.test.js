@@ -391,10 +391,83 @@ test("concurrent refresh publishes only retained evidence references", async () 
     path.join(root, ".kanon", "EVIDENCE.jsonl"),
     "utf8"
   ).trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(ledger.length, 1);
   const retained = new Set(ledger.map((record) => record.id));
   for (const evidenceId of collectEvidenceIds(state.state)) {
     assert.equal(retained.has(evidenceId), true, evidenceId);
   }
+  for (const relative of ["KANON.md", "HANDOFF.md"]) {
+    const output = fs.readFileSync(path.join(root, ".kanon", relative), "utf8");
+    for (const match of output.matchAll(/\be_[A-Za-z0-9-]+_\d{3}\b/g)) {
+      assert.equal(retained.has(match[0]), true, match[0]);
+    }
+  }
+  assert.equal(
+    fs.readdirSync(path.join(root, ".kanon"))
+      .some((name) => name.endsWith(".tmp")),
+    false
+  );
+});
+
+test("failed refresh restores published artifacts and evidence capacity", async () => {
+  const root = makeFixture({
+    "README.md": "# Publication rollback\n",
+    "package.json": JSON.stringify({
+      name: "publication-rollback",
+      description: "Retained publication before failure"
+    })
+  });
+  await captureCli(runWriteCli, ["refresh", "--root", root]);
+  const relativeOutputs = [
+    "KANON.md",
+    "STATE.json",
+    "EVIDENCE.jsonl",
+    "HANDOFF.md"
+  ];
+  const before = new Map(relativeOutputs.map((relative) => [
+    relative,
+    fs.readFileSync(path.join(root, ".kanon", relative), "utf8")
+  ]));
+  const snapshotsBefore = fs.readdirSync(path.join(root, ".kanon", "snapshots"));
+  const originalRename = fs.renameSync;
+  let injected = false;
+  fs.renameSync = (source, destination) => {
+    if (
+      !injected &&
+      destination === path.join(root, ".kanon", "HANDOFF.md")
+    ) {
+      injected = true;
+      throw Object.assign(new Error("injected publication failure"), {
+        code: "EIO"
+      });
+    }
+    return originalRename(source, destination);
+  };
+  try {
+    await assert.rejects(
+      () => captureCli(runWriteCli, ["refresh", "--root", root]),
+      /injected publication failure/
+    );
+  } finally {
+    fs.renameSync = originalRename;
+  }
+
+  assert.equal(injected, true);
+  for (const relative of relativeOutputs) {
+    assert.equal(
+      fs.readFileSync(path.join(root, ".kanon", relative), "utf8"),
+      before.get(relative)
+    );
+  }
+  assert.deepEqual(
+    fs.readdirSync(path.join(root, ".kanon", "snapshots")),
+    snapshotsBefore
+  );
+  assert.equal(
+    fs.readdirSync(path.join(root, ".kanon"))
+      .some((name) => name.endsWith(".tmp")),
+    false
+  );
 });
 
 function configWithInputLimits(inputLimits) {
