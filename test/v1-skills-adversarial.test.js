@@ -174,10 +174,12 @@ test("sanitization preserves repository identities and enforces byte caps", asyn
     ).truncated,
     true
   );
-  assert.ok(
+  assert.equal(oriented.report.inspection.coverage.complete, true);
+  assert.equal(
     oriented.report.inspection.coverage.budgets_reached.includes(
       "evidence_truncated"
-    )
+    ),
+    false
   );
   assert.equal(
     oriented.report.inspection.coverage.sensitive_files_excluded,
@@ -563,15 +565,21 @@ test("incomplete scan evidence prevents absence conclusions", async () => {
     }),
     stableContext()
   );
-  assert.equal(truncated.report.live.coverage.complete, false);
-  assert.ok(
+  const truncatedEvidence = truncated.report.live.evidence.find(
+    (item) => item.path.value === "README.md"
+  );
+  assert.ok(truncatedEvidence);
+  assert.equal(truncatedEvidence.truncated, true);
+  assert.equal(truncated.report.live.coverage.complete, true);
+  assert.equal(
     truncated.report.live.coverage.budgets_reached.includes(
       "evidence_truncated"
-    )
+    ),
+    false
   );
   assert.equal(truncated.report.documentation.contradictions.length, 0);
   assert.equal(truncated.report.documentation.non_observations.length, 0);
-  assert.equal(truncated.report.documentation.status, "Unknown");
+  assert.equal(truncated.report.documentation.status, "Known");
 });
 
 test("malformed, overbroad, and cross-root receipts remain Unknown or Stale", async () => {

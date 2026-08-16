@@ -9,7 +9,6 @@ import { safeTerminalText } from "../src/trust.js";
 import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
 import {
   canonicalJson,
-  semanticReportProjection,
   sha256
 } from "../scripts/lib/d2e-evidence.js";
 import {
@@ -27,7 +26,6 @@ import {
   writePostCorrectionJsonFile
 } from "../scripts/lib/d2e-post-correction.js";
 import { createRankingTraceCollector } from "../scripts/lib/d2e-trace.js";
-import { repositoryCacheName } from "../scripts/lib/eval-corpus/checkout.js";
 import { runCorpus } from "../scripts/lib/eval-corpus/runner.js";
 import {
   aggregateScores,
@@ -39,7 +37,6 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
-const analyzerModule = path.join(repoRoot, "src", "index.js");
 const authority = JSON.parse(
   fs.readFileSync(
     path.join(
@@ -55,135 +52,27 @@ const policy = JSON.parse(
   fs.readFileSync(path.join(repoRoot, "eval", "corpus.json"), "utf8")
 ).policy;
 
-test("real runner executes bounded synthetic trace-on and trace-off controls exactly", async () => {
-  const cacheRoot = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-post-correction-runner-")
+test("real runner rejects retired trace mode without artifacts", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "kanon-retired-trace-runner-")
   );
-  const repository =
-    "https://example.invalid/synthetic/repository.git";
-  const revision = "a".repeat(40);
-  const cacheName = repositoryCacheName(repository, revision);
-  const fixture = path.join(cacheRoot, cacheName);
-  fs.mkdirSync(fixture);
-  fs.mkdirSync(path.join(fixture, "bin"));
-  fs.mkdirSync(path.join(fixture, "lib"));
-  fs.writeFileSync(
-    path.join(fixture, "README.md"),
-    "# Synthetic fixture\n"
-  );
-  fs.writeFileSync(
-    path.join(fixture, "package.json"),
-    JSON.stringify({
-      bin: { fixture: "./bin/cli.js" },
-      exports: { "./declaration": "./lib/declaration.js" },
-      name: "synthetic-fixture",
-      version: "1.0.0"
-    })
-  );
-  fs.writeFileSync(
-    path.join(fixture, "bin", "cli.js"),
-    "#!/usr/bin/env node\nconsole.log('fixture');\n"
-  );
-  fs.writeFileSync(
-    path.join(fixture, "lib", "declaration.js"),
-    "export const value = 1;\n"
-  );
-  const traceDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-post-correction-trace-")
-  );
-  const corpus = {
-    _manifest: { sha256: "b".repeat(64) },
-    cases: [
+  const traceDirectory = path.join(root, "trace-output");
+  await assert.rejects(
+    runCorpus(
       {
-        category: "monorepo",
-        id: "synthetic/repository",
-        labels: {
-          important_files: [
-            {
-              path: "README.md",
-              rationale: "synthetic",
-              relevance: 3,
-              sources: ["README.md"]
-            }
-          ],
-          run: null,
-          test: null
-        },
-        repository,
-        revision,
-        strata: []
+        schema_version: 2,
+        evaluation_role: "development",
+        cases: []
+      },
+      {
+        rankingTrace: { outputDirectory: traceDirectory },
+        traceOffControl: true
       }
-    ],
-    evaluation_role: "development",
-    label_version: "synthetic",
-    policy,
-    release: null,
-    schema_version: 2
-  };
-  let consumed = 0;
-  let control = null;
-  const primary = await runCorpus(corpus, {
-    analyzerModule,
-    cacheRoot,
-    fetch: false,
-    onAttemptConsume(value) {
-      consumed += 1;
-      assert.deepEqual(value, {
-        caseOrdinal: 1,
-        component: "canonical-d2e-corpus-runner"
-      });
-    },
-    onTraceOffComplete(value) {
-      control = value;
-    },
-    rankingTrace: {
-      artifactSha256: "c".repeat(64),
-      canonicalSerialization: true,
-      corpusSha256: corpus._manifest.sha256,
-      exclusiveCreation: true,
-      fileNamePrefix: "",
-      outputDirectory: traceDirectory,
-      protocolSha256: "d".repeat(64),
-      traceSourceCommit: "e".repeat(40)
-    },
-    traceOffControl: true
-  });
-
-  assert.equal(consumed, 1);
-  assert.ok(control);
-  assert.deepEqual(
-    semanticReportProjection(primary),
-    semanticReportProjection(control)
+    ),
+    /trace-attempt mode is retired/u
   );
-  assert.deepEqual(fs.readdirSync(traceDirectory), ["001.json"]);
-  const traceBytes = fs.readFileSync(
-    path.join(traceDirectory, "001.json")
-  );
-  const trace = JSON.parse(traceBytes);
-  assert.equal(
-    traceBytes.toString("utf8"),
-    `${canonicalJson(trace)}\n`
-  );
-  const declaration = trace.candidates.find(
-    (item) =>
-      item.normalized_path === "lib/declaration.js"
-  );
-  const executable = trace.candidates.find(
-    (item) => item.normalized_path === "bin/cli.js"
-  );
-  assert.ok(
-    declaration.curation.visits.some(
-      (item) =>
-        item.stage === "package-declarations" &&
-        item.decision === "selected" &&
-        item.heuristic === "manifest-entrypoint"
-    )
-  );
-  assert.ok(
-    executable.curation.visits.some(
-      (item) => item.stage === "manifest-entrypoints"
-    )
-  );
+  assert.equal(fs.existsSync(traceDirectory), false);
+  assert.deepEqual(fs.readdirSync(root), []);
 });
 
 test("post-correction finalizer emits canonical exact inventory and bounded traces", () => {

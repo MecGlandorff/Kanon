@@ -305,16 +305,16 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
   const selected = selectEvidencePaths(
     scan.files, applicableInstructions, task, explicitPaths, profile, target
   );
-  const texts = readVisibleRepositoryTexts(
-    root.root, scan.files, coverage,
-    limits.compatibility_policy
-      ? null
-      : new Set(selected),
-    limits.compatibility_policy
-      ? new Set(applicableInstructions)
-      : new Set(),
-    limits.compatibility_policy
-  );
+  const texts = limits.compatibility_policy
+    ? readVisibleRepositoryTexts(
+        root.root,
+        scan.files,
+        coverage,
+        null,
+        new Set(applicableInstructions),
+        true
+      )
+    : new Map();
   if (limits.compatibility_policy) {
     instructions = readVisibleApplicableInstructions(
       applicableInstructions, scan.files, texts, coverage
@@ -332,7 +332,15 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
   );
   const evidence = [
     ...instructions,
-    ...readSelectedEvidence(scan.files, selected, instructions, texts, coverage)
+    ...readSelectedEvidence(
+      root.root,
+      scan.files,
+      selected,
+      instructions,
+      texts,
+      coverage,
+      limits.compatibility_policy
+    )
   ].slice(0, MAX_EVIDENCE_ITEMS);
   finishCoverage(coverage, scan.files.length, git);
   const evidenceFingerprint = fingerprintEvidence(
@@ -534,7 +542,7 @@ function readVisibleApplicableInstructions(candidates, files, texts, coverage) {
     }
     const remaining = coverage.limits.max_evidence_bytes - renderedBytes;
     if (remaining < 1) {
-      noteBudget(coverage, "max_total_text_bytes");
+      noteBudget(coverage, "max_evidence_bytes");
       break;
     }
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
@@ -1378,13 +1386,15 @@ function selectEvidencePaths(
     .slice(0, Math.max(0, MAX_EVIDENCE_ITEMS - instructionPaths.length))
     .map((item) => item.path);
 }
-/** @param {InspectedFile[]} files @param {string[]} selectedPaths @param {RepositoryEvidence[]} instructions @param {Map<string, string>} texts @param {InspectionCoverage} coverage @returns {RepositoryEvidence[]} */
+/** @param {string} root @param {InspectedFile[]} files @param {string[]} selectedPaths @param {RepositoryEvidence[]} instructions @param {Map<string, string>} texts @param {InspectionCoverage} coverage @param {boolean} compatibilityPolicy @returns {RepositoryEvidence[]} */
 function readSelectedEvidence(
+  root,
   files,
   selectedPaths,
   instructions,
   texts,
-  coverage
+  coverage,
+  compatibilityPolicy
 ) {
   const instructionPaths = new Set(instructions.map((item) => item.path));
   const byPath = new Map(files.map((file) => [file.path, file]));
@@ -1404,12 +1414,47 @@ function readSelectedEvidence(
     }
     const remaining = coverage.limits.max_evidence_bytes - renderedBytes;
     if (remaining < 1) {
-      noteBudget(coverage, "max_total_text_bytes");
+      noteBudget(coverage, "max_evidence_bytes");
       break;
     }
-    const rawContent = texts.get(selectedPath);
-    if (rawContent === undefined) continue;
     const maximum = Math.min(MAX_EXCERPT_BYTES, remaining);
+    let rawContent;
+    let evidenceDigest = file.sha256;
+    let readTruncated = false;
+    if (compatibilityPolicy) {
+      rawContent = texts.get(selectedPath);
+      if (rawContent === undefined) continue;
+      if (evidenceDigest === null) {
+        evidenceDigest = sha256(Buffer.from(rawContent));
+      }
+    } else {
+      const read = readBoundedRepositoryFile(
+        root,
+        selectedPath,
+        file.sha256 === null ? maximum : coverage.limits.max_file_bytes,
+        { truncate: true }
+      );
+      if (!read.ok) {
+        recordReadFailure(coverage, read);
+        continue;
+      }
+      const currentDigest = sha256(read.bytes);
+      if (
+        read.size !== file.size ||
+        read.mtime_ms !== file.mtime_ms ||
+        (file.sha256 !== null && currentDigest !== file.sha256)
+      ) {
+        coverage.unreadable_paths += 1;
+        samplePath(coverage.unreadable_path_samples, selectedPath);
+        coverage.diagnostics.push(
+          "A selected evidence file changed between the repository scan and its bounded evidence read."
+        );
+        continue;
+      }
+      rawContent = decodeRepositoryText(read.bytes, read.truncated);
+      evidenceDigest ||= currentDigest;
+      readTruncated = read.truncated;
+    }
     const sanitizationTruncated =
       file.size > Buffer.byteLength(rawContent, "utf8") ||
       Buffer.byteLength(rawContent, "utf8") > maximum;
@@ -1423,9 +1468,9 @@ function readSelectedEvidence(
       kind: evidenceKind(selectedPath),
       path: selectedPath,
       size: file.size,
-      sha256: file.sha256 || sha256(Buffer.from(rawContent)),
+      sha256: evidenceDigest || sha256(Buffer.from(rawContent)),
       content,
-      truncated: sanitizationTruncated,
+      truncated: readTruncated || sanitizationTruncated,
       trust: "repository-untrusted"
     });
   }

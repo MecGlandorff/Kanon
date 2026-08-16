@@ -119,6 +119,19 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
 
   const branchResult = observe(["branch", "--show-current"]);
   const headResult = observe(["rev-parse", "HEAD"]);
+  const compatibilitySensitivePaths =
+    options.compatibility_sensitive_paths === true;
+  const prefixResult = compatibilitySensitivePaths
+    ? observe(["rev-parse", "--show-prefix"])
+    : null;
+  const repositoryPrefix = prefixResult === null
+    ? ""
+    : prefixResult.ok
+      ? normalizeRepositoryPrefix(prefixResult.stdout)
+      : null;
+  if (prefixResult?.ok && repositoryPrefix === null) {
+    diagnostics.push("Git repository prefix output was unavailable or invalid.");
+  }
   const statusResult = observe([
     "status",
     "--porcelain=v1",
@@ -134,10 +147,11 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
     "--",
     "."
   ]);
-  const parsedStatus = statusResult.ok
+  const parsedStatus = statusResult.ok && repositoryPrefix !== null
     ? parseStatus(
         statusResult.stdout,
-        options.compatibility_sensitive_paths === true
+        compatibilitySensitivePaths,
+        repositoryPrefix
       )
     : null;
   const parsedLog = logResult.ok
@@ -198,6 +212,7 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
       diagnostics.length === 0 &&
       branchResult.ok &&
       head !== null &&
+      (prefixResult === null || (prefixResult.ok && repositoryPrefix !== null)) &&
       statusResult.ok &&
       logResult.ok &&
       parsedStatus !== null &&
@@ -547,6 +562,7 @@ function boundedInteger(value, fallback, minimum, maximum) {
 /**
  * @param {string} output
  * @param {boolean} [compatibilitySensitivePaths]
+ * @param {string} [repositoryPrefix]
  * @returns {{
  *   change_count: number,
  *   changes: GitObservation["changes"],
@@ -555,7 +571,11 @@ function boundedInteger(value, fallback, minimum, maximum) {
  *   complete: boolean
  * }}
  */
-function parseStatus(output, compatibilitySensitivePaths = false) {
+function parseStatus(
+  output,
+  compatibilitySensitivePaths = false,
+  repositoryPrefix = ""
+) {
   const entries = output.split("\0");
   /** @type {GitObservation["changes"]} */
   const changes = [];
@@ -573,11 +593,15 @@ function parseStatus(output, compatibilitySensitivePaths = false) {
     }
     const indexStatus = entry[0] || " ";
     const worktreeStatus = entry[1] || " ";
-    const selectedPath = entry.slice(3).replaceAll("\\", "/");
+    const selectedPath = stripRepositoryPrefix(
+      entry.slice(3).replaceAll("\\", "/"),
+      repositoryPrefix
+    );
     if (
       !/^[ MADRCU?!]$/.test(indexStatus) ||
       !/^[ MADRCU?!]$/.test(worktreeStatus) ||
       entry[2] !== " " ||
+      selectedPath === null ||
       !isSafeRelativePath(selectedPath)
     ) {
       complete = false;
@@ -585,8 +609,11 @@ function parseStatus(output, compatibilitySensitivePaths = false) {
     }
     if (indexStatus === "R" || indexStatus === "C") {
       index += 1;
-      const originalPath = entries[index]?.replaceAll("\\", "/");
-      if (!isSafeRelativePath(originalPath)) {
+      const originalPath = stripRepositoryPrefix(
+        entries[index]?.replaceAll("\\", "/") || "",
+        repositoryPrefix
+      );
+      if (originalPath === null || !isSafeRelativePath(originalPath)) {
         complete = false;
       }
     }
@@ -615,6 +642,25 @@ function parseStatus(output, compatibilitySensitivePaths = false) {
     sensitive_skipped: sensitiveSkipped,
     complete
   };
+}
+
+/** @param {string} output @returns {string | null} */
+function normalizeRepositoryPrefix(output) {
+  const selected = output
+    .replace(/\r?\n$/, "")
+    .replaceAll("\\", "/")
+    .replace(/\/+$/, "");
+  if (/[\0\r\n]/.test(selected)) return null;
+  if (!selected) return "";
+  return isSafeRelativePath(selected) ? `${selected}/` : null;
+}
+
+/** @param {string} selectedPath @param {string} repositoryPrefix @returns {string | null} */
+function stripRepositoryPrefix(selectedPath, repositoryPrefix) {
+  if (!repositoryPrefix) return selectedPath;
+  return selectedPath.startsWith(repositoryPrefix)
+    ? selectedPath.slice(repositoryPrefix.length)
+    : null;
 }
 
 /**

@@ -12,7 +12,12 @@ import {
 } from "./scoring.js";
 
 export async function runCorpus(corpus, options = {}) {
-  if (options.rankingTrace) {
+  if (
+    options.rankingTrace ||
+    options.traceOffControl ||
+    options.onAttemptConsume ||
+    options.onTraceOffComplete
+  ) {
     throw new Error("D.2E ranking trace-attempt mode is retired in v1.1.");
   }
   const cacheRoot = path.resolve(
@@ -63,16 +68,8 @@ export async function runCorpus(corpus, options = {}) {
     35_000
   );
   const results = [];
-  const traceOffResults = [];
-  const rankingTraceReceipts = [];
   let analyzerVersion = options.analyzerVersion || VERSION;
-  for (const [caseIndex, item] of selected.entries()) {
-    if (caseIndex === 0 && options.onAttemptConsume) {
-      options.onAttemptConsume({
-        caseOrdinal: 1,
-        component: "canonical-d2e-corpus-runner"
-      });
-    }
+  for (const item of selected) {
     try {
       options.onProgress?.({ phase: "checkout", id: item.id });
       const checkout = ensureCheckout(item, {
@@ -87,105 +84,21 @@ export async function runCorpus(corpus, options = {}) {
         analyzerModule,
         checkout,
         item,
-        analysisTimeoutMs,
-        options.rankingTrace
-          ? {
-              output_directory:
-                options.rankingTrace.outputDirectory,
-              file_name:
-                `${options.rankingTrace.fileNamePrefix ?? "case-"}${String(
-                  caseIndex + 1
-                ).padStart(3, "0")}.json`,
-              canonical_serialization:
-                options.rankingTrace.canonicalSerialization === true,
-              exclusive_creation:
-                options.rankingTrace.exclusiveCreation === true,
-              binding: {
-                protocolSha256:
-                  options.rankingTrace.protocolSha256,
-                traceSourceCommit:
-                  options.rankingTrace.traceSourceCommit,
-                artifactSha256:
-                  options.rankingTrace.artifactSha256,
-                corpusSha256:
-                  options.rankingTrace.corpusSha256,
-                caseId: item.id,
-                revision: item.revision,
-                ordinal: caseIndex + 1
-              }
-            }
-          : null
+        analysisTimeoutMs
       );
       const analysisDurationMs = Date.now() - analysisStarted;
       analyzerVersion = analysis.state.version || analyzerVersion;
-      if (options.rankingTrace) {
-        rankingTraceReceipts.push({
-          id: item.id,
-          revision: item.revision,
-          ordinal: caseIndex + 1,
-          ...(analysis.ranking_trace || {
-            status: "missing",
-            file_name: null,
-            sha256: null,
-            bytes: 0,
-            complete: false,
-            validation_failures: ["worker trace receipt missing"]
-          })
-        });
-      }
       results.push({
         ...scoreCase(item, analysis, corpus.policy),
         analysis_duration_ms: analysisDurationMs
       });
-      if (options.traceOffControl) {
-        const controlStarted = Date.now();
-        try {
-          const control = analyzeCase(
-            analyzerModule,
-            checkout,
-            item,
-            analysisTimeoutMs
-          );
-          traceOffResults.push({
-            ...scoreCase(item, control, corpus.policy),
-            analysis_duration_ms: Date.now() - controlStarted
-          });
-        } catch (controlError) {
-          traceOffResults.push(
-            scoreErrorCase(item, controlError, corpus.policy)
-          );
-        }
-      }
     } catch (error) {
       options.onProgress?.({
         phase: "error",
         id: item.id,
         message: error.message
       });
-      if (options.rankingTrace) {
-        rankingTraceReceipts.push({
-          id: item.id,
-          revision: item.revision,
-          ordinal: caseIndex + 1,
-          status: "analysis-error",
-          file_name:
-            `${options.rankingTrace.fileNamePrefix ?? "case-"}${String(
-              caseIndex + 1
-            ).padStart(3, "0")}.json`,
-          sha256: null,
-          bytes: 0,
-          complete: false,
-          validation_failures: [
-            String(error?.message || error).slice(0, 1_000)
-          ]
-        });
-      }
       results.push(scoreErrorCase(item, error, corpus.policy));
-      if (options.traceOffControl) {
-        traceOffResults.push(
-          scoreErrorCase(item, error, corpus.policy)
-        );
-      }
     }
   }
 
@@ -266,41 +179,8 @@ export async function runCorpus(corpus, options = {}) {
       reasons: summary.passed
         ? ["All predeclared gates passed."]
         : summary.failures
-    },
-    ...(options.rankingTrace
-      ? {
-          ranking_trace: {
-            schema: "kanon-d2e-ranking-trace-receipts-v1",
-            receipts: rankingTraceReceipts
-          }
-        }
-      : {})
+    }
   };
-  if (options.traceOffControl) {
-    const controlSummary = aggregateScores(
-      traceOffResults,
-      corpus.policy,
-      {
-        expectedCaseCount:
-          corpus.evaluation_role === "release"
-            ? corpus.cases.length
-            : selected.length,
-        requireCompleteScans:
-          corpus.evaluation_role === "release"
-      }
-    );
-    const controlRun = structuredClone(run);
-    controlRun.results = traceOffResults;
-    controlRun.summary = controlSummary;
-    controlRun.final = {
-      passed: controlSummary.passed,
-      reasons: controlSummary.passed
-        ? ["All predeclared gates passed."]
-        : controlSummary.failures
-    };
-    delete controlRun.ranking_trace;
-    options.onTraceOffComplete?.(controlRun);
-  }
   return run;
 }
 
@@ -373,10 +253,7 @@ export function analyzeCase(
           maxTotalTextBytes: 32 * 1024 * 1024,
           maxElapsedMs: 30_000,
           useGitIgnore: false
-        },
-        ...(rankingTrace
-          ? { ranking_trace: rankingTrace }
-          : {})
+        }
       }),
       maxBuffer: 4 * 1024 * 1024,
       timeout: timeoutMs,

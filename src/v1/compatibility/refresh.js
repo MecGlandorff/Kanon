@@ -129,15 +129,15 @@ const ROOT_README_NAMES = Object.freeze([
  */
 /** Run one bounded compatibility refresh using only the v1 repository inspector and the narrow compatibility persistence modules. @param {string} root @param {{deep?: boolean}} [options] */
 export function refreshKanon(root, options = {}) {
-  const prepared = prepareRefreshAnalysis(root);
+  const prepared = prepareRefreshAnalysis(root, {}, true);
   return persistRefresh(prepared.analysis, prepared.config, options);
 }
 /** @param {string} [root] @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1], inspectGit?: boolean, _rankingObserver?: RankingObserver}} [options] */
 export function analyzeRepo(root = process.cwd(), options = {}) {
   return prepareRefreshAnalysis(root, options).analysis;
 }
-/** @param {string} root @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1], inspectGit?: boolean, _rankingObserver?: RankingObserver}} [options] */
-function prepareRefreshAnalysis(root, options = {}) {
+/** @param {string} root @param {{runId?: string, scan?: Parameters<typeof scanOptionsFromConfig>[1], inspectGit?: boolean, _rankingObserver?: RankingObserver}} [options] @param {boolean} [persistenceBound] */
+function prepareRefreshAnalysis(root, options = {}, persistenceBound = false) {
   const requestedRoot = path.resolve(root);
   const configInspection = inspectKanonConfig(requestedRoot);
   const inspection = inspectRepository(
@@ -156,10 +156,12 @@ function prepareRefreshAnalysis(root, options = {}) {
   if (!inspection.ok) {
     throw new Error(inspection.diagnostic);
   }
-  const evidenceRetention = availableEvidenceRetention(
-    inspection.root,
-    configInspection.config.persistence
-  );
+  const evidenceRetention = persistenceBound
+    ? availableEvidenceRetention(
+        inspection.root,
+        configInspection.config.persistence
+      )
+    : configuredEvidenceRetention(configInspection.config.persistence);
   return {
     analysis: buildRefreshAnalysis(
       inspection,
@@ -469,6 +471,13 @@ function availableEvidenceRetention(root, limits) {
     )
   };
 }
+/** @param {typeof DEFAULT_CONFIG.persistence} limits @returns {EvidenceRetention} */
+function configuredEvidenceRetention(limits) {
+  return {
+    maxRecords: limits.max_evidence_records,
+    maxBytes: limits.max_evidence_bytes
+  };
+}
 /** @param {Map<string, string>} texts @returns {Record<string, unknown> | null} */
 function readPackageEvidence(texts) {
   const text = texts.get("package.json");
@@ -680,6 +689,7 @@ function manifestTargets(packageInfo) {
   const pending = [
     packageInfo.main,
     packageInfo.module,
+    packageInfo.types,
     packageInfo.bin,
     packageInfo.exports
   ];
@@ -1396,7 +1406,7 @@ function projectReadmeVerification(input) {
     };
   }
   const readme = input.texts.get(target);
-  if (readme === undefined) {
+  if (readme === undefined || !readme.trim()) {
     return {
       target,
       checked: false,
@@ -1434,7 +1444,10 @@ function projectReadmeVerification(input) {
     );
     const expectation = packageScriptExpectation(command);
     if (expectation && input.packageInfo) {
-      if (typeof scripts[expectation.script] !== "string") {
+      if (
+        typeof scripts[expectation.script] !== "string" ||
+        !scripts[expectation.script].trim()
+      ) {
         const packageEvidence = evidenceFor(
           input.evidence,
           "package.json",
@@ -1591,7 +1604,7 @@ function addReadmeNonObservations(input, target, readme, unknowns) {
     !input.deployment.files.some((file) => /docker|compose/i.test(file.path))
   ) {
     add(
-      /\bdocker(?:file)?\b|\bdocker\s+compose\b|\bcontainers?\b/i,
+      /\bdocker(?:file)?\b|\bdocker\s+compose\b|\bcontainer\s+images?\b|\bcontaineri[sz](?:ed|ation)\b|\brun(?:s|ning)?\b[^.\n]{0,80}\bin\s+(?:an?\s+)?containers?\b|\bdeploy(?:ments?|s|ed|ing)?\b[^.\n]{0,80}\b(?:to|as)\s+(?:an?\s+)?containers?\b/i,
       "README declares Docker or container behavior.",
       "Current checks did not find a conventional Dockerfile or compose path. This non-observation is not a contradiction."
     );
@@ -1795,7 +1808,7 @@ function projectCurrentState(input) {
         claim: `Conventional ${label} evidence is Unknown.`,
         reason: input.evidenceTruncated
           ? "The configured evidence retention boundary was reached."
-          : input.inspection.evidence_complete
+          : input.inspection.coverage.complete
             ? "The bounded v1 inspection did not observe a conventional path."
             : "The bounded v1 inspection was incomplete; absence is not established."
       });

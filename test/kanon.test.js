@@ -890,6 +890,174 @@ test("round-seven semantic prefixes and display excerpts stay distinct", () => {
   );
 });
 
+test("stable evidence preserves bounded hashes and evidence budgets", () => {
+  const oversizedContent = `# Oversized evidence\n${"x".repeat(800_000)}`;
+  const oversizedRoot = makeFixture({ "README.md": oversizedContent });
+  const oversized = inspectRepository(
+    oversizedRoot,
+    "inspect README.md",
+    { profile: "orient", inspect_git: false }
+  );
+  assert.equal(oversized.ok, true);
+  if (!oversized.ok) return;
+  const readme = oversized.evidence.find((item) => item.path === "README.md");
+  assert.ok(readme);
+  assert.equal(readme.truncated, true);
+  assert.equal(
+    readme.sha256,
+    crypto.createHash("sha256")
+      .update(Buffer.from(oversizedContent).subarray(0, 8_192))
+      .digest("hex")
+  );
+
+  const names = Array.from({ length: 9 }, (_, index) => `doc-${index + 1}.txt`);
+  const budgetRoot = makeFixture(Object.fromEntries(
+    names.map((name, index) => [name, `${index}\n${"y".repeat(9_000)}`])
+  ));
+  const bounded = inspectRepository(
+    budgetRoot,
+    `inspect ${names.join(" ")}`,
+    { profile: "orient", inspect_git: false }
+  );
+  assert.equal(bounded.ok, true);
+  if (!bounded.ok) return;
+  assert.equal(bounded.evidence.length, 8);
+  assert.equal(
+    bounded.coverage.budgets_reached.includes("max_evidence_bytes"),
+    true
+  );
+  assert.equal(
+    bounded.coverage.budgets_reached.includes("max_total_text_bytes"),
+    false
+  );
+});
+
+test("compact compatibility validates bounded repository facts accurately", () => {
+  const emptyReadme = analyzeCompatibilityRepo(
+    makeFixture({ "README.md": "" }),
+    { inspectGit: false }
+  );
+  assert.equal(emptyReadme.state.verification.checked, false);
+  assert.equal(
+    emptyReadme.state.verification.unknowns[0].type,
+    "unavailable_readme"
+  );
+
+  const emptyScript = analyzeCompatibilityRepo(makeFixture({
+    "README.md": "# Empty script\n\nRun `npm test`.\n",
+    "package.json": JSON.stringify({ scripts: { test: "" } })
+  }), { inspectGit: false });
+  assert.equal(emptyScript.state.verification.issues.length, 1);
+  assert.equal(
+    emptyScript.state.verification.issues[0].conclusion,
+    "contradiction"
+  );
+
+  const typesTarget = analyzeCompatibilityRepo(makeFixture({
+    "README.md": "# Types target\n",
+    "package.json": JSON.stringify({
+      name: "types-target",
+      types: "./types/index.d.ts"
+    }),
+    "types/index.d.ts": "export declare const value: string;\n"
+  }), { inspectGit: false });
+  assert.equal(
+    typesTarget.state.code_intelligence.entrypoints.some(
+      (item) => item.path === "types/index.d.ts"
+    ),
+    true
+  );
+  assert.equal(
+    typesTarget.state.important_files.some(
+      (item) => item.path === "types/index.d.ts"
+    ),
+    true
+  );
+
+  const genericContainer = analyzeCompatibilityRepo(makeFixture({
+    "README.md": "# Data library\n\nA container data type stores values.\n"
+  }), {
+    inspectGit: false,
+    scan: { useGitIgnore: false }
+  });
+  assert.equal(
+    genericContainer.state.verification.unknowns.some(
+      (item) => /Docker or container behavior/.test(item.claim)
+    ),
+    false
+  );
+  const ciAbsence = genericContainer.state.current_state.unknown.find(
+    (item) => item.claim === "Conventional CI evidence is Unknown."
+  );
+  assert.ok(ciAbsence);
+  assert.match(ciAbsence.reason, /did not observe a conventional path/);
+  assert.doesNotMatch(ciAbsence.reason, /inspection was incomplete/);
+});
+
+test("read-only compact analysis ignores persisted evidence capacity", () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.persistence.max_evidence_records = 4;
+  const source = {
+    ".kanon/config.json": `${JSON.stringify(config)}\n`,
+    "README.md": "# Read-only retention\n",
+    "package.json": JSON.stringify({
+      name: "read-only-retention",
+      description: "Stable retained purpose",
+      scripts: {
+        start: "node src/index.js",
+        test: "node --test"
+      }
+    }),
+    "src/index.js": "export const value = 1;\n"
+  };
+  const cleanRoot = makeFixture(source);
+  const ledger = Array.from({ length: 4 }, (_, index) => JSON.stringify({
+    id: `e_prior_${index + 1}`,
+    kind: "metadata",
+    path: `prior-${index + 1}.json`,
+    claim: `Prior evidence ${index + 1}.`,
+    trust: "repository-untrusted"
+  })).join("\n") + "\n";
+  const saturatedRoot = makeFixture({
+    ...source,
+    ".kanon/EVIDENCE.jsonl": ledger
+  });
+  const options = {
+    inspectGit: false,
+    runId: "readonly-retention-01"
+  };
+  const clean = analyzeCompatibilityRepo(cleanRoot, options);
+  const saturated = analyzeCompatibilityRepo(saturatedRoot, options);
+  assert.deepEqual(saturated.state.purpose, clean.state.purpose);
+  assert.deepEqual(saturated.state.commands, clean.state.commands);
+  assert.deepEqual(saturated.evidence, clean.evidence);
+  assert.equal(saturated.state.purpose.confidence, "likely");
+  assert.equal(
+    fs.readFileSync(
+      path.join(saturatedRoot, ".kanon", "EVIDENCE.jsonl"),
+      "utf8"
+    ),
+    ledger
+  );
+});
+
+test("compatibility Git changes are relative to a nested root", () => {
+  const root = makeFixture({
+    "nested/README.md": "# Nested Git root\n",
+    "nested/file.js": "export const value = 1;\n"
+  });
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  writeFixtureFile(root, "nested/file.js", "export const value = 2;\n");
+  const analysis = analyzeCompatibilityRepo(path.join(root, "nested"));
+  assert.equal(analysis.state.git.observation_complete, true);
+  assert.equal(analysis.state.git.change_count, 1);
+  assert.deepEqual(
+    analysis.state.git.changes.map((item) => item.path),
+    ["file.js"]
+  );
+});
+
 test("schema-2 Git projection keeps legacy hash and history bounds", () => {
   const root = makeFixture({
     "README.md": "# Git projection fixture\n",
