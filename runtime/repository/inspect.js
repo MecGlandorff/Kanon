@@ -325,6 +325,7 @@ export function inspectRepository(rootInput, taskInput, options = {}) {
     ...(options.git_runner === undefined ? {} : { runner: options.git_runner }),
     timeout_ms: limits.git_timeout_ms,
     max_output_bytes: limits.git_max_output_bytes,
+    max_entries: limits.max_entries,
     compatibility_sensitive_paths: limits.compatibility_policy
   });
   const receiptPaths = selectEvidencePaths(
@@ -774,10 +775,12 @@ function scanRepository(root, coverage, limits, gitRunner) {
     const listing = listGitVisibleFiles(root, {
       ...(gitRunner === undefined ? {} : { runner: gitRunner }),
       timeout_ms: limits.git_timeout_ms,
-      max_output_bytes: limits.git_max_output_bytes
+      max_output_bytes: limits.git_max_output_bytes,
+      max_entries: limits.max_entries
     });
     if (listing.ok) {
       coverage.strategy = "git";
+      if (listing.diagnostic) noteBudget(coverage, "max_entries");
       for (const relative of listing.files) {
         if (!visitEntryBudget()) {
           break;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -687,6 +688,75 @@ test("invalid structured Git paths prevent completeness and absence claims", () 
   assert.match(git.diagnostics.join(" "), /Git status output/);
   assert.match(git.diagnostics.join(" "), /Git log output/);
   assert.doesNotMatch(JSON.stringify(git), /outside-secret/);
+});
+
+test("Git enumeration and status stop at the configured entry sentinel", () => {
+  const moduleUrl = new URL("../src/v1/repository/inspect.js", import.meta.url).href;
+  const proof = String.raw`
+    import fs from "node:fs";
+    import os from "node:os";
+    import path from "node:path";
+    import { inspectRepository } from ${JSON.stringify(moduleUrl)};
+    const nul = String.fromCharCode(0);
+    const success = (stdout) => ({
+      ok: true, status: 0, stdout, stderr: "", timeout: false, overflow: false
+    });
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "kanon-git-bound-"));
+    try {
+      fs.writeFileSync(path.join(root, "a.js"), "export default 1;\n");
+      fs.writeFileSync(path.join(root, "b.js"), "export default 2;\n");
+      const runner = (_root, args) => {
+        if (args[0] === "ls-files") return success(
+          "a.js" + nul + "b.js" + nul + "c.js" + nul +
+          ("a.js" + nul).repeat(1_500_000)
+        );
+        if (args[0] === "branch") return success("main\n");
+        if (args[0] === "status") return success(
+          "?? a.js" + nul + "?? b.js" + nul + "?? c.js" + nul +
+          ("?? a.js" + nul).repeat(800_000)
+        );
+        if (args[0] === "log") return success(
+          "e".repeat(40) + nul + "2026-08-16" + nul + "bounded" + nul
+        );
+        if (args[1] === "--is-inside-work-tree") return success("true\n");
+        if (args[1] === "--show-prefix") return success("");
+        return success("e".repeat(40) + "\n");
+      };
+      const inspected = inspectRepository(root, "bounded Git", {
+        git_runner: runner,
+        scan: {
+          compatibilityPolicy: true,
+          gitMaxOutputBytes: 16 * 1024 * 1024,
+          maxEntries: 2,
+          useGitIgnore: true
+        }
+      });
+      if (!inspected.ok) throw new Error(inspected.diagnostic);
+      console.log(JSON.stringify({
+        budgets: inspected.coverage.budgets_reached,
+        changes: inspected.git.changes.map((item) => item.path),
+        entries: inspected.coverage.entries_visited,
+        files: inspected.files.map((item) => item.path),
+        gitComplete: inspected.git.observation_complete
+      }));
+    } finally {
+      fs.rmSync(root, { force: true, recursive: true });
+    }
+  `;
+  const result = spawnSync(process.execPath, [
+    "--max-old-space-size=64",
+    "--input-type=module",
+    "-e",
+    proof
+  ], { encoding: "utf8", timeout: 30_000, windowsHide: true });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    budgets: ["max_entries"],
+    changes: ["a.js", "b.js"],
+    entries: 2,
+    files: ["a.js", "b.js"],
+    gitComplete: false
+  });
 });
 
 test("oversized host executable search state fails Git closed", () => {

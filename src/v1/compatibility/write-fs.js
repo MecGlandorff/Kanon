@@ -8,7 +8,6 @@ import {
 } from "#kanon-repository-read";
 const APPEND_WAIT = new Int32Array(new SharedArrayBuffer(4));
 const RETENTION_CHANGED = "Evidence retention changed before refresh publication.";
-const RESERVATION_STALE_MS = 30_000;
 
 /**
  * @typedef {{ok: true, status: "ok", root: string, path: string, relativePath: string, stat: fs.Stats}} ContainedPathSuccess
@@ -150,41 +149,33 @@ function removeStaleReservation(root, relativePath) {
   if (!current.ok) return current.status === "missing";
   const read = readContainedText(root, relativePath, 64);
   const match = read.ok ? /^([1-9]\d{0,9}) ([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\n?$/.exec(read.text) : null;
-  const owner = match ? Number(match[1]) : 0;
-  const age = Date.now() - current.stat.mtimeMs;
-  if (owner > 0 && owner <= 2_147_483_647 &&
-    age >= 0 && age < RESERVATION_STALE_MS) {
-    try {
-      process.kill(owner, 0);
-      return false;
-    } catch (error) {
-      if (errorCode(error) !== "ESRCH") return false;
-    }
-  }
-  const movedRelative = `${relativePath}.${crypto.randomUUID()}.stale`;
-  const moved = prepareDestination(root, movedRelative);
-  try { fs.renameSync(current.path, moved.path); }
+  if (!match || Number(match[1]) > 2_147_483_647) return false;
+  try { process.kill(Number(match[1]), 0); return false; }
   catch (error) {
-    if (errorCode(error) === "ENOENT") return true;
-    throw error;
+    if (errorCode(error) !== "ESRCH") return false;
   }
-  const claimed = resolveContainedPath(root, movedRelative, { type: "file" });
-  if (!claimed.ok) throw pathError(movedRelative, claimed);
-  const claimedRead = readContainedText(root, movedRelative, 64);
-  if (fileIdentityChanged(current.stat, claimed.stat) ||
-    (read.ok && (!claimedRead.ok || claimedRead.text !== read.text))) {
-    try { fs.linkSync(claimed.path, current.path); }
+  const claimRelative = `${relativePath}.${match[2]}.claim`;
+  const claim = prepareDestination(root, claimRelative);
+  let claimed = false;
+  try {
+    try { fs.linkSync(current.path, claim.path); claimed = true; }
     catch (error) {
-      if (errorCode(error) !== "EEXIST") throw error;
-      const replacement = resolveContainedPath(root, relativePath, { type: "file" });
-      if (!replacement.ok || fileIdentityChanged(claimed.stat, replacement.stat))
-        throw new Error(`${relativePath}: reservation ownership changed during stale takeover.`);
+      if (errorCode(error) === "ENOENT") return true;
+      if (errorCode(error) === "EEXIST") return false;
+      throw error;
     }
-    fs.unlinkSync(claimed.path);
-    return false;
+    const pinned = resolveContainedPath(root, claimRelative, { type: "file" });
+    const pinnedRead = readContainedText(root, claimRelative, 64);
+    if (!pinned.ok || fileIdentityChanged(current.stat, pinned.stat) ||
+      !pinnedRead.ok || pinnedRead.text !== read.text) return false;
+    const latest = resolveContainedPath(root, relativePath, { type: "file" });
+    if (!latest.ok) return latest.status === "missing";
+    if (fileIdentityChanged(pinned.stat, latest.stat)) return false;
+    fs.unlinkSync(latest.path);
+    return true;
+  } finally {
+    if (claimed) fs.unlinkSync(claim.path);
   }
-  fs.unlinkSync(claimed.path);
-  return true;
 }
 
 /** @param {string} text @param {number} maximum */

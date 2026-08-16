@@ -76,6 +76,7 @@ const MAX_PATH_ENTRIES = 128;
  *   enabled?: boolean,
  *   timeout_ms?: number,
  *   max_output_bytes?: number,
+ *   max_entries?: number,
  *   compatibility_sensitive_paths?: boolean
  * }} [options]
  * @returns {GitObservation}
@@ -121,6 +122,7 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
   const headResult = observe(["rev-parse", "HEAD"]);
   const compatibilitySensitivePaths =
     options.compatibility_sensitive_paths === true;
+  const maximumEntries = boundedInteger(options.max_entries, 10_000, 1, 100_000);
   const prefixResult = compatibilitySensitivePaths
     ? observe(["rev-parse", "--show-prefix"])
     : null;
@@ -151,7 +153,8 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
     ? parseStatus(
         statusResult.stdout,
         compatibilitySensitivePaths,
-        repositoryPrefix
+        repositoryPrefix,
+        maximumEntries
       )
     : null;
   const parsedLog = logResult.ok
@@ -224,14 +227,7 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
   };
 }
 
-/**
- * @param {string} canonicalRoot
- * @param {{
- *   runner?: GitRunner,
- *   timeout_ms?: number,
- *   max_output_bytes?: number
- * }} [options]
- */
+/** @param {string} canonicalRoot @param {{runner?: GitRunner, timeout_ms?: number, max_output_bytes?: number, max_entries?: number}} [options] */
 export function listGitVisibleFiles(canonicalRoot, options = {}) {
   const runner = typeof options.runner === "function"
     ? options.runner
@@ -254,21 +250,25 @@ export function listGitVisibleFiles(canonicalRoot, options = {}) {
   if (result.stdout && !result.stdout.endsWith("\0")) {
     return unavailableFileList();
   }
-  const files = [];
-  for (const value of result.stdout.split("\0")) {
-    if (!value) {
-      continue;
-    }
+  const maximumEntries = boundedInteger(options.max_entries, 10_000, 1, 100_000);
+  const files = [], seen = new Set(), cursor = { offset: 0 };
+  let observed = 0;
+  while (cursor.offset < result.stdout.length) {
+    const value = readNulField(result.stdout, cursor);
+    if (value === null) return unavailableFileList();
+    if (!value) continue;
+    observed += 1;
+    if (observed > maximumEntries) break;
     const selected = value.replaceAll("\\", "/");
     if (!isSafeRelativePath(selected)) {
       return unavailableFileList();
     }
-    files.push(selected);
+    if (!seen.has(selected)) { seen.add(selected); files.push(selected); }
   }
   return {
     ok: true,
-    files: Array.from(new Set(files)).sort(),
-    diagnostic: null
+    files: files.sort(),
+    diagnostic: observed > maximumEntries ? "Git file-list output exceeded its entry limit." : null
   };
 }
 
@@ -559,34 +559,35 @@ function boundedInteger(value, fallback, minimum, maximum) {
     : fallback;
 }
 
-/**
- * @param {string} output
- * @param {boolean} [compatibilitySensitivePaths]
- * @param {string} [repositoryPrefix]
- * @returns {{
- *   change_count: number,
- *   changes: GitObservation["changes"],
- *   truncated: boolean,
- *   sensitive_skipped: number,
- *   complete: boolean
- * }}
- */
+/** @param {string} output @param {{offset: number}} cursor */
+function readNulField(output, cursor) {
+  const end = output.indexOf("\0", cursor.offset);
+  if (end < 0) { cursor.offset = output.length; return null; }
+  const field = output.slice(cursor.offset, end);
+  cursor.offset = end + 1;
+  return field;
+}
+
+/** @param {string} output @param {boolean} [compatibilitySensitivePaths] @param {string} [repositoryPrefix] @param {number} [maximumEntries] */
 function parseStatus(
   output,
   compatibilitySensitivePaths = false,
-  repositoryPrefix = ""
+  repositoryPrefix = "",
+  maximumEntries = 10_000
 ) {
-  const entries = output.split("\0");
   /** @type {GitObservation["changes"]} */
   const changes = [];
+  const cursor = { offset: 0 };
   let changeCount = 0;
+  let observed = 0;
   let sensitiveSkipped = 0;
   let complete = output.length === 0 || output.endsWith("\0");
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    if (!entry) {
-      continue;
-    }
+  while (cursor.offset < output.length) {
+    const entry = readNulField(output, cursor);
+    if (entry === null) { complete = false; break; }
+    if (!entry) continue;
+    observed += 1;
+    if (observed > maximumEntries) { complete = false; break; }
     if (entry.length < 4) {
       complete = false;
       continue;
@@ -608,11 +609,9 @@ function parseStatus(
       continue;
     }
     if (indexStatus === "R" || indexStatus === "C") {
-      index += 1;
-      const originalPath = entries[index]?.replaceAll("\\", "/") || "";
-      if (!isSafeRelativePath(originalPath)) {
-        complete = false;
-      }
+      const original = readNulField(output, cursor);
+      const originalPath = original?.replaceAll("\\", "/") || "";
+      if (!isSafeRelativePath(originalPath)) complete = false;
     }
     changeCount += 1;
     if (
@@ -635,7 +634,8 @@ function parseStatus(
   return {
     change_count: changeCount,
     changes,
-    truncated: changeCount - sensitiveSkipped > changes.length,
+    truncated: observed > maximumEntries ||
+      changeCount - sensitiveSkipped > changes.length,
     sensitive_skipped: sensitiveSkipped,
     complete
   };

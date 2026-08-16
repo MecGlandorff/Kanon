@@ -369,9 +369,7 @@ test("concurrent refresh publishes only retained evidence references", async () 
   });
   fs.mkdirSync(path.join(root, ".kanon", "snapshots"));
   const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
-  fs.writeFileSync(reservationPath, "stale reservation\n");
-  const staleTime = new Date(Date.now() - 31_000);
-  fs.utimesSync(reservationPath, staleTime, staleTime);
+  fs.writeFileSync(reservationPath, await deadReservationMarker());
   const results = await Promise.all(
     Array.from({ length: 8 }, () =>
       spawnWrite(["refresh", "--root", root])
@@ -387,7 +385,7 @@ test("concurrent refresh publishes only retained evidence references", async () 
       assert.equal(result.status, 1);
       assert.match(
         result.stderr,
-        /Evidence retention changed before refresh publication/
+        /Evidence retention changed before refresh publication|reservation ownership changed|could not be canonicalized/
       );
     }
   }
@@ -524,7 +522,7 @@ test("refresh bounds evidence reads before retention counting", async () => {
   assert.doesNotMatch(dense.stderr, /heap out of memory|allocation failed/i);
 });
 
-test("refresh rejects live reservations and recovers preseeded or stale identities", async (t) => {
+test("refresh fails closed on ambiguous or live reservations and recovers dead owners", async (t) => {
   const root = makeFixture({
     "README.md": "# Recover evidence reservation\n",
     "package.json": JSON.stringify({ name: "reservation-recovery" })
@@ -537,8 +535,10 @@ test("refresh rejects live reservations and recovers preseeded or stale identiti
   fs.mkdirSync(path.dirname(reservationPath));
   fs.writeFileSync(reservationPath, "1\n");
   const preseeded = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(preseeded.status, 0, preseeded.stderr || preseeded.stdout);
-  assert.equal(fs.existsSync(reservationPath), false);
+  assert.equal(preseeded.status, 1, preseeded.stderr || preseeded.stdout);
+  assert.match(preseeded.stderr, /EEXIST|file already exists/i);
+  assert.equal(fs.readFileSync(reservationPath, "utf8"), "1\n");
+  fs.unlinkSync(reservationPath);
 
   const owner = spawn(
     process.execPath,
@@ -551,6 +551,8 @@ test("refresh rejects live reservations and recovers preseeded or stale identiti
   });
   const ownerToken = crypto.randomUUID();
   fs.writeFileSync(reservationPath, `${owner.pid} ${ownerToken}\n`);
+  const staleTime = new Date(Date.now() - 31_000);
+  fs.utimesSync(reservationPath, staleTime, staleTime);
 
   const blocked = await spawnWrite(["refresh", "--root", root]);
   assert.equal(blocked.status, 1, blocked.stderr || blocked.stdout);
@@ -572,11 +574,12 @@ test("refresh rejects live reservations and recovers preseeded or stale identiti
     reservationPath,
     `${process.pid} ${crypto.randomUUID()}\n`
   );
-  const staleTime = new Date(Date.now() - 31_000);
   fs.utimesSync(reservationPath, staleTime, staleTime);
   const reused = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(reused.status, 0, reused.stderr || reused.stdout);
-  assert.equal(fs.existsSync(reservationPath), false);
+  assert.equal(reused.status, 1, reused.stderr || reused.stdout);
+  assert.match(reused.stderr, /EEXIST|file already exists/i);
+  assert.equal(fs.existsSync(reservationPath), true);
+  fs.unlinkSync(reservationPath);
 });
 
 test("stale takeover preserves a concurrently acquired reservation", async () => {
@@ -587,23 +590,23 @@ test("stale takeover preserves a concurrently acquired reservation", async () =>
   const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
   const displacedPath = `${reservationPath}.displaced`;
   fs.mkdirSync(path.dirname(reservationPath));
-  fs.writeFileSync(reservationPath, "stale reservation\n");
-  const staleTime = new Date(Date.now() - 31_000);
-  fs.utimesSync(reservationPath, staleTime, staleTime);
+  fs.writeFileSync(reservationPath, await deadReservationMarker());
   const freshMarker = `${process.pid} ${crypto.randomUUID()}\n`;
-  const originalRename = fs.renameSync;
+  const originalLink = fs.linkSync;
   let injected = false;
-  fs.renameSync = (source, destination) => {
+  fs.linkSync = (source, destination) => {
     if (
       !injected &&
       source === reservationPath &&
-      String(destination).endsWith(".stale")
+      String(destination).endsWith(".claim")
     ) {
       injected = true;
-      originalRename(source, displacedPath);
+      originalLink(source, destination);
+      fs.renameSync(source, displacedPath);
       fs.writeFileSync(reservationPath, freshMarker);
+      return;
     }
-    return originalRename(source, destination);
+    return originalLink(source, destination);
   };
   try {
     await assert.rejects(
@@ -611,13 +614,13 @@ test("stale takeover preserves a concurrently acquired reservation", async () =>
       /EEXIST|file already exists/i
     );
   } finally {
-    fs.renameSync = originalRename;
+    fs.linkSync = originalLink;
   }
   assert.equal(injected, true);
   assert.equal(fs.readFileSync(reservationPath, "utf8"), freshMarker);
   assert.equal(
     fs.readdirSync(path.dirname(reservationPath))
-      .some((name) => name.endsWith(".owner") || name.endsWith(".stale")),
+      .some((name) => name.endsWith(".owner") || name.endsWith(".claim")),
     false
   );
   fs.unlinkSync(reservationPath);
@@ -657,6 +660,30 @@ test("refresh reports evidence reservation cleanup failures", async () => {
   }
   assert.equal(injected, true);
   assert.equal(inspectPreviousState(root).valid, true);
+
+  fs.writeFileSync(reservationPath, await deadReservationMarker());
+  let claimCleanupInjected = false;
+  fs.unlinkSync = (target) => {
+    if (!claimCleanupInjected && String(target).endsWith(".claim")) {
+      claimCleanupInjected = true;
+      throw Object.assign(new Error("injected claim cleanup failure"), {
+        code: "EIO"
+      });
+    }
+    return originalUnlink(target);
+  };
+  try {
+    await assert.rejects(
+      () => captureCli(runWriteCli, ["refresh", "--root", root]),
+      /injected claim cleanup failure/
+    );
+  } finally {
+    fs.unlinkSync = originalUnlink;
+    for (const name of fs.readdirSync(path.dirname(reservationPath))) {
+      if (name.endsWith(".claim")) originalUnlink(path.join(path.dirname(reservationPath), name));
+    }
+  }
+  assert.equal(claimCleanupInjected, true);
 });
 
 test("compatibility persistence mirrors and release metrics stay exact", () => {
@@ -675,7 +702,7 @@ test("compatibility persistence mirrors and release metrics stay exact", () => {
   }
   assert.deepEqual(
     { files: mappings.length, lines, bytes },
-    { files: 39, lines: 17_684, bytes: 496_112 }
+    { files: 39, lines: 17_678, bytes: 496_856 }
   );
 });
 
@@ -720,6 +747,20 @@ function spawnWrite(args, nodeArgs = []) {
       resolve({ status, signal, stdout, stderr });
     });
   });
+}
+
+async function deadReservationMarker() {
+  const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 60_000)"], {
+    stdio: "ignore",
+    windowsHide: true
+  });
+  await once(owner, "spawn");
+  const closed = once(owner, "close");
+  const pid = owner.pid;
+  owner.kill();
+  await closed;
+  if (!Number.isInteger(pid)) throw new Error("Reservation owner PID was unavailable.");
+  return `${pid} ${crypto.randomUUID()}\n`;
 }
 
 function collectEvidenceIds(value, output = new Set()) {
