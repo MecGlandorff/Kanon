@@ -3,8 +3,6 @@ import { safeTerminalText } from "../../src/trust.js";
 import { normalizeRelPath } from "../../src/code-intel/shared.js";
 
 export const TRACE_SCHEMA_VERSION = "kanon-d2e-ranking-trace-v1";
-export const COMPACT_TRACE_SCHEMA_VERSION =
-  "kanon-d2e-compact-ranking-trace-v2";
 export const TRACE_LIMITS = Object.freeze({
   candidatesPerCase: 25_000,
   stagesPerCase: 32,
@@ -34,22 +32,6 @@ export const EXPECTED_TRACE_STAGES = Object.freeze([
   "executable-syntax",
   "final-cap"
 ]);
-export const EXPECTED_COMPACT_TRACE_STAGES = Object.freeze([
-  "compact-important-files",
-  "evaluation-five-file-cap"
-]);
-const LEGACY_TRACE_CONTRACT = Object.freeze({
-  schemaVersion: TRACE_SCHEMA_VERSION,
-  stages: EXPECTED_TRACE_STAGES,
-  capStage: "final-cap",
-  candidateDomain: "kanon-d2e-candidate-v1"
-});
-const COMPACT_TRACE_CONTRACT = Object.freeze({
-  schemaVersion: COMPACT_TRACE_SCHEMA_VERSION,
-  stages: EXPECTED_COMPACT_TRACE_STAGES,
-  capStage: "evaluation-five-file-cap",
-  candidateDomain: "kanon-d2e-compact-candidate-v2"
-});
 
 /**
  * @typedef {{
@@ -61,12 +43,6 @@ const COMPACT_TRACE_CONTRACT = Object.freeze({
  *   revision: string,
  *   ordinal: number
  * }} TraceBinding
- * @typedef {{
- *   schemaVersion: string,
- *   stages: readonly string[],
- *   capStage: string,
- *   candidateDomain: string
- * }} TraceContract
  */
 
 /**
@@ -77,16 +53,6 @@ const COMPACT_TRACE_CONTRACT = Object.freeze({
  * @param {TraceBinding} binding
  */
 export function createRankingTraceCollector(binding) {
-  return createTraceCollector(binding, LEGACY_TRACE_CONTRACT);
-}
-
-/** @param {TraceBinding} binding */
-export function createCompactRankingTraceCollector(binding) {
-  return createTraceCollector(binding, COMPACT_TRACE_CONTRACT);
-}
-
-/** @param {TraceBinding} binding @param {TraceContract} contract */
-function createTraceCollector(binding, contract) {
   /** @type {Map<string, ReturnType<typeof candidateRecord>>} */
   const candidates = new Map();
   /** @type {Map<number, ReturnType<typeof stageRecord>>} */
@@ -158,7 +124,7 @@ function createTraceCollector(binding, contract) {
       finalizedCandidates,
       exitedStages,
       visitCount
-    }, contract);
+    });
     for (const check of checks) {
       if (!check.passed) {
         addFailure(check.name);
@@ -166,7 +132,7 @@ function createTraceCollector(binding, contract) {
     }
 
     const trace = {
-      schema_version: contract.schemaVersion,
+      schema_version: TRACE_SCHEMA_VERSION,
       protocol_sha256: binding.protocolSha256,
       trace_source_commit: binding.traceSourceCommit,
       artifact_sha256: binding.artifactSha256,
@@ -204,7 +170,7 @@ function createTraceCollector(binding, contract) {
       }
       stabilizeSerializedBytes(trace);
     }
-    const validation = validateTrace(trace, binding, contract);
+    const validation = validateRankingTrace(trace, binding);
     if (!validation.valid) {
       trace.completeness.complete = false;
       for (const issue of validation.failures) {
@@ -235,7 +201,7 @@ function createTraceCollector(binding, contract) {
       if (candidates.size >= TRACE_LIMITS.candidatesPerCase) {
         throw new Error("candidate-limit");
       }
-      candidates.set(path, candidateRecord(binding, path, event, contract));
+      candidates.set(path, candidateRecord(binding, path, event));
       return;
     }
     if (event.type === "curation-stage-entered") {
@@ -368,8 +334,7 @@ function createTraceCollector(binding, contract) {
             ? null
             : candidateIdFor(
                 binding,
-                tracePath(event.displaced_by),
-                contract
+                tracePath(event.displaced_by)
               ),
         quota:
           event.quota === null
@@ -438,16 +403,6 @@ function createTraceCollector(binding, contract) {
  * @param {Partial<TraceBinding>} [expected]
  */
 export function validateRankingTrace(value, expected = {}) {
-  return validateTrace(value, expected, LEGACY_TRACE_CONTRACT);
-}
-
-/** @param {unknown} value @param {Partial<TraceBinding>} [expected] */
-export function validateCompactRankingTrace(value, expected = {}) {
-  return validateTrace(value, expected, COMPACT_TRACE_CONTRACT);
-}
-
-/** @param {unknown} value @param {Partial<TraceBinding>} expected @param {TraceContract} contract */
-function validateTrace(value, expected, contract) {
   /** @type {string[]} */
   const failures = [];
   if (!plainRecord(value)) {
@@ -473,7 +428,7 @@ function validateTrace(value, expected, contract) {
     "trace"
   );
   expect(
-    value.schema_version === contract.schemaVersion,
+    value.schema_version === TRACE_SCHEMA_VERSION,
     failures,
     "schema-version"
   );
@@ -510,11 +465,11 @@ function validateTrace(value, expected, contract) {
   }
   validateLimits(value.limits, failures);
   validateScan(value.scan, failures);
-  validateStages(value.stages, failures, contract);
+  validateStages(value.stages, failures);
   validateCandidates(value.candidates, failures);
   validatePredictions(value.predictions, failures);
   validateCompleteness(value.completeness, failures);
-  validateCrossReferences(value, failures, contract);
+  validateCrossReferences(value, failures);
   if (
     plainRecord(value.limits) &&
     Array.isArray(value.candidates)
@@ -553,13 +508,12 @@ function validateTrace(value, expected, contract) {
  * @param {TraceBinding} binding
  * @param {string} path
  * @param {Record<string, unknown>} event
- * @param {TraceContract} contract
  */
-function candidateRecord(binding, path, event, contract) {
+function candidateRecord(binding, path, event) {
   const eligible = event.eligible === true;
   const eligibilityReason = boundedText(event.eligibility_reason);
   return {
-    candidate_id: candidateIdFor(binding, path, contract),
+    candidate_id: candidateIdFor(binding, path),
     normalized_path: path,
     discovery_source: "scanner",
     evidence: {
@@ -632,12 +586,11 @@ function stageRecord(event, candidates) {
   };
 }
 
-/** @param {TraceBinding | {caseId: unknown, revision: unknown}} binding @param {unknown} normalizedPath @param {TraceContract} contract */
-function candidateIdFor(binding, normalizedPath, contract) {
+function candidateIdFor(binding, normalizedPath) {
   return `candidate-${crypto
     .createHash("sha256")
     .update(
-      `${contract.candidateDomain}\0${binding.caseId}\0` +
+      `kanon-d2e-candidate-v1\0${binding.caseId}\0` +
       `${binding.revision}\0${normalizedPath}`
     )
     .digest("hex")}`;
@@ -739,7 +692,7 @@ function boundedScan(scan) {
   };
 }
 
-function completenessChecks(input, contract) {
+function completenessChecks(input) {
   const eligible = input.candidates.filter(
     (candidate) => candidate.ranking.eligible
   );
@@ -795,8 +748,8 @@ function completenessChecks(input, contract) {
       name: "curation-stages-complete",
       passed:
         JSON.stringify(stageNames) ===
-          JSON.stringify(contract.stages) &&
-        input.exitedStages.size === contract.stages.length
+          JSON.stringify(EXPECTED_TRACE_STAGES) &&
+        input.exitedStages.size === EXPECTED_TRACE_STAGES.length
     },
     {
       name: "stage-visits-counted",
@@ -837,7 +790,7 @@ function completenessChecks(input, contract) {
   ];
 }
 
-function validateCrossReferences(value, failures, contract) {
+function validateCrossReferences(value, failures) {
   if (
     !plainRecord(value.case) ||
     !Array.isArray(value.candidates) ||
@@ -857,7 +810,7 @@ function validateCrossReferences(value, failures, contract) {
     if (!plainRecord(candidate)) continue;
     expect(
       candidate.candidate_id ===
-        candidateIdFor(binding, candidate.normalized_path, contract),
+        candidateIdFor(binding, candidate.normalized_path),
       failures,
       "candidate-id-derivation"
     );
@@ -937,7 +890,7 @@ function validateCrossReferences(value, failures, contract) {
       failures,
       "stage-transition"
     );
-    if (stage.name === contract.capStage) {
+    if (stage.name === "final-cap") {
       expect(
         JSON.stringify(stage.selected_on_exit) ===
           JSON.stringify(
@@ -1115,7 +1068,7 @@ function validateScan(value, failures) {
   );
 }
 
-function validateStages(value, failures, contract) {
+function validateStages(value, failures) {
   expect(
     Array.isArray(value) &&
       value.length <= TRACE_LIMITS.stagesPerCase,
@@ -1142,7 +1095,7 @@ function validateStages(value, failures, contract) {
     );
     expectText(stage.name, failures, "stage-name");
     expect(
-      stage.name === contract.stages[index],
+      stage.name === EXPECTED_TRACE_STAGES[index],
       failures,
       "stage-name-order"
     );

@@ -12,6 +12,9 @@ import {
 } from "./scoring.js";
 
 export async function runCorpus(corpus, options = {}) {
+  if (options.rankingTrace) {
+    throw new Error("D.2E ranking trace-attempt mode is retired in v1.1.");
+  }
   const cacheRoot = path.resolve(
     options.cacheRoot ||
       process.env.KANON_CORPUS_CACHE ||
@@ -334,6 +337,9 @@ export function analyzeCase(
   timeoutMs,
   rankingTrace = null
 ) {
+  if (rankingTrace) {
+    throw new Error("D.2E ranking trace-attempt mode is retired in v1.1.");
+  }
   const worker = fileURLToPath(
     new URL("./analyze-case.js", import.meta.url)
   );

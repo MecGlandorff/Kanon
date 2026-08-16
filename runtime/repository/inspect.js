@@ -710,23 +710,9 @@ function readVisibleRepositoryTexts(root, files, coverage, selectedPaths, instru
   coverage.elapsed_ms += elapsedMilliseconds(started);
   return texts;
 }
-/** @param {Buffer} bytes @param {boolean} truncated */
-function decodeRepositoryText(bytes, truncated) {
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch (error) {
-    if (!truncated) throw error;
-    for (let removed = 1; removed <= Math.min(3, bytes.length); removed += 1) {
-      try {
-        return new TextDecoder("utf-8", { fatal: true }).decode(
-          bytes.subarray(0, bytes.length - removed)
-        );
-      } catch {
-        continue;
-      }
-    }
-    throw error;
-  }
+/** @param {Buffer} bytes @param {boolean} _truncated */
+function decodeRepositoryText(bytes, _truncated) {
+  return new TextDecoder("utf-8").decode(bytes);
 }
 /** @param {string} selectedPath @param {Set<string>} instructionPaths @param {boolean} compatibilityPolicy @returns {number} */
 function textReadPriority(selectedPath, instructionPaths, compatibilityPolicy) {
@@ -1705,16 +1691,36 @@ function publicEvidence(evidence) {
     truncated: evidence.truncated
   };
 }
-/** Keep repository-derived diagnostic paths explicitly trust-labeled in structured output while retaining numeric limits and generic diagnostics. @param {InspectionCoverage} coverage @returns {Omit< InspectionCoverage, "rejected_path_samples" | "unreadable_path_samples" > & { rejected_path_samples: import("../core/trust.js").RepositoryValue[], unreadable_path_samples: import("../core/trust.js").RepositoryValue[] }} */
+/** @param {InspectionCoverage} coverage */
 function publicCoverage(coverage) {
   return {
-    ...coverage,
+    complete: coverage.complete,
+    instruction_complete: coverage.instruction_complete,
+    entries_visited: coverage.entries_visited,
+    files_observed: coverage.files_observed,
+    fixed_directories_excluded: coverage.fixed_directories_excluded,
+    ignore_entries_excluded: coverage.ignore_entries_excluded,
+    sensitive_files_excluded: coverage.sensitive_files_excluded,
+    rejected_paths: coverage.rejected_paths,
+    unreadable_paths: coverage.unreadable_paths,
     rejected_path_samples: coverage.rejected_path_samples.map((value) =>
       repositoryIdentifier(value, 4_096)
     ),
     unreadable_path_samples: coverage.unreadable_path_samples.map((value) =>
       repositoryIdentifier(value, 4_096)
-    )
+    ),
+    budgets_reached: [...coverage.budgets_reached],
+    diagnostics: [...coverage.diagnostics],
+    limits: {
+      max_files: coverage.limits.max_files,
+      max_entries: coverage.limits.max_entries,
+      max_file_bytes: coverage.limits.max_file_bytes,
+      max_hash_bytes: coverage.limits.max_hash_bytes,
+      max_scan_ms: coverage.limits.max_scan_ms,
+      max_ignore_match_work: coverage.limits.max_ignore_match_work,
+      max_evidence_items: coverage.limits.max_evidence_items,
+      max_evidence_bytes: coverage.limits.max_evidence_bytes
+    }
   };
 }
 /** @param {InspectionLimits} limits @returns {InspectionCoverage} */

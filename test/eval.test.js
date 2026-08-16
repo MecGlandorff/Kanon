@@ -628,26 +628,8 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
   assert.equal(report.results.length, 1);
   assert.equal(report.results[0].analysis_error, null);
 
-  const analysisRoot = path.join(root, "trace-analysis-root");
   const traceDirectory = path.join(root, "trace-output");
-  fs.mkdirSync(path.join(analysisRoot, "src"), { recursive: true });
   fs.mkdirSync(traceDirectory);
-  fs.writeFileSync(
-    path.join(analysisRoot, "README.md"),
-    "# Artifact trace fixture\n"
-  );
-  fs.writeFileSync(
-    path.join(analysisRoot, "package.json"),
-    JSON.stringify({
-      name: "artifact-trace-fixture",
-      main: "src/main.js",
-      scripts: { test: "node --test" }
-    })
-  );
-  fs.writeFileSync(
-    path.join(analysisRoot, "src", "main.js"),
-    "export const main = true;\n"
-  );
   const traceBinding = {
     protocolSha256: "a".repeat(64),
     traceSourceCommit: head.stdout.trim(),
@@ -657,46 +639,38 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
     revision: "b".repeat(40),
     ordinal: 1
   };
-  const traced = analyzeCase(
-    artifactAnalyzer,
-    analysisRoot,
-    {
-      id: traceBinding.caseId,
-      revision: traceBinding.revision
-    },
-    20_000,
-    {
-      output_directory: traceDirectory,
-      file_name: "case-001.json",
-      binding: traceBinding
-    }
+  assert.throws(
+    () => analyzeCase(
+      artifactAnalyzer,
+      artifactRoot,
+      {
+        id: traceBinding.caseId,
+        revision: traceBinding.revision
+      },
+      20_000,
+      {
+        output_directory: traceDirectory,
+        file_name: "case-001.json",
+        binding: traceBinding
+      }
+    ),
+    /trace-attempt mode is retired/u
   );
-  assert.equal(traced.ranking_trace.status, "written");
-  assert.equal(traced.ranking_trace.complete, true);
-  assert.equal(traced.state.important_files.length <= 5, true);
-  const persistedTrace = readJson(path.join(traceDirectory, "case-001.json"));
-  assert.equal(persistedTrace.completeness.complete, true);
-  assert.equal(
-    persistedTrace.schema_version,
-    "kanon-d2e-compact-ranking-trace-v2"
+  assert.deepEqual(fs.readdirSync(traceDirectory), []);
+
+  const retiredTraceRoot = path.join(root, "retired-trace-attempt");
+  const retired = spawnSync(
+    process.execPath,
+    [
+      "scripts/eval-corpus.js",
+      "--ranking-trace-directory",
+      retiredTraceRoot
+    ],
+    commandOptions(20_000)
   );
-  assert.deepEqual(
-    persistedTrace.stages.map((stage) => stage.name),
-    ["compact-important-files", "evaluation-five-file-cap"]
-  );
-  const eligibleCandidates = persistedTrace.candidates.filter(
-    (candidate) => candidate.ranking.eligible
-  );
-  assert.equal(eligibleCandidates.length > 0, true);
-  assert.equal(eligibleCandidates.every((candidate) =>
-    candidate.ranking.contributions.some(
-      (contribution) => contribution.name === "compact-priority"
-    ) && candidate.ranking.score < 2_000
-  ), true);
-  assert.deepEqual(
-    persistedTrace.predictions.important_files,
-    traced.state.important_files.map((file) => file.path)
-  );
+  assert.equal(retired.status, 2);
+  assert.match(retired.stderr, /trace-attempt mode is retired/u);
+  assert.equal(fs.existsSync(retiredTraceRoot), false);
 
   const substitutedRoot = path.join(root, "substituted-root");
   fs.mkdirSync(substitutedRoot);

@@ -1284,14 +1284,17 @@ function projectGit(inspection, evidence) {
   return {
     found: inspection.git.found,
     branch: inspection.git.branch,
-    head: inspection.git.head,
+    head: shortGitHash(inspection.git.head),
     dirty: inspection.git.dirty,
     change_count: inspection.git.change_count,
     change_count_exact: inspection.git.change_count_exact,
     changes: inspection.git.changes,
     changes_truncated: inspection.git.changes_truncated,
     sensitive_changes_skipped: inspection.git.sensitive_changes_skipped,
-    recent_commits: inspection.git.recent_commits,
+    recent_commits: inspection.git.recent_commits.slice(0, 5).map((commit) => ({
+      ...commit,
+      hash: shortGitHash(commit.hash)
+    })),
     observation_complete: inspection.git.observation_complete,
     diagnostics: inspection.git.diagnostics.map((message) => ({
       operation: "repository observation",
@@ -1301,6 +1304,10 @@ function projectGit(inspection, evidence) {
     trust: inspection.git.trust,
     evidence: gitEvidence
   };
+}
+/** @param {string | null} value */
+function shortGitHash(value) {
+  return typeof value === "string" ? value.slice(0, 12) : value;
 }
 /** @param {Inspection} inspection @param {RepositoryFacts} facts */
 function projectScan(inspection, facts) {

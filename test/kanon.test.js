@@ -26,7 +26,10 @@ import {
 } from "../src/index.js";
 import { runCli } from "../src/cli.js";
 import { runWriteCli } from "../src/v1/compatibility/cli.js";
-import { inspectRepository } from "../src/v1/repository/inspect.js";
+import {
+  inspectRepository,
+  publicInspection
+} from "../src/v1/repository/inspect.js";
 import {
   analyzeRepo as analyzeCompatibilityRepo
 } from "../src/v1/compatibility/refresh.js";
@@ -39,6 +42,7 @@ import {
   initializeGit,
   makeFixture,
   readJson,
+  runGitFixture,
   writeFixtureFile
 } from "./helpers.js";
 
@@ -716,6 +720,34 @@ test("review regressions: stable inspection preserves receipt semantics", () => 
     false
   );
   assert.equal(orient.evidence_fingerprint, verify.evidence_fingerprint);
+  const publicOrient = publicInspection(orient);
+  assert.ok(publicOrient);
+  assert.deepEqual(Object.keys(publicOrient.coverage).sort(), [
+    "budgets_reached",
+    "complete",
+    "diagnostics",
+    "entries_visited",
+    "files_observed",
+    "fixed_directories_excluded",
+    "ignore_entries_excluded",
+    "instruction_complete",
+    "limits",
+    "rejected_path_samples",
+    "rejected_paths",
+    "sensitive_files_excluded",
+    "unreadable_path_samples",
+    "unreadable_paths"
+  ]);
+  assert.deepEqual(Object.keys(publicOrient.coverage.limits).sort(), [
+    "max_entries",
+    "max_evidence_bytes",
+    "max_evidence_items",
+    "max_file_bytes",
+    "max_files",
+    "max_hash_bytes",
+    "max_ignore_match_work",
+    "max_scan_ms"
+  ]);
 });
 
 test("round-seven inspection preserves instruction order and Git disablement", () => {
@@ -826,6 +858,73 @@ test("round-seven semantic prefixes and display excerpts stay distinct", () => {
   assert.equal(
     display.state.scan.budgets_reached.includes("evidence_truncated"),
     false
+  );
+
+  const replacementRoot = makeFixture({
+    "README.md": Buffer.concat([
+      Buffer.from("# Replacement-decoded purpose\n"),
+      Buffer.from([0xff])
+    ])
+  });
+  const replacement = analyzeCompatibilityRepo(replacementRoot, {
+    inspectGit: false,
+    scan: { useGitIgnore: false }
+  });
+  assert.equal(replacement.state.purpose.claim, "Replacement-decoded purpose");
+
+  const strictControlRoot = makeFixture({
+    ".kanonignore": Buffer.from([0xff]),
+    "README.md": "# Strict control fixture\n"
+  });
+  const strictControl = inspectRepository(
+    strictControlRoot,
+    "inspect README.md",
+    { profile: "orient", inspect_git: false }
+  );
+  assert.equal(strictControl.ok, true);
+  if (!strictControl.ok) return;
+  assert.equal(strictControl.files.length, 0);
+  assert.equal(
+    strictControl.coverage.budgets_reached.includes("invalid_ignore_rules"),
+    true
+  );
+});
+
+test("schema-2 Git projection keeps legacy hash and history bounds", () => {
+  const root = makeFixture({
+    "README.md": "# Git projection fixture\n",
+    "tracked.txt": "0\n"
+  });
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  for (let index = 1; index <= 6; index += 1) {
+    writeFixtureFile(root, "tracked.txt", `${index}\n`);
+    const added = runGitFixture(root, ["add", "tracked.txt"]);
+    assert.equal(added.status, 0, added.stderr);
+    const committed = runGitFixture(root, [
+      "-c",
+      "user.name=Kanon Test",
+      "-c",
+      "user.email=kanon@example.invalid",
+      "commit",
+      "-m",
+      `fixture ${index}`
+    ]);
+    assert.equal(committed.status, 0, committed.stderr);
+  }
+
+  const analysis = analyzeCompatibilityRepo(root, {
+    scan: { useGitIgnore: false }
+  });
+  assert.equal(typeof analysis.state.git.head, "string");
+  if (typeof analysis.state.git.head !== "string") return;
+  assert.match(analysis.state.git.head, /^[0-9a-f]{12}$/u);
+  assert.equal(analysis.state.git.recent_commits.length, 5);
+  assert.equal(
+    analysis.state.git.recent_commits.every((commit) =>
+      /^[0-9a-f]{12}$/u.test(commit.hash)
+    ),
+    true
   );
 });
 

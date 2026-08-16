@@ -103,9 +103,9 @@ test("every shipped stable runtime module has one checked canonical source", () 
   const mappings = stableRuntimeArtifacts(repoRoot);
   const sources = mappings.map(([source]) => source).sort();
   const targets = mappings.map(([, target]) => target).sort();
-  assert.equal(mappings.length, 38);
-  assert.equal(sources.length, 38);
-  assert.equal(new Set(targets).size, 38);
+  assert.equal(mappings.length, 39);
+  assert.equal(sources.length, mappings.length);
+  assert.equal(new Set(targets).size, mappings.length);
   assert.deepEqual(
     targets,
     listJavaScriptFiles(path.join(repoRoot, "runtime"))

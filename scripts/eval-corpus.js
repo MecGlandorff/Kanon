@@ -466,14 +466,12 @@ function parseArgs(argv) {
     options.rankingTraceDirectory,
     options.traceProtocolSha256,
     options.traceSourceCommit,
-    options.expectedD2aSha256
+    options.expectedD2aSha256,
+    options.postCorrectionAuthoritySha256
   ];
-  if (
-    traceFields.some(Boolean) &&
-    !traceFields.every(Boolean)
-  ) {
+  if (traceFields.some(Boolean)) {
     throw new Error(
-      "D.2E tracing requires its directory, protocol hash, source commit, and D.2A hash together."
+      "D.2E ranking trace-attempt mode is retired in v1.1."
     );
   }
   if (
@@ -905,13 +903,7 @@ Development options:
   --json-output <path>            Write the raw report atomically
   --require-role <role>           Require development or release
 
-D.2E trace options (all required together; development/full/no-fetch only):
-  --ranking-trace-directory <dir> One absent direct child of the OS temp root
-  --trace-protocol-sha256 <sha>   Frozen D.2E protocol identity
-  --trace-source-commit <commit>  Exact clean instrumentation commit
-  --expected-d2a-sha256 <sha>     Frozen D.2A raw-report identity
-  --post-correction-authority-sha256 <sha>
-                                    Freeze the single paired post-correction attempt
+D.2E trace-attempt options are retired and rejected in v1.1.
 
 Required together for an artifact-bound development run or release:
   --artifact-tarball <path>       Exact packed artifact

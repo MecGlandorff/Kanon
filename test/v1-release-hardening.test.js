@@ -10,7 +10,6 @@ import {
   SIGNED_WAIVER_SHA256,
   validateReleasePolicy
 } from "../scripts/lib/maintainer-stable-release.js";
-import { publicSkillFiles } from "../scripts/lib/artifact-files.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflow = read(".github/workflows/ci.yml");
@@ -219,7 +218,6 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   assert.equal(Object.keys(packageJson.dependencies || {}).length, 0);
   assert.equal(Object.keys(packageJson.optionalDependencies || {}).length, 0);
   assert.equal(Object.keys(packageJson.peerDependencies || {}).length, 0);
-  assert.equal(publicSkillFiles(repoRoot).length + 6, 86);
   const output = fs.mkdtempSync(
     path.join(os.tmpdir(), "kanon-release-inventory-")
   );
@@ -234,6 +232,7 @@ test("package metadata and expected inventory are exact and dependency-free", ()
     }
   );
   assert.equal(built.status, 0, built.stderr || built.stdout);
+  assert.equal(listFiles(output).length, 87);
   assert.equal(
     fs.readFileSync(path.join(output, "SECURITY.md"), "utf8"),
     read("SECURITY.md")
@@ -264,4 +263,15 @@ function section(start, end) {
 
 function read(relative) {
   return fs.readFileSync(path.join(repoRoot, relative), "utf8");
+}
+
+function listFiles(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const target = path.join(directory, entry.name);
+      return entry.isDirectory()
+        ? listFiles(target).map((child) => `${entry.name}/${child}`)
+        : [entry.name];
+    })
+    .sort();
 }

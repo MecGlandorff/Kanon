@@ -78,13 +78,6 @@ external config, prompts, optional locks, and lazy fetching, verifies a clean
 checkout, and removes Git metadata before analysis. Product analysis receives
 `inspectGit: false`.
 
-The v1.1 installed evaluator uses the versioned
-`kanon-v1.1-compact-first-five-v1` selection contract: it takes the first five
-retained compact important-file results. When tracing is enabled it emits
-`kanon-d2e-compact-ranking-trace-v2`, whose only curation stages are the actual
-compact important-file projection and the evaluator's five-file cap. It does
-not claim that the removed legacy curation stages ran.
-
 ## Development data
 
 Visible labels may guide generic behavior only. Every production heuristic must

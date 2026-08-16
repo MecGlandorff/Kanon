@@ -9,8 +9,6 @@ import { analyzeRepo as analyzeCompatibilityRepo } from "../compatibility/refres
  * @typedef {{path: string, reason: string, fan_in: number}}
  *   EvaluationImportantFile
  */
-export const RANKING_TRACE_SCHEMA_VERSION =
-  "kanon-d2e-compact-ranking-trace-v2";
 export const EVALUATION_SELECTION_CONTRACT =
   "kanon-v1.1-compact-first-five-v1";
 
@@ -20,10 +18,10 @@ export function analyzeRepo(root = process.cwd(), options = {}) {
   /** @type {Map<string, {eligible: boolean, rankedPosition: number | null, reason: string | null}>} */
   const tracedCandidates = new Map();
   const compatibilityObserver = typeof observer === "function"
-    ? (event) => {
+    ? /** @type {RankingObserver} */ ((event) => {
         recordCompactObservation(tracedCandidates, event);
         emit(observer, event);
-      }
+      })
     : undefined;
   const analysis = analyzeCompatibilityRepo(root, {
     ...analysisOptions,
