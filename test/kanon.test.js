@@ -750,6 +750,38 @@ test("review regressions: stable inspection preserves receipt semantics", () => 
   ]);
 });
 
+test("stable inspection retains its bounded Git output default", () => {
+  const root = makeFixture({ "README.md": "# Git limit fixture\n" });
+  const observed = [];
+  const runner = (_root, args, options) => {
+    observed.push(options.max_output_bytes);
+    let stdout = "";
+    if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") {
+      stdout = "true\n";
+    } else if (args[0] === "branch") {
+      stdout = "main\n";
+    } else if (args[0] === "rev-parse") {
+      stdout = `${"a".repeat(40)}\n`;
+    }
+    return {
+      ok: true,
+      status: 0,
+      stdout,
+      stderr: "",
+      timeout: false,
+      overflow: false
+    };
+  };
+  const inspection = inspectRepository(root, "inspect Git limits", {
+    profile: "orient",
+    git_runner: runner
+  });
+
+  assert.equal(inspection.ok, true);
+  assert.ok(observed.length > 0);
+  assert.deepEqual(new Set(observed), new Set([1024 * 1024]));
+});
+
 test("round-seven inspection preserves instruction order and Git disablement", () => {
   const root = makeFixture({
     ".kanonignore": "AGENTS.md\n",
@@ -1044,18 +1076,41 @@ test("read-only compact analysis ignores persisted evidence capacity", () => {
 test("compatibility Git changes are relative to a nested root", () => {
   const root = makeFixture({
     "nested/README.md": "# Nested Git root\n",
-    "nested/file.js": "export const value = 1;\n"
+    "nested/file.js": "export const value = 1;\n",
+    "outside.js": "export const outside = true;\n"
   });
   const initialized = initializeGit(root);
   assert.equal(initialized.status, 0, initialized.stderr);
   writeFixtureFile(root, "nested/file.js", "export const value = 2;\n");
+  const moved = runGitFixture(root, [
+    "mv",
+    "outside.js",
+    "nested/inside.js"
+  ]);
+  assert.equal(moved.status, 0, moved.stderr);
   const analysis = analyzeCompatibilityRepo(path.join(root, "nested"));
   assert.equal(analysis.state.git.observation_complete, true);
-  assert.equal(analysis.state.git.change_count, 1);
+  assert.equal(analysis.state.git.change_count, 2);
   assert.deepEqual(
-    analysis.state.git.changes.map((item) => item.path),
-    ["file.js"]
+    analysis.state.git.changes.map((item) => item.path).sort(),
+    ["file.js", "inside.js"]
   );
+});
+
+test("tracked deletions remain informational scan observations", () => {
+  const root = makeFixture({
+    "README.md": "# Tracked deletion fixture\n",
+    "removed.txt": "tracked before deletion\n"
+  });
+  const initialized = initializeGit(root);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  fs.unlinkSync(path.join(root, "removed.txt"));
+
+  const analysis = analyzeCompatibilityRepo(root);
+
+  assert.equal(analysis.state.scan.missing_tracked_files, 1);
+  assert.equal(analysis.state.scan.complete, true);
+  assert.equal(analysis.state.scan.truncated, false);
 });
 
 test("schema-2 Git projection keeps legacy hash and history bounds", () => {

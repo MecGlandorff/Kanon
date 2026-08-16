@@ -1826,7 +1826,7 @@ function finishCoverage(coverage, fileCount, git) {
     coverage.budgets_reached.length === 0 &&
     coverage.rejected_paths === 0 &&
     coverage.unreadable_paths === 0 &&
-    !coverage.git_ignore_observation_failed && coverage.missing_tracked_files === 0;
+    !coverage.git_ignore_observation_failed;
 }
 /** @param {InspectionCoverage} coverage @param {string} name @returns {void} */
 function noteBudget(coverage, name) {
@@ -1906,7 +1906,10 @@ function inspectionLimits(input = {}) {
     ),
     git_timeout_ms: boundedInteger(input.gitTimeoutMs, 2_000, 100, 60_000),
     git_max_output_bytes: boundedInteger(
-      input.gitMaxOutputBytes, 8 * 1024 * 1024, 1_024, 32 * 1024 * 1024
+      input.gitMaxOutputBytes,
+      input.compatibilityPolicy === true ? 8 * 1024 * 1024 : 1024 * 1024,
+      1_024,
+      32 * 1024 * 1024
     ),
     use_git_ignore: input.useGitIgnore === true,
     compatibility_policy: input.compatibilityPolicy === true

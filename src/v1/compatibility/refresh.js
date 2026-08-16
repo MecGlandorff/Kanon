@@ -1923,6 +1923,14 @@ function persistRefresh(analysis, config, options) {
     ...(previous.warning ? { previous_warning: previous.warning } : {}),
     handoff: handoff.handoff
   });
+  const warnings = [previous.warning, todos.warning, handoff.warning]
+    .filter((warning) => typeof warning === "string");
+  if (analysis.evidence_truncated) {
+    warnings.push(
+      "Evidence retention limit was reached; unsupported claims were downgraded to Unknown."
+    );
+  }
+  appendEvidence(root, analysis.evidence, config.persistence);
   writeKanonGitignore(root);
   atomicWriteContained(root, ".kanon/KANON.md", renderBrief(analysis, options));
   atomicWriteContained(
@@ -1943,23 +1951,10 @@ function persistRefresh(analysis, config, options) {
     })
   );
   ensureConfig(root);
-  const warnings = [previous.warning, todos.warning, handoff.warning]
-    .filter((warning) => typeof warning === "string");
-  if (analysis.evidence_truncated) {
-    warnings.push(
-      "Evidence retention limit was reached; unsupported claims were downgraded to Unknown."
-    );
-  }
   const snapshot = writeSnapshot(
     root,
     analysis.state.run_id,
     analysis.state,
-    config.persistence,
-    warnings
-  );
-  appendEvidence(
-    root,
-    analysis.evidence,
     config.persistence,
     warnings
   );
@@ -2004,8 +1999,8 @@ function writeSnapshot(root, id, state, limits, warnings) {
   atomicWriteContained(root, relative, `${safeJsonStringify(state)}\n`);
   return relative;
 }
-/** @param {string} root @param {EvidenceRecord[]} records @param {typeof DEFAULT_CONFIG.persistence} limits @param {string[]} warnings */
-function appendEvidence(root, records, limits, warnings) {
+/** @param {string} root @param {EvidenceRecord[]} records @param {typeof DEFAULT_CONFIG.persistence} limits */
+function appendEvidence(root, records, limits) {
   const relative = ".kanon/EVIDENCE.jsonl";
   const target = containedFileStat(root, relative, { optional: true });
   const existingBytes = target.ok ? target.stat.size : 0;
@@ -2024,28 +2019,22 @@ function appendEvidence(root, records, limits, warnings) {
   const currentRecords = existingText
     ? existingText.split(/\r?\n/).filter(Boolean).length
     : 0;
-  const accepted = records.slice(
-    0,
-    Math.max(0, limits.max_evidence_records - currentRecords)
-  );
-  let payload = accepted.length
-    ? `${accepted.map((record) => safeJsonStringify(record, 0)).join("\n")}\n`
+  const payload = records.length
+    ? `${records.map((record) => safeJsonStringify(record, 0)).join("\n")}\n`
     : "";
   if (
+    records.length > limits.max_evidence_records - currentRecords ||
     Buffer.byteLength(payload) >
     Math.max(0, limits.max_evidence_bytes - existingBytes)
   ) {
-    payload = "";
+    throw new Error(
+      "Evidence retention changed before refresh publication."
+    );
   }
   if (payload) {
     appendContained(root, relative, payload);
   } else if (!target.ok) {
-    atomicWriteContained(root, relative, "");
-  }
-  if (accepted.length < records.length || (!payload && records.length)) {
-    warnings.push(
-      "Evidence retention limit was reached; additional records were not appended."
-    );
+    appendContained(root, relative, "");
   }
 }
 /** @param {ReturnType<typeof buildRefreshAnalysis>} analysis @param {{deep?: boolean}} options */

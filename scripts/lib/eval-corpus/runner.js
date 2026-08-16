@@ -61,7 +61,9 @@ export async function runCorpus(corpus, options = {}) {
 
   const analyzerModule = path.resolve(
     options.analyzerModule ||
-      fileURLToPath(new URL("../../../src/index.js", import.meta.url))
+      fileURLToPath(
+        new URL("../../../src/v1/evaluation/analyze.js", import.meta.url)
+      )
   );
   const analysisTimeoutMs = boundedTimeout(
     options.analysisTimeoutMs,

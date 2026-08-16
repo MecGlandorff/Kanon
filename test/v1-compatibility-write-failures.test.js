@@ -329,8 +329,13 @@ test("concurrent compatibility writers leave complete bounded artifacts", async 
     .split(/\r?\n/)
     .filter(Boolean);
   assert.ok(evidenceLines.length > 0);
+  const retainedEvidence = new Set();
   for (const line of evidenceLines) {
-    assert.doesNotThrow(() => JSON.parse(line));
+    const record = JSON.parse(line);
+    retainedEvidence.add(record.id);
+  }
+  for (const evidenceId of collectEvidenceIds(state.state)) {
+    assert.equal(retainedEvidence.has(evidenceId), true, evidenceId);
   }
   for (const directory of [
     path.join(root, ".kanon"),
@@ -345,6 +350,50 @@ test("concurrent compatibility writers leave complete bounded artifacts", async 
     assert.doesNotThrow(() => readJson(
       path.join(root, ".kanon", "snapshots", snapshot)
     ));
+  }
+});
+
+test("concurrent refresh publishes only retained evidence references", async () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.persistence.max_evidence_records = 1;
+  const root = makeFixture({
+    "README.md": "# Concurrent evidence\n",
+    "package.json": JSON.stringify({
+      name: "concurrent-evidence",
+      description: "Concurrency-safe retained evidence"
+    }),
+    ".kanon/config.json": `${JSON.stringify(config)}\n`
+  });
+  fs.mkdirSync(path.join(root, ".kanon", "snapshots"));
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      spawnWrite(["refresh", "--root", root])
+    )
+  );
+
+  assert.ok(results.some((result) => result.status === 0));
+  for (const result of results) {
+    assert.equal(result.signal, null);
+    if (result.status === 0) {
+      assert.match(result.stdout, /^Kanon refreshed /);
+    } else {
+      assert.equal(result.status, 1);
+      assert.match(
+        result.stderr,
+        /Evidence retention changed before refresh publication/
+      );
+    }
+  }
+
+  const state = inspectPreviousState(root);
+  assert.equal(state.valid, true);
+  const ledger = fs.readFileSync(
+    path.join(root, ".kanon", "EVIDENCE.jsonl"),
+    "utf8"
+  ).trim().split("\n").map((line) => JSON.parse(line));
+  const retained = new Set(ledger.map((record) => record.id));
+  for (const evidenceId of collectEvidenceIds(state.state)) {
+    assert.equal(retained.has(evidenceId), true, evidenceId);
   }
 });
 
@@ -389,4 +438,19 @@ function spawnWrite(args) {
       resolve({ status, signal, stdout, stderr });
     });
   });
+}
+
+function collectEvidenceIds(value, output = new Set()) {
+  if (typeof value === "string") {
+    if (/^e_[A-Za-z0-9-]+_\d{3}$/.test(value)) output.add(value);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectEvidenceIds(item, output);
+    return output;
+  }
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) collectEvidenceIds(item, output);
+  }
+  return output;
 }

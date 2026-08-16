@@ -536,6 +536,35 @@ test("analysis workers inherit no arbitrary parent secret environment", () => {
   }
 });
 
+test("development evaluation defaults to the compact v1 analyzer", async () => {
+  const root = makeFixture({}, "kanon-compact-development-");
+  const cacheRoot = path.join(root, "cache");
+  const item = corpus.cases[0];
+  const cached = path.join(
+    cacheRoot,
+    repositoryCacheName(item.repository, item.revision)
+  );
+  fs.mkdirSync(cached, { recursive: true });
+  fs.writeFileSync(
+    path.join(cached, "go.mod"),
+    "module example.invalid/compact\n"
+  );
+  fs.writeFileSync(
+    path.join(cached, "main_test.go"),
+    "package compact\n"
+  );
+
+  const report = await runCorpus(corpus, {
+    cacheRoot,
+    fetch: false,
+    repoIds: [item.id]
+  });
+
+  assert.equal(report.results[0].analysis_error, null);
+  assert.deepEqual(report.results[0].predictions.test, []);
+  assert.equal(report.analyzer.source, "source-tree");
+});
+
 test("artifact-bound development evaluation loads the shipped runtime path", () => {
   const root = makeFixture({}, "kanon-development-artifact-");
   const artifactRoot = path.join(root, "artifact-root");

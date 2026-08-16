@@ -609,11 +609,8 @@ function parseStatus(
     }
     if (indexStatus === "R" || indexStatus === "C") {
       index += 1;
-      const originalPath = stripRepositoryPrefix(
-        entries[index]?.replaceAll("\\", "/") || "",
-        repositoryPrefix
-      );
-      if (originalPath === null || !isSafeRelativePath(originalPath)) {
+      const originalPath = entries[index]?.replaceAll("\\", "/") || "";
+      if (!isSafeRelativePath(originalPath)) {
         complete = false;
       }
     }
