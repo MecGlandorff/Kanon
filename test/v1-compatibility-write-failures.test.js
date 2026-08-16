@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -470,6 +471,115 @@ test("failed refresh restores published artifacts and evidence capacity", async 
   );
 });
 
+test("refresh bounds evidence reads before retention counting", async () => {
+  const config = structuredClone(DEFAULT_CONFIG);
+  config.persistence.max_evidence_bytes = 1_024;
+  const root = makeFixture({
+    "README.md": "# Bounded evidence read\n",
+    ".kanon/config.json": `${JSON.stringify(config)}\n`,
+    ".kanon/EVIDENCE.jsonl": ""
+  });
+  const evidencePath = path.join(root, ".kanon", "EVIDENCE.jsonl");
+  const oversized = 64 * 1024 * 1024 + 1;
+  fs.truncateSync(evidencePath, oversized);
+
+  const result = await spawnWrite(
+    ["refresh", "--root", root],
+    ["--max-old-space-size=32"]
+  );
+
+  assert.equal(result.status, 1, result.stderr || result.stdout);
+  assert.equal(result.signal, null);
+  assert.match(
+    result.stderr,
+    /Evidence retention changed before refresh publication/
+  );
+  assert.doesNotMatch(result.stderr, /heap out of memory|allocation failed/i);
+  assert.equal(fs.statSync(evidencePath).size, oversized);
+  assert.equal(fs.existsSync(`${evidencePath}.tmp`), false);
+});
+
+test("refresh excludes live reservations and recovers killed or stale owners", async (t) => {
+  const root = makeFixture({
+    "README.md": "# Recover evidence reservation\n",
+    "package.json": JSON.stringify({ name: "reservation-recovery" })
+  });
+  const reservationPath = path.join(
+    root,
+    ".kanon",
+    "EVIDENCE.jsonl.tmp"
+  );
+  fs.mkdirSync(path.dirname(reservationPath));
+  const owner = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 60_000)"],
+    { stdio: "ignore", windowsHide: true }
+  );
+  await once(owner, "spawn");
+  t.after(() => {
+    if (owner.exitCode === null && owner.signalCode === null) owner.kill();
+  });
+  fs.writeFileSync(reservationPath, `${owner.pid}\n`);
+
+  const blocked = await spawnWrite(["refresh", "--root", root]);
+  assert.equal(blocked.status, 1, blocked.stderr || blocked.stdout);
+  assert.equal(blocked.signal, null);
+  assert.match(blocked.stderr, /EEXIST|file already exists/i);
+  assert.equal(
+    fs.readFileSync(reservationPath, "utf8"),
+    `${owner.pid}\n`
+  );
+
+  const exited = once(owner, "close");
+  assert.equal(owner.kill(), true);
+  await exited;
+  const recovered = await spawnWrite(["refresh", "--root", root]);
+  assert.equal(recovered.status, 0, recovered.stderr || recovered.stdout);
+  assert.equal(fs.existsSync(reservationPath), false);
+
+  fs.writeFileSync(reservationPath, "");
+  const staleTime = new Date(Date.now() - 6_000);
+  fs.utimesSync(reservationPath, staleTime, staleTime);
+  const legacy = await spawnWrite(["refresh", "--root", root]);
+  assert.equal(legacy.status, 0, legacy.stderr || legacy.stdout);
+  assert.equal(fs.existsSync(reservationPath), false);
+});
+
+test("refresh reports evidence reservation cleanup failures", async () => {
+  const root = makeFixture({
+    "README.md": "# Reservation cleanup\n",
+    "package.json": JSON.stringify({ name: "reservation-cleanup" })
+  });
+  const reservationPath = path.join(
+    root,
+    ".kanon",
+    "EVIDENCE.jsonl.tmp"
+  );
+  const originalUnlink = fs.unlinkSync;
+  let injected = false;
+  fs.unlinkSync = (target) => {
+    if (!injected && target === reservationPath) {
+      injected = true;
+      throw Object.assign(new Error("injected reservation cleanup failure"), {
+        code: "EIO"
+      });
+    }
+    return originalUnlink(target);
+  };
+  try {
+    await assert.rejects(
+      () => captureCli(runWriteCli, ["refresh", "--root", root]),
+      /injected reservation cleanup failure/
+    );
+    assert.equal(fs.existsSync(reservationPath), true);
+  } finally {
+    fs.unlinkSync = originalUnlink;
+    if (fs.existsSync(reservationPath)) originalUnlink(reservationPath);
+  }
+  assert.equal(injected, true);
+  assert.equal(inspectPreviousState(root).valid, true);
+});
+
 function configWithInputLimits(inputLimits) {
   return {
     ...DEFAULT_CONFIG,
@@ -480,9 +590,9 @@ function configWithInputLimits(inputLimits) {
   };
 }
 
-function spawnWrite(args) {
+function spawnWrite(args, nodeArgs = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [writeBin, ...args], {
+    const child = spawn(process.execPath, [...nodeArgs, writeBin, ...args], {
       cwd: repoRoot,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],

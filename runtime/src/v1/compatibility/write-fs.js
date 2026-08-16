@@ -7,6 +7,7 @@ import {
   resolveRepositoryPath
 } from "#kanon-repository-read";
 const APPEND_WAIT = new Int32Array(new SharedArrayBuffer(4));
+const RETENTION_CHANGED = "Evidence retention changed before refresh publication.";
 
 /**
  * @typedef {{ok: true, status: "ok", root: string, path: string, relativePath: string, stat: fs.Stats}} ContainedPathSuccess
@@ -62,13 +63,9 @@ export function atomicWriteContained(root, relativePath, contents) {
     }
     return;
   }
-  const parentRelative = path.posix.dirname(
-    relativePath.replaceAll("\\", "/")
-  );
+  const parentRelative = path.posix.dirname(relativePath.replaceAll("\\", "/"));
   const tempName = `.kanon.${process.pid}.${crypto.randomUUID()}.tmp`;
-  const tempRelative = parentRelative === "."
-    ? tempName
-    : `${parentRelative}/${tempName}`;
+  const tempRelative = parentRelative === "." ? tempName : `${parentRelative}/${tempName}`;
   const temp = resolveContainedPath(root, tempRelative, { type: "file" });
   if (temp.ok) {
     throw new Error(`${tempRelative}: temporary target already exists.`);
@@ -82,14 +79,9 @@ export function atomicWriteContained(root, relativePath, contents) {
   const noFollow = Number(fs.constants.O_NOFOLLOW) || 0;
   let fd;
   try {
-    fd = fs.openSync(
-      temp.path,
-      fs.constants.O_CREAT |
-        fs.constants.O_EXCL |
-        fs.constants.O_WRONLY |
-        noFollow,
-      0o600
-    );
+    fd = fs.openSync(temp.path,
+      fs.constants.O_CREAT | fs.constants.O_EXCL |
+        fs.constants.O_WRONLY | noFollow, 0o600);
     fs.writeFileSync(fd, contents, "utf8");
     fs.fsyncSync(fd);
     fs.closeSync(fd);
@@ -97,9 +89,7 @@ export function atomicWriteContained(root, relativePath, contents) {
     prepareDestination(root, relativePath);
     fs.renameSync(temp.path, destination.path);
   } finally {
-    if (fd !== undefined) {
-      fs.closeSync(fd);
-    }
+    if (fd !== undefined) fs.closeSync(fd);
     try {
       fs.unlinkSync(temp.path);
     } catch {
@@ -111,55 +101,44 @@ export function atomicWriteContained(root, relativePath, contents) {
 /** @param {string} root @param {string} relativePath @param {string} contents
  * @param {{maximumBytes: number, maximumRecords: number, publish: () => void}} [transaction] */
 export function appendContained(root, relativePath, contents, transaction) {
-  let reservation;
-  let reservationFd;
-  if (transaction) {
-    const deadline = Date.now() + 5_000;
-    for (;;) {
-      reservation = prepareDestination(root, `${relativePath}.tmp`);
-      try {
-        reservationFd = fs.openSync(
-          reservation.path,
-          fs.constants.O_CREAT |
-            fs.constants.O_EXCL |
-            fs.constants.O_WRONLY |
-            (Number(fs.constants.O_NOFOLLOW) || 0),
-          0o600
-        );
-        break;
-      } catch (error) {
-        if (errorCode(error) !== "EEXIST" || Date.now() >= deadline) {
-          throw error;
-        }
-        Atomics.wait(APPEND_WAIT, 0, 0, 10);
-      }
-    }
-  }
+  const reservationRelative = `${relativePath}.tmp`;
   const destination = prepareDestination(root, relativePath);
   const noFollow = Number(fs.constants.O_NOFOLLOW) || 0;
+  let reservation;
+  let reservationFd;
   let fd;
   let originalSize;
   try {
-    fd = fs.openSync(
-      destination.path,
-      fs.constants.O_APPEND |
-        fs.constants.O_CREAT |
-        (transaction ? fs.constants.O_RDWR : fs.constants.O_WRONLY) |
-        noFollow,
-      0o600
-    );
+    if (transaction) {
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        reservation = prepareDestination(root, reservationRelative);
+        try {
+          reservationFd = fs.openSync(reservation.path,
+            fs.constants.O_CREAT | fs.constants.O_EXCL |
+              fs.constants.O_WRONLY | noFollow, 0o600);
+          fs.writeFileSync(reservationFd, `${process.pid}\n`, "utf8");
+          break;
+        } catch (error) {
+          if (reservationFd !== undefined) {
+            fs.closeSync(reservationFd);
+            reservationFd = undefined;
+            fs.unlinkSync(reservation.path);
+          }
+          if (errorCode(error) !== "EEXIST") throw error;
+          if (removeStaleReservation(root, reservationRelative)) continue;
+          if (Date.now() >= deadline) throw error;
+          Atomics.wait(APPEND_WAIT, 0, 0, 10);
+        }
+      }
+    }
+    fd = fs.openSync(destination.path,
+      fs.constants.O_APPEND | fs.constants.O_CREAT |
+        (transaction ? fs.constants.O_RDWR : fs.constants.O_WRONLY) | noFollow, 0o600);
     const stat = fs.fstatSync(fd);
     if (
       !stat.isFile() ||
-      (
-        destination.ok &&
-        destination.stat.dev !== undefined &&
-        destination.stat.ino !== undefined &&
-        (
-          destination.stat.dev !== stat.dev ||
-          destination.stat.ino !== stat.ino
-        )
-      )
+      (destination.ok && fileIdentityChanged(destination.stat, stat))
     ) {
       throw new Error(
         `${relativePath}: append target changed after containment validation.`
@@ -167,23 +146,16 @@ export function appendContained(root, relativePath, contents, transaction) {
     }
     originalSize = stat.size;
     if (transaction) {
+      const payloadBytes = Buffer.byteLength(contents);
+      if (stat.size > transaction.maximumBytes - payloadBytes)
+        throw new Error(RETENTION_CHANGED);
       const existing = stat.size
         ? fs.readFileSync(fd, "utf8")
         : "";
-      const currentRecords = existing
-        .split(/\r?\n/)
-        .filter(Boolean).length;
-      const incomingRecords = contents
-        .split(/\r?\n/)
-        .filter(Boolean).length;
-      if (
-        stat.size + Buffer.byteLength(contents) > transaction.maximumBytes ||
-        currentRecords + incomingRecords > transaction.maximumRecords
-      ) {
-        throw new Error(
-          "Evidence retention changed before refresh publication."
-        );
-      }
+      const currentRecords = existing.split(/\r?\n/).filter(Boolean).length;
+      const incomingRecords = contents.split(/\r?\n/).filter(Boolean).length;
+      if (currentRecords + incomingRecords > transaction.maximumRecords)
+        throw new Error(RETENTION_CHANGED);
     }
     fs.writeFileSync(fd, contents, "utf8");
     fs.fsyncSync(fd);
@@ -195,16 +167,36 @@ export function appendContained(root, relativePath, contents, transaction) {
     }
     throw error;
   } finally {
-    if (fd !== undefined) {
-      fs.closeSync(fd);
-    }
+    if (fd !== undefined) fs.closeSync(fd);
     if (reservationFd !== undefined && reservation) {
       fs.closeSync(reservationFd);
-      try {
-        fs.unlinkSync(reservation.path);
-      } catch {}
+      fs.unlinkSync(reservation.path);
     }
   }
+}
+
+/** @param {string} root @param {string} relativePath */
+function removeStaleReservation(root, relativePath) {
+  const current = resolveContainedPath(root, relativePath, { type: "file" });
+  if (!current.ok) return true;
+  const read = readContainedText(root, relativePath, 32);
+  const owner = read.ok && /^[1-9]\d{0,9}\n?$/.test(read.text)
+    ? Number(read.text)
+    : 0;
+  const validOwner = owner > 0 && owner <= 2_147_483_647;
+  if (validOwner) {
+    try {
+      process.kill(owner, 0);
+      return false;
+    } catch (error) {
+      if (errorCode(error) !== "ESRCH") return false;
+    }
+  } else if (Date.now() - current.stat.mtimeMs < 5_000) return false;
+  const latest = resolveContainedPath(root, relativePath, { type: "file" });
+  if (!latest.ok) return true;
+  if (fileIdentityChanged(current.stat, latest.stat)) return false;
+  fs.unlinkSync(latest.path);
+  return true;
 }
 
 /** @param {string} root @param {string} relativePath @param {number} maximumBytes
