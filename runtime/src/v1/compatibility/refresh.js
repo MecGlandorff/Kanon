@@ -457,9 +457,10 @@ function availableEvidenceRetention(root, limits) {
   if (!existing.ok) {
     return { maxRecords: 0, maxBytes: 0 };
   }
-  const currentRecords = existing.text
-    ? existing.text.split(/\r?\n/).filter(Boolean).length
-    : 0;
+  const currentRecords = boundedRecordCount(
+    existing.text,
+    limits.max_evidence_records
+  );
   return {
     maxRecords: Math.max(
       0,
@@ -477,6 +478,19 @@ function configuredEvidenceRetention(limits) {
     maxRecords: limits.max_evidence_records,
     maxBytes: limits.max_evidence_bytes
   };
+}
+/** @param {string} text @param {number} maximum */
+function boundedRecordCount(text, maximum) {
+  let count = 0;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) !== 10) continue;
+    const end = index > start && text.charCodeAt(index - 1) === 13
+      ? index - 1 : index;
+    if (end > start && ++count > maximum) return count;
+    start = index + 1;
+  }
+  return start < text.length ? count + 1 : count;
 }
 /** @param {Map<string, string>} texts @returns {Record<string, unknown> | null} */
 function readPackageEvidence(texts) {

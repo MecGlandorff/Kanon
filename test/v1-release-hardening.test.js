@@ -232,7 +232,13 @@ test("package metadata and expected inventory are exact and dependency-free", ()
     }
   );
   assert.equal(built.status, 0, built.stderr || built.stdout);
-  assert.equal(listFiles(output).length, 87);
+  const stagedFiles = listFiles(output);
+  assert.equal(stagedFiles.length, 87);
+  assert.equal(
+    stagedFiles.reduce((bytes, relative) =>
+      bytes + fs.statSync(path.join(output, relative)).size, 0),
+    585_851
+  );
   assert.equal(
     fs.readFileSync(path.join(output, "SECURITY.md"), "utf8"),
     read("SECURITY.md")

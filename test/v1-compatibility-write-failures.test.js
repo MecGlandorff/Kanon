@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,6 +8,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { runWriteCli } from "../src/v1/compatibility/cli.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
+import { stableRuntimeArtifacts } from "../scripts/lib/artifact-files.js";
 import {
   inspectPreviousState,
   readKanonTodos
@@ -366,6 +368,10 @@ test("concurrent refresh publishes only retained evidence references", async () 
     ".kanon/config.json": `${JSON.stringify(config)}\n`
   });
   fs.mkdirSync(path.join(root, ".kanon", "snapshots"));
+  const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
+  fs.writeFileSync(reservationPath, "stale reservation\n");
+  const staleTime = new Date(Date.now() - 31_000);
+  fs.utimesSync(reservationPath, staleTime, staleTime);
   const results = await Promise.all(
     Array.from({ length: 8 }, () =>
       spawnWrite(["refresh", "--root", root])
@@ -405,7 +411,7 @@ test("concurrent refresh publishes only retained evidence references", async () 
   }
   assert.equal(
     fs.readdirSync(path.join(root, ".kanon"))
-      .some((name) => name.endsWith(".tmp")),
+      .some((name) => name.startsWith("EVIDENCE.jsonl.tmp")),
     false
   );
 });
@@ -497,9 +503,28 @@ test("refresh bounds evidence reads before retention counting", async () => {
   assert.doesNotMatch(result.stderr, /heap out of memory|allocation failed/i);
   assert.equal(fs.statSync(evidencePath).size, oversized);
   assert.equal(fs.existsSync(`${evidencePath}.tmp`), false);
+
+  const denseConfig = structuredClone(DEFAULT_CONFIG);
+  denseConfig.persistence.max_evidence_bytes = 32 * 1024 * 1024;
+  denseConfig.persistence.max_evidence_records = 1;
+  const denseRoot = makeFixture({
+    "README.md": "# Bounded evidence count\n",
+    ".kanon/config.json": `${JSON.stringify(denseConfig)}\n`,
+    ".kanon/EVIDENCE.jsonl": ""
+  });
+  const denseEvidence = path.join(denseRoot, ".kanon", "EVIDENCE.jsonl");
+  fs.writeFileSync(denseEvidence, Buffer.alloc(32 * 1024 * 1024, "x\n"));
+  const dense = await spawnWrite(
+    ["refresh", "--root", denseRoot],
+    ["--max-old-space-size=96"]
+  );
+  assert.equal(dense.status, 1, dense.stderr || dense.stdout);
+  assert.equal(dense.signal, null);
+  assert.match(dense.stderr, /Evidence retention changed before refresh publication/);
+  assert.doesNotMatch(dense.stderr, /heap out of memory|allocation failed/i);
 });
 
-test("refresh excludes live reservations and recovers killed or stale owners", async (t) => {
+test("refresh rejects live reservations and recovers preseeded or stale identities", async (t) => {
   const root = makeFixture({
     "README.md": "# Recover evidence reservation\n",
     "package.json": JSON.stringify({ name: "reservation-recovery" })
@@ -510,6 +535,11 @@ test("refresh excludes live reservations and recovers killed or stale owners", a
     "EVIDENCE.jsonl.tmp"
   );
   fs.mkdirSync(path.dirname(reservationPath));
+  fs.writeFileSync(reservationPath, "1\n");
+  const preseeded = await spawnWrite(["refresh", "--root", root]);
+  assert.equal(preseeded.status, 0, preseeded.stderr || preseeded.stdout);
+  assert.equal(fs.existsSync(reservationPath), false);
+
   const owner = spawn(
     process.execPath,
     ["-e", "setInterval(() => {}, 60_000)"],
@@ -519,7 +549,8 @@ test("refresh excludes live reservations and recovers killed or stale owners", a
   t.after(() => {
     if (owner.exitCode === null && owner.signalCode === null) owner.kill();
   });
-  fs.writeFileSync(reservationPath, `${owner.pid}\n`);
+  const ownerToken = crypto.randomUUID();
+  fs.writeFileSync(reservationPath, `${owner.pid} ${ownerToken}\n`);
 
   const blocked = await spawnWrite(["refresh", "--root", root]);
   assert.equal(blocked.status, 1, blocked.stderr || blocked.stdout);
@@ -527,7 +558,7 @@ test("refresh excludes live reservations and recovers killed or stale owners", a
   assert.match(blocked.stderr, /EEXIST|file already exists/i);
   assert.equal(
     fs.readFileSync(reservationPath, "utf8"),
-    `${owner.pid}\n`
+    `${owner.pid} ${ownerToken}\n`
   );
 
   const exited = once(owner, "close");
@@ -537,12 +568,60 @@ test("refresh excludes live reservations and recovers killed or stale owners", a
   assert.equal(recovered.status, 0, recovered.stderr || recovered.stdout);
   assert.equal(fs.existsSync(reservationPath), false);
 
-  fs.writeFileSync(reservationPath, "");
-  const staleTime = new Date(Date.now() - 6_000);
+  fs.writeFileSync(
+    reservationPath,
+    `${process.pid} ${crypto.randomUUID()}\n`
+  );
+  const staleTime = new Date(Date.now() - 31_000);
   fs.utimesSync(reservationPath, staleTime, staleTime);
-  const legacy = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(legacy.status, 0, legacy.stderr || legacy.stdout);
+  const reused = await spawnWrite(["refresh", "--root", root]);
+  assert.equal(reused.status, 0, reused.stderr || reused.stdout);
   assert.equal(fs.existsSync(reservationPath), false);
+});
+
+test("stale takeover preserves a concurrently acquired reservation", async () => {
+  const root = makeFixture({
+    "README.md": "# Reservation takeover\n",
+    "package.json": JSON.stringify({ name: "reservation-takeover" })
+  });
+  const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
+  const displacedPath = `${reservationPath}.displaced`;
+  fs.mkdirSync(path.dirname(reservationPath));
+  fs.writeFileSync(reservationPath, "stale reservation\n");
+  const staleTime = new Date(Date.now() - 31_000);
+  fs.utimesSync(reservationPath, staleTime, staleTime);
+  const freshMarker = `${process.pid} ${crypto.randomUUID()}\n`;
+  const originalRename = fs.renameSync;
+  let injected = false;
+  fs.renameSync = (source, destination) => {
+    if (
+      !injected &&
+      source === reservationPath &&
+      String(destination).endsWith(".stale")
+    ) {
+      injected = true;
+      originalRename(source, displacedPath);
+      fs.writeFileSync(reservationPath, freshMarker);
+    }
+    return originalRename(source, destination);
+  };
+  try {
+    await assert.rejects(
+      () => captureCli(runWriteCli, ["refresh", "--root", root]),
+      /EEXIST|file already exists/i
+    );
+  } finally {
+    fs.renameSync = originalRename;
+  }
+  assert.equal(injected, true);
+  assert.equal(fs.readFileSync(reservationPath, "utf8"), freshMarker);
+  assert.equal(
+    fs.readdirSync(path.dirname(reservationPath))
+      .some((name) => name.endsWith(".owner") || name.endsWith(".stale")),
+    false
+  );
+  fs.unlinkSync(reservationPath);
+  fs.unlinkSync(displacedPath);
 });
 
 test("refresh reports evidence reservation cleanup failures", async () => {
@@ -578,6 +657,26 @@ test("refresh reports evidence reservation cleanup failures", async () => {
   }
   assert.equal(injected, true);
   assert.equal(inspectPreviousState(root).valid, true);
+});
+
+test("compatibility persistence mirrors and release metrics stay exact", () => {
+  const mappings = stableRuntimeArtifacts(repoRoot);
+  let lines = 0;
+  let bytes = 0;
+  for (const [sourceRelative, targetRelative] of mappings) {
+    const source = fs.readFileSync(path.join(repoRoot, sourceRelative));
+    assert.deepEqual(
+      fs.readFileSync(path.join(repoRoot, targetRelative)),
+      source,
+      `${targetRelative} must mirror ${sourceRelative}`
+    );
+    lines += source.toString("utf8").split("\n").length - 1;
+    bytes += source.length;
+  }
+  assert.deepEqual(
+    { files: mappings.length, lines, bytes },
+    { files: 39, lines: 17_684, bytes: 496_112 }
+  );
 });
 
 function configWithInputLimits(inputLimits) {
