@@ -494,7 +494,7 @@ function runInstrumentedEntry(
     [
       "--no-warnings",
       "--experimental-loader",
-      instrumentation.loader,
+      pathToFileURL(instrumentation.loader).href,
       entry,
       ...args
     ],
