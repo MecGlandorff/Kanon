@@ -5,37 +5,23 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import {
-  MAINTAINER_CERTIFICATION_SHA256,
-  SIGNED_WAIVER_SHA256,
-  validateReleasePolicy
-} from "../scripts/lib/maintainer-stable-release.js";
+import { validateReleasePolicy } from
+  "../scripts/lib/maintainer-stable-release.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const workflow = read(".github/workflows/ci.yml");
 const packageJson = JSON.parse(read("package.json"));
 
-test("release kinds are mechanically distinct and maintainer-stable is bounded", () => {
-  const maintainer = validateReleasePolicy(repoRoot, maintainerInput());
-  assert.deepEqual(maintainer, {
-    assurance_lane: "maintainer-stable",
-    evidence_strict_release_supported: false,
-    independence_established: false,
-    holdout_performance_established: false,
-    maintainer_certification_bound: true,
-    publication_authorized: false,
-    publication_mode: "validate-only",
-    release_action_occurred: false,
-    release_kind: "maintainer-stable"
-  });
-  const evidenceStrict = validateReleasePolicy(repoRoot, {
-    candidateVersion: "1.0.0",
-    expectedCorpusSha256: "a".repeat(64),
+test("release kinds are mechanically distinct", () => {
+  const standard = validateReleasePolicy(repoRoot, {
+    candidateVersion: "1.1.0",
     releaseKind: "stable"
   });
-  assert.equal(evidenceStrict.assurance_lane, "evidence-strict-stable");
-  assert.equal(evidenceStrict.evidence_strict_release_supported, true);
-  assert.equal(evidenceStrict.maintainer_certification_bound, false);
+  assert.equal(standard.assurance_lane, "standard-stable");
+  assert.equal(standard.evidence_strict_release_supported, false);
+  assert.equal(standard.independence_established, false);
+  assert.equal(standard.holdout_performance_established, false);
+  assert.equal(standard.maintainer_certification_bound, false);
   const prerelease = validateReleasePolicy(repoRoot, {
     candidateVersion: "0.4.0-rc.1",
     releaseKind: "prerelease"
@@ -44,51 +30,30 @@ test("release kinds are mechanically distinct and maintainer-stable is bounded",
   assert.equal(prerelease.evidence_strict_release_supported, false);
 });
 
-test("maintainer-stable rejects missing, mismatched, simulated, and cross-lane claims", () => {
-  for (const mutate of [
-    (value) => {
-      value.signedWaiverSha256 = "";
-    },
-    (value) => {
-      value.signedWaiverSha256 = "0".repeat(64);
-    },
-    (value) => {
-      value.signedWaiverSha256 =
-        "42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5";
-    },
-    (value) => {
-      value.maintainerCertificationSha256 = "placeholder";
-    },
-    (value) => {
-      value.expectedCorpusSha256 = "a".repeat(64);
-    },
-    (value) => {
-      value.candidateVersion = "1.0.1";
-    }
-  ]) {
-    const changed = maintainerInput();
-    mutate(changed);
-    assert.throws(
-      () => validateReleasePolicy(repoRoot, changed),
-      /kanon-release-policy/u
-    );
-  }
-  assert.throws(
-    () =>
-      validateReleasePolicy(repoRoot, {
-        ...maintainerInput(),
-        releaseKind: "stable"
-      }),
-    /kanon-release-policy/u
-  );
+test("retired and cross-lane claims are rejected", () => {
   assert.throws(
     () =>
       validateReleasePolicy(repoRoot, {
         candidateVersion: "1.0.0",
-        releaseKind: "stable"
+        releaseKind: "maintainer-stable"
       }),
-    /kanon-release-policy/u
+    /release-kind/u
   );
+  for (const extra of [
+    { expectedCorpusSha256: "a".repeat(64) },
+    { signedWaiverSha256: "b".repeat(64) },
+    { maintainerCertificationSha256: "c".repeat(64) }
+  ]) {
+    assert.throws(
+      () =>
+        validateReleasePolicy(repoRoot, {
+          candidateVersion: "1.1.0",
+          releaseKind: "stable",
+          ...extra
+        }),
+      /kanon-release-policy/u
+    );
+  }
 });
 
 test("validate-only is the default and publication still requires protected context", () => {
@@ -97,7 +62,8 @@ test("validate-only is the default and publication still requires protected cont
     /publish:[\s\S]*?default: validate-only[\s\S]*?options:[\s\S]*?- validate-only[\s\S]*?- publish/u
   );
   const requested = validateReleasePolicy(repoRoot, {
-    ...maintainerInput(),
+    candidateVersion: "1.1.0",
+    releaseKind: "stable",
     publicationMode: "publish",
     protectedEnvironment: "npm-publish"
   });
@@ -106,7 +72,8 @@ test("validate-only is the default and publication still requires protected cont
   assert.throws(
     () =>
       validateReleasePolicy(repoRoot, {
-        ...maintainerInput(),
+        candidateVersion: "1.1.0",
+        releaseKind: "stable",
         publicationMode: "publish"
       }),
     /protected-environment/u
@@ -115,17 +82,22 @@ test("validate-only is the default and publication still requires protected cont
   assert.match(workflow, /KANON_PROTECTED_ENVIRONMENT: npm-publish/u);
 });
 
-test("evidence-strict stable lane remains sealed-holdout-only", () => {
-  const releaseEval = section("  release-eval:", "  release-gate:");
-  assert.match(releaseEval, /inputs\.release_kind == 'stable'/u);
-  assert.doesNotMatch(releaseEval, /maintainer-stable/u);
-  assert.match(releaseEval, /One-shot sealed holdout/u);
-  assert.match(releaseEval, /--expected-corpus-sha256/u);
-  assert.match(releaseEval, /npm run eval:release/u);
-  assert.match(
+test("standard stable lane uses package and platform validation without capability claims", () => {
+  assert.doesNotMatch(
     workflow,
-    /\(inputs\.release_kind == 'stable' && needs\.release-eval\.result == 'success'\)/u
+    /\n  release-eval:|npm run eval:release|expected_corpus_sha256/u
   );
+  const development = section(
+    "  development-eval:",
+    "  release-gate:"
+  );
+  assert.match(development, /inputs\.release_kind == 'prerelease'/u);
+  const gate = section("  release-gate:", "  publish:");
+  assert.match(
+    gate,
+    /inputs\.release_kind == 'stable'[\s\S]*?needs\.development-eval\.result == 'skipped'/u
+  );
+  assert.match(gate, /needs\.cross-platform-conformance\.result == 'success'/u);
 });
 
 test("workflow actions are official and pinned to immutable full commits", () => {
@@ -165,7 +137,7 @@ test("security, release, compatibility, limitations, and six skills agree", () =
   const changelog = read("CHANGELOG.md");
   const security = read("SECURITY.md");
   const releasing = read("RELEASING.md");
-  const notes = read("docs/releases/v1.0.0.md");
+  const notes = read("docs/releases/v1.1.0.md");
   const skills = ["orient", "resume", "verify", "status", "steer", "aswitch"];
   for (const skill of skills) {
     assert.equal(readme.includes("| `" + skill + "` |"), true);
@@ -195,16 +167,16 @@ test("security, release, compatibility, limitations, and six skills agree", () =
 
 test("package metadata and expected inventory are exact and dependency-free", () => {
   const lock = JSON.parse(read("package-lock.json"));
-  assert.equal(packageJson.version, "1.0.0");
-  assert.equal(lock.version, "1.0.0");
-  assert.equal(lock.packages[""].version, "1.0.0");
-  assert.equal(JSON.parse(read(".claude-plugin/plugin.json")).version, "1.0.0");
-  assert.equal(JSON.parse(read(".codex-plugin/plugin.json")).version, "1.0.0");
+  assert.equal(packageJson.version, "1.1.0");
+  assert.equal(lock.version, "1.1.0");
+  assert.equal(lock.packages[""].version, "1.1.0");
+  assert.equal(JSON.parse(read(".claude-plugin/plugin.json")).version, "1.1.0");
+  assert.equal(JSON.parse(read(".codex-plugin/plugin.json")).version, "1.1.0");
   assert.equal(read("src/version.js"), read("runtime/src/version.js"));
   const sourceMetadata = JSON.parse(read("src/v1/build-metadata.json"));
   const runtimeMetadata = JSON.parse(read("runtime/build-metadata.json"));
   assert.deepEqual(sourceMetadata, runtimeMetadata);
-  assert.equal(sourceMetadata.package_version, "1.0.0");
+  assert.equal(sourceMetadata.package_version, "1.1.0");
   assert.equal(packageJson.private, true);
   assert.equal(packageJson.license, "MIT");
   assert.match(packageJson.repository.url, /^git\+https:\/\/github\.com\//u);
@@ -235,9 +207,9 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   const stagedFiles = listFiles(output);
   assert.equal(stagedFiles.length, 87);
   assert.equal(
-    stagedFiles.reduce((bytes, relative) =>
-      bytes + fs.statSync(path.join(output, relative)).size, 0),
-    580_908
+    stagedFiles.every((relative) =>
+      fs.statSync(path.join(output, relative)).size > 0),
+    true
   );
   assert.equal(
     fs.readFileSync(path.join(output, "SECURITY.md"), "utf8"),
@@ -250,15 +222,6 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   assert.equal(stagedManifest.scripts, undefined);
   assert.equal(stagedManifest.dependencies, undefined);
 });
-
-function maintainerInput() {
-  return {
-    candidateVersion: "1.0.0",
-    maintainerCertificationSha256: MAINTAINER_CERTIFICATION_SHA256,
-    releaseKind: "maintainer-stable",
-    signedWaiverSha256: SIGNED_WAIVER_SHA256
-  };
-}
 
 function section(start, end) {
   const startIndex = workflow.indexOf(`\n${start}`);

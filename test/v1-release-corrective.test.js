@@ -24,8 +24,6 @@ test("every history-dependent workflow job checks out full history", () => {
   const historyDependentEntrypoints = [
     /npm run validate/u,
     /scripts\/check-candidate\.js/u,
-    /scripts\/check-maintainer-evidence\.js/u,
-    /npm run eval:release/u,
     /scripts\/release-bind\.js/u
   ];
   const affected = Array.from(jobs)
@@ -35,10 +33,8 @@ test("every history-dependent workflow job checks out full history", () => {
     .map(([name]) => name)
     .sort();
   assert.deepEqual(affected, [
-    "maintainer-stable-evidence",
     "pack-candidate",
     "publish",
-    "release-eval",
     "release-gate",
     "test"
   ]);
@@ -84,7 +80,7 @@ test("CRLF-style wrapper fixtures normalize deterministically to canonical LF", 
   }
 });
 
-test("maintainer-stable validates one exact frozen failed development binding", () => {
+test("retired maintainer evidence remains an exact historical binding", () => {
   const binding = validateMaintainerStableEvidence(repoRoot);
   assert.equal(
     binding.frozen_development.sha256,
@@ -114,23 +110,21 @@ test("maintainer-stable validates one exact frozen failed development binding", 
   );
 });
 
-test("maintainer-stable routes around execution while stable stays strict", () => {
-  const development = workflowSection("development-eval", "maintainer-stable-evidence");
-  const maintainer = workflowSection("maintainer-stable-evidence", "release-eval");
-  const release = workflowSection("release-eval", "release-gate");
+test("standard stable routes around capability evaluation", () => {
+  const development = workflowSection("development-eval", "release-gate");
   const gate = workflowSection("release-gate", "publish");
-  assert.match(development, /inputs\.release_kind != 'maintainer-stable'/u);
+  assert.match(development, /inputs\.release_kind == 'prerelease'/u);
   assert.match(development, /npm run eval:dev/u);
-  assert.match(development, /--require-threshold-pass/u);
-  assert.doesNotMatch(maintainer, /eval:dev|eval:corpus|eval:release/u);
-  assert.match(maintainer, /check-maintainer-evidence\.js/u);
-  assert.match(maintainer, /without corpus execution/u);
-  assert.match(release, /inputs\.release_kind == 'stable'/u);
-  assert.match(release, /npm run eval:release/u);
-  assert.match(release, /--expected-corpus-sha256/u);
-  assert.match(gate, /needs\.maintainer-stable-evidence\.result == 'success'/u);
-  assert.match(gate, /Download frozen maintainer evidence binding/u);
-  assert.match(gate, /if: inputs\.release_kind != 'maintainer-stable'/u);
+  assert.doesNotMatch(development, /--require-threshold-pass/u);
+  assert.doesNotMatch(
+    workflow,
+    /\n  release-eval:|\n  maintainer-stable-evidence:|npm run eval:release/u
+  );
+  assert.match(
+    gate,
+    /inputs\.release_kind == 'stable'[\s\S]*?needs\.development-eval\.result == 'skipped'/u
+  );
+  assert.match(gate, /if: inputs\.release_kind == 'prerelease'/u);
 });
 
 test("validate-only cannot reach publication, tagging, release, merge, or registry mutation", () => {
@@ -180,7 +174,7 @@ test("PowerShell Node detection accepts only majors 20, 22, 24, and 25 on Unix",
       writeNodeProbe(path.join(trusted, "node"), `${major}\n`, 0, true);
       const run = runPowerShellDispatch(shell, fixture, trusted);
       assert.equal(run.status, 0, run.stderr || run.stdout);
-      assert.equal(run.stdout, "1.0.0\n");
+      assert.equal(run.stdout, "1.1.0\n");
     }
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });

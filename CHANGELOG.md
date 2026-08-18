@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.0
+
+### Simpler runtime
+
+- Remove the duplicated legacy runtime and historical generated evaluation
+  outputs from the active package path.
+- Keep the stable `orient`, `resume`, `verify`, `status`, `steer`, and
+  `aswitch` skills plus the v0.4 compatibility workflows.
+- Preserve the dependency-free package, explicit advisory behavior, bounded
+  repository evidence, and consent-gated writes.
+
+### Stable release
+
+- Validate every supported Node.js major on Linux, Windows, and macOS.
+- Build, attest, and reuse one exact tarball through installed-artifact
+  conformance, protected npm OIDC publication, tagging, and GitHub release.
+- Treat visible evaluations as development evidence only. This release does not
+  claim evidence-strict support, independence, blinded review, causal
+  improvement, generalization, official holdout performance, or independent
+  validation; accepted risks remain open.
+
 ## 1.0.0 — candidate
 
 Prepared locally but not published.

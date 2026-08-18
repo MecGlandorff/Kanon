@@ -6,9 +6,6 @@ import {
   validateFrozenSignedWaiver
 } from "../../eval/v1.0.0-candidate/lib/validator.js";
 import {
-  validateCorrectedCandidateTransitionAuthority
-} from "../../eval/v1.0.0-candidate-corrected/lib/validator.js";
-import {
   loadCanonicalJson,
   validateRiskLedger,
   WAIVER_RISK_IDS
@@ -17,10 +14,8 @@ import { runGit } from "../../src/git-runner.js";
 
 export const RELEASE_KINDS = Object.freeze([
   "prerelease",
-  "stable",
-  "maintainer-stable"
+  "stable"
 ]);
-export const MAINTAINER_STABLE_VERSION = "1.0.0";
 export const SIGNED_WAIVER_SHA256 =
   "9d0770ce609479eca5f7b27dcb92dad69a287913ed62a236afc4ed5ae499a2a6";
 export const MAINTAINER_CERTIFICATION_SHA256 =
@@ -45,10 +40,8 @@ const CERTIFICATION_RELATIVE =
   "eval/v1.0.0-maintainer-certification/" +
   "evidence-sha256-49b1ee409f32eabaa6558f794c1199f3d3595635d1252ab6600ace375ecd9de8/" +
   "certification.json";
-const HASH = /^[0-9a-f]{64}$/u;
-
 export function validateReleasePolicy(repoRoot, input) {
-  const root = path.resolve(repoRoot);
+  void repoRoot;
   const releaseKind = input.releaseKind || "";
   const candidateVersion = input.candidateVersion || "";
   const expectedCorpusSha256 = input.expectedCorpusSha256 || "";
@@ -87,7 +80,7 @@ export function validateReleasePolicy(repoRoot, input) {
 
   expect(!candidateVersion.includes("-"), "stable-semantic-version");
   if (releaseKind === "stable") {
-    expect(HASH.test(expectedCorpusSha256), "stable-holdout-commitment");
+    expect(expectedCorpusSha256 === "", "stable-no-holdout-claim");
     expect(
       signedWaiverSha256 === "" && maintainerCertificationSha256 === "",
       "stable-no-maintainer-waiver-claim"
@@ -95,64 +88,13 @@ export function validateReleasePolicy(repoRoot, input) {
     return conclusion(
       releaseKind,
       publicationMode,
-      "evidence-strict-stable",
-      true,
+      "standard-stable",
+      false,
       false
     );
   }
 
-  expect(candidateVersion === MAINTAINER_STABLE_VERSION, "maintainer-version");
-  expect(expectedCorpusSha256 === "", "maintainer-no-holdout-claim");
-  expect(
-    signedWaiverSha256 === SIGNED_WAIVER_SHA256,
-    "maintainer-waiver-commitment"
-  );
-  expect(
-    maintainerCertificationSha256 === MAINTAINER_CERTIFICATION_SHA256,
-    "maintainer-certification-commitment"
-  );
-  const authority = validateCorrectedCandidateTransitionAuthority(root);
-  const frozenEvidence = validateMaintainerStableEvidence(root);
-  expect(
-    authority.transition.boundaries.publication_authorized === false &&
-      authority.transition.boundaries.release_action_occurred === false &&
-      authority.transition.boundaries.evidence_strict_release_supported ===
-        false &&
-      authority.transition.boundaries.independence_established === false &&
-      authority.transition.boundaries.holdout_performance_established === false,
-    "maintainer-transition-boundaries"
-  );
-  expect(
-    frozenEvidence.signed_waiver_sha256 === SIGNED_WAIVER_SHA256 &&
-      frozenEvidence.accepted_risks_remain_open === true &&
-      frozenEvidence.failed_thresholds_called_passing === false &&
-      frozenEvidence.corpus_execution_occurred === false,
-    "maintainer-frozen-evidence"
-  );
-  const certificationPath = path.join(root, CERTIFICATION_RELATIVE);
-  const bytes = fs.readFileSync(certificationPath);
-  expect(
-    crypto.createHash("sha256").update(bytes).digest("hex") ===
-      MAINTAINER_CERTIFICATION_SHA256,
-    "maintainer-certification-file"
-  );
-  const certification = JSON.parse(bytes.toString("utf8"));
-  expect(
-    certification.result === "maintainer-certification-ready" &&
-      certification.boundaries.publication_authorized === false &&
-      certification.boundaries.release_action_occurred === false &&
-      certification.boundaries.evidence_strict_release_supported === false &&
-      certification.boundaries.independence_established === false &&
-      certification.boundaries.holdout_performance_established === false,
-    "maintainer-certification-boundaries"
-  );
-  return conclusion(
-    releaseKind,
-    publicationMode,
-    "maintainer-stable",
-    false,
-    true
-  );
+  throw new Error("kanon-release-policy:retired-release-kind");
 }
 
 export function validateMaintainerStableEvidence(repoRoot) {

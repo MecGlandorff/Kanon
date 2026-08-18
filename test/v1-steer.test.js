@@ -11,7 +11,7 @@ import { captureCli, makeFixture } from "./helpers.js";
 
 const NOW = Date.parse("2026-07-28T12:00:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
-const PACKAGE_VERSION = "1.0.0";
+const PACKAGE_VERSION = "1.1.0";
 
 test("steer state is one bounded non-authorizing deterministic loop", () => {
   const built = buildSteerState(request());

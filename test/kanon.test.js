@@ -1672,7 +1672,7 @@ test("compatibility todo preserves its successful result and markdown contract",
 test("CLI exposes the narrowed public surface and rejects removed modes", async () => {
   const root = makeFixture({ "README.md": "# Demo\n" });
   const version = await captureCli(runCli, ["--version"]);
-  assert.equal(version, "1.0.0\n");
+  assert.equal(version, "1.1.0\n");
 
   for (const argv of [
     ["improve", "--root", root],
@@ -1858,7 +1858,7 @@ test("shared dispatch survives plugin and repository paths with spaces", () => {
       timeout: 30_000
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.equal(run.stdout, "1.0.0\n");
+    assert.equal(run.stdout, "1.1.0\n");
   }
 });
 
@@ -1996,7 +1996,7 @@ test("generated skill artifact is synchronized and self-contained", () => {
       timeout: 30_000
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.equal(JSON.parse(run.stdout).version, "1.0.0");
+    assert.equal(JSON.parse(run.stdout).version, "1.1.0");
   }
   assert.deepEqual(
     readJson(path.join(repoRoot, "src/v1/build-metadata.json")),

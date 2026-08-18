@@ -17,7 +17,7 @@ import {
 
 const NOW = Date.parse("2026-07-28T19:30:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
-const PACKAGE_VERSION = "1.0.0";
+const PACKAGE_VERSION = "1.1.0";
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
