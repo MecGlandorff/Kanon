@@ -32,9 +32,10 @@ important-file projection and records only the two ranking stages that run.
 
 The visible 30-repository corpus is development and regression data. Its
 results are in-sample and are not presented as performance on unseen
-repositories. A release needs a fresh, frozen corpus under the process in
-[`eval/PROTOCOL.md`](eval/PROTOCOL.md). Historical development results and
-current limitations are published in [`eval/RESULTS.md`](eval/RESULTS.md).
+repositories. Any future public capability claim needs a fresh, frozen corpus
+under the process in [`eval/PROTOCOL.md`](eval/PROTOCOL.md). Historical
+development results and current limitations are published in
+[`eval/RESULTS.md`](eval/RESULTS.md).
 In v0.4, corpus scores cover important files plus run and test commands only.
 Purpose, entrypoint, drift, and narrowly scoped `ask` checks have regression
 tests but no claimed cross-repository capability estimate. Improvement
@@ -49,6 +50,12 @@ support, independence, blinded review, causal improvement, generalization,
 official holdout performance, or independent validation. The prospective
 protocol remains inactive, and the six-person simulation is simulated
 development evidence only.
+
+The v1.1.0 release uses the standard engineering-validation lane: the complete
+Node/OS test matrix, deterministic packaging, exact-tarball attestation, and
+installed-artifact conformance. It does not turn the historical development
+corpus into an evidence-strict, independence, improvement, or holdout claim;
+accepted risks remain open.
 
 ### Planned Codex ablation
 
@@ -180,11 +187,11 @@ Report vulnerabilities privately and review supported versions in
 reuse, and post-publication verification are specified in
 [`RELEASING.md`](RELEASING.md).
 
-The local v1.0.0 candidate is not a publication. GitHub environment protection,
+Release candidates are not publications. GitHub environment protection,
 repository permissions, artifact-attestation availability, immutable-release
-settings, npm trusted-publisher configuration, and registry policy remain
-Unknown until remotely verified. Native Linux and Windows conformance also
-remain Unknown until the validate-only remote matrix passes.
+settings, npm trusted-publisher configuration, registry policy, and native
+platform conformance remain Unknown until the applicable remote workflow
+passes.
 
 ## Development
 
@@ -196,12 +203,11 @@ npm run eval:dev
 ```
 
 `npm run eval:dev` uses visible labels and may guide generic implementation
-work. A workflow-dispatched release candidate must also pass it. The existing
-evidence-strict `stable` lane additionally requires an independently frozen
-`eval/release-corpus.json`; a missing, partial, development-role, or
-threshold-failing corpus blocks that lane. The separate `maintainer-stable`
-lane requires the exact signed waiver and maintainer certification and makes no
-holdout or independence claim. False positives cost five times false negatives,
-and every scored dimension and category has its own precision and recall floor.
+work, but it is not a stable-release capability claim. Stable publication is
+gated by the full test matrix, deterministic exact-tarball packaging,
+cross-platform installed-artifact conformance, and protected npm publishing.
+The retired `maintainer-stable` evidence remains historical data for v1.0.0.
+False positives cost five times false negatives, and every scored dimension
+and category has its own precision and recall floor.
 
 MIT

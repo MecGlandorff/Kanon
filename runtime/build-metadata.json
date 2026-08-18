@@ -1,7 +1,7 @@
 {
   "schema": "kanon-build-metadata-v1",
   "package_name": "@mecglandorff/kanon",
-  "package_version": "1.0.0",
+  "package_version": "1.1.0",
   "plugin_name": "kanon",
   "runtime": {
     "format": "esm",

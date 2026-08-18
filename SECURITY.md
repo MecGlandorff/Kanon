@@ -2,15 +2,14 @@
 
 ## Supported versions
 
-Kanon supports only the latest published stable release line. The `1.0.x`
-line becomes supported when its first release is published. Prereleases and
+Kanon supports only the latest published stable release line. Prereleases and
 unpublished candidates receive no formal security-support commitment.
 
 | Version | Security fixes |
 | --- | --- |
-| Latest published `1.0.x` | Yes |
-| `0.4.x` prereleases | No |
-| Unpublished candidates and older versions | No |
+| Latest published stable `1.x` | Yes |
+| Prereleases | No |
+| Unpublished candidates and older stable versions | No |
 
 When a supported fix cannot be made without a breaking change, the maintainer
 may issue a documented migration or deprecation instead of silently changing

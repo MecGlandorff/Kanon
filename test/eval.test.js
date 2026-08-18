@@ -482,6 +482,52 @@ test("prerelease binding records a complete threshold-failing development report
   assert.equal(manifest.held_out_capability_estimate_claimed, false);
 });
 
+test("standard stable binding requires conformance without capability reports", () => {
+  const candidateCommit = "c".repeat(40);
+  const candidateVersion = "1.1.0";
+  const root = makeFixture({}, "kanon-stable-binding-");
+  const tarball = path.join(root, "kanon-1.1.0.tgz");
+  fs.writeFileSync(tarball, "stable fixture tarball");
+  const artifactSha256 = sha256File(tarball);
+  for (const platform of ["ubuntu", "windows", "macos"]) {
+    fs.writeFileSync(
+      path.join(root, `conformance-${platform}.json`),
+      `${JSON.stringify({
+        passed: true,
+        artifact_sha256: artifactSha256,
+        candidate_commit: candidateCommit,
+        candidate_version: candidateVersion
+      })}\n`
+    );
+  }
+
+  const invocation = spawnSync(
+    process.execPath,
+    [
+      "scripts/release-bind.js",
+      "--bundle",
+      root,
+      "--candidate-commit",
+      candidateCommit,
+      "--candidate-version",
+      candidateVersion,
+      "--artifact-sha256",
+      artifactSha256,
+      "--release-kind",
+      "stable"
+    ],
+    commandOptions(20_000)
+  );
+  assert.equal(invocation.status, 0, invocation.stderr);
+  const manifest = readJson(path.join(root, "release-manifest.json"));
+  assert.equal(manifest.schema, "kanon-release-binding-v4");
+  assert.equal(manifest.assurance_lane, "standard-stable");
+  assert.equal(manifest.development_execution_complete, null);
+  assert.equal(manifest.holdout_corpus_executed_in_workflow, false);
+  assert.equal(manifest.held_out_capability_estimate_claimed, false);
+  assert.equal(manifest.evidence_strict_release_supported, false);
+});
+
 test("per-case analysis timeout is enforced by process isolation", () => {
   const root = makeFixture({
     "analyzer.mjs":
@@ -615,7 +661,7 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
     `${JSON.stringify({
       schema: "kanon-artifact-conformance-v1",
       candidate_commit: head.stdout.trim(),
-      candidate_version: "1.0.0",
+      candidate_version: "1.1.0",
       artifact_sha256: sha256File(tarball),
       installed_package_root: fs.realpathSync(artifactRoot),
       checks: [],
@@ -908,7 +954,7 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
       "--candidate-commit",
       "a".repeat(40),
       "--candidate-version",
-      "1.0.0"
+      "1.1.0"
     ],
     conformOptions
   );
@@ -917,7 +963,7 @@ test("one exact tarball passes installed Bash or PowerShell conformance", {
 
   assert.equal(report.passed, true, report.reasons.join("\n"));
   assert.equal(report.artifact_sha256, sha256File(tarball));
-  assert.equal(report.candidate_version, "1.0.0");
+  assert.equal(report.candidate_version, "1.1.0");
   assert.ok(
     report.checks.some((check) =>
       /wrapper refresh/.test(check.name)

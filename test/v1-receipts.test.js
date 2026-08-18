@@ -19,7 +19,7 @@ import { canonicalRealpath, makeFixture } from "./helpers.js";
 
 const NOW = Date.parse("2026-07-28T10:00:00.000Z");
 const PACKAGE_NAME = "@mecglandorff/kanon";
-const PACKAGE_VERSION = "1.0.0";
+const PACKAGE_VERSION = "1.1.0";
 const RECEIPT_FILE = "context-receipts-v1.json";
 
 test("explicit orient persists only bounded hashes and verify reloads them", async () => {

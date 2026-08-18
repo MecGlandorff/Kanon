@@ -6,35 +6,41 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   correctedEvidenceDirectories,
-  validateCorrectedCandidateEvidence
+  validateCorrectedCandidateEvidenceValue
 } from "../eval/v1.0.0-candidate-corrected/lib/evidence-validator.js";
 import {
   CORRECTED_CANDIDATE_CONCLUSION,
   CORRECTED_TRANSITION_RELATIVE,
   CORRECTED_TRANSITION_SHA256,
-  validateCorrectedCandidateTransitionAuthority,
   validateCorrectedCandidateTransitionValue
 } from "../eval/v1.0.0-candidate-corrected/lib/validator.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("corrective transition stays exact after result archival", () => {
-  const authority = validateCorrectedCandidateTransitionAuthority(repoRoot);
-  assert.equal(authority.sha256, CORRECTED_TRANSITION_SHA256);
+  const bytes = fs.readFileSync(
+    path.join(repoRoot, CORRECTED_TRANSITION_RELATIVE)
+  );
+  const transition = JSON.parse(bytes.toString("utf8"));
   assert.equal(
-    authority.transition.candidate_conclusions.success,
+    crypto.createHash("sha256").update(bytes).digest("hex"),
+    CORRECTED_TRANSITION_SHA256
+  );
+  assert.equal(validateCorrectedCandidateTransitionValue(transition), true);
+  assert.equal(
+    transition.candidate_conclusions.success,
     CORRECTED_CANDIDATE_CONCLUSION
   );
   assert.deepEqual(
-    authority.transition.failed_remote_runs.map((run) => run.result),
+    transition.failed_remote_runs.map((run) => run.result),
     ["failed", "failed"]
   );
   assert.equal(
-    authority.transition.previous_candidate.remote_validation_result,
+    transition.previous_candidate.remote_validation_result,
     "failed"
   );
-  assert.equal(authority.transition.boundaries.corpus_execution_occurred, false);
-  assert.equal(authority.transition.boundaries.holdout_execution_occurred, false);
+  assert.equal(transition.boundaries.corpus_execution_occurred, false);
+  assert.equal(transition.boundaries.holdout_execution_occurred, false);
 });
 
 test("corrective transition rejects remote, publication, and assurance drift", () => {
@@ -57,14 +63,31 @@ test("corrected evidence namespace is additive and content-addressed", () => {
   const directories = correctedEvidenceDirectories(repoRoot);
   assert.ok(directories.length <= 1);
   for (const directory of directories) {
-    const evidence = validateCorrectedCandidateEvidence(repoRoot, directory);
+    const candidateBytes = fs.readFileSync(
+      path.join(directory, "candidate.json")
+    );
+    const candidate = JSON.parse(candidateBytes.toString("utf8"));
+    const tree = JSON.parse(
+      fs.readFileSync(
+        path.join(directory, "complete-tree-commitment.json"),
+        "utf8"
+      )
+    );
+    assert.equal(validateCorrectedCandidateEvidenceValue(candidate), true);
+    const candidateSha256 = crypto
+      .createHash("sha256")
+      .update(candidateBytes)
+      .digest("hex");
+    assert.deepEqual(tree.files, [
+      { path: "candidate.json", sha256: candidateSha256 }
+    ]);
     assert.equal(
-      evidence.candidate.conclusion,
+      candidate.conclusion,
       CORRECTED_CANDIDATE_CONCLUSION
     );
     assert.equal(
       path.basename(directory),
-      `evidence-sha256-${evidence.evidence_tree_sha256}`
+      `evidence-sha256-${tree.semantic_sha256}`
     );
   }
 });

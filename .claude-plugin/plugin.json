@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "kanon",
   "displayName": "Kanon",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Evidence-backed repository orientation and continuity with explicit advisory status.",
   "author": {
     "name": "mecglandorff",
