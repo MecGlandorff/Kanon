@@ -2,6 +2,11 @@
 
 **Date:** 2026-07-29
 
+Archive note for v1.1.0: the raw D.2B report and predeclared case/path taxonomy
+referenced by this historical record now live only in the immutable `v1.0.0`
+tag. Their exact paths and digests remain recorded below; see the
+[historical evaluation archive](../eval/results/README.md) for retrieval.
+
 **Branch:** `release/v.1.0.0`
 
 **Recovery scope:** restore the pre-D.2B product without erasing the failed
@@ -74,13 +79,14 @@ inverse was applied:
 | Generated runtime | The matching 11 paths under `runtime/src/code-intel/` | All 11 restored to the pre-D.2B blobs through the product inverse; canonical generation then confirmed byte synchronization. |
 | Hypothesis-specific product test | `test/d2b-code-intel.test.js` | Removed, matching its absence before D.2B. |
 | Evaluation diagnostics | `scripts/lib/eval-corpus/analyze-case.js`, `scripts/lib/eval-corpus/scoring.js`, and `test/eval.test.js` | Preserved. These bounded raw-report diagnostics are evaluation-only, are excluded from the shipped allowlist, and support interpretation of the permanent report. |
-| Predeclared evidence | `docs/v1-run-d2b.md` and `eval/results/d2b-predeclared-taxonomy.json` | Preserved byte-for-byte. |
+| Predeclared evidence | `docs/v1-run-d2b.md` and `v1.0.0:eval/results/d2b-predeclared-taxonomy.json` | The compact record remains in HEAD; the case/path payload is archive-only and byte-identical. |
 
 The later evidence commit changed three evidence-only paths:
 
 - `docs/v1-run-d2b.md`;
 - `eval/RESULTS.md`; and
-- `eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`.
+- `v1.0.0:eval/results/development-0.4.0-rc.1-d2b-7da293a5.json`
+  (now archive-only).
 
 Those paths were not included in the inverse. No replacement ranking,
 command, scanner, budget, label, policy, threshold, or scoring hypothesis was

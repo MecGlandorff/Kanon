@@ -536,38 +536,67 @@ test("analysis workers inherit no arbitrary parent secret environment", () => {
   }
 });
 
+test("development evaluation defaults to the compact v1 analyzer", async () => {
+  const root = makeFixture({}, "kanon-compact-development-");
+  const cacheRoot = path.join(root, "cache");
+  const item = corpus.cases[0];
+  const cached = path.join(
+    cacheRoot,
+    repositoryCacheName(item.repository, item.revision)
+  );
+  fs.mkdirSync(cached, { recursive: true });
+  fs.writeFileSync(
+    path.join(cached, "go.mod"),
+    "module example.invalid/compact\n"
+  );
+  fs.writeFileSync(
+    path.join(cached, "main_test.go"),
+    "package compact\n"
+  );
+
+  const report = await runCorpus(corpus, {
+    cacheRoot,
+    fetch: false,
+    repoIds: [item.id]
+  });
+
+  assert.equal(report.results[0].analysis_error, null);
+  assert.deepEqual(report.results[0].predictions.test, []);
+  assert.equal(report.analyzer.source, "source-tree");
+});
+
 test("artifact-bound development evaluation loads the shipped runtime path", () => {
   const root = makeFixture({}, "kanon-development-artifact-");
   const artifactRoot = path.join(root, "artifact-root");
-  const analyzerDirectory = path.join(
+  const cacheRoot = path.join(root, "cache");
+  const build = spawnSync(
+    process.execPath,
+    ["scripts/build-package.js", "--output", artifactRoot],
+    commandOptions(30_000)
+  );
+  assert.equal(build.status, 0, build.stderr || build.stdout);
+  assert.equal(
+    fs.existsSync(path.join(
+      artifactRoot,
+      "runtime",
+      "src",
+      "v1",
+      "compatibility",
+      "refresh.js"
+    )),
+    true
+  );
+  const artifactAnalyzer = path.join(
     artifactRoot,
     "runtime",
-    "src"
+    "src",
+    "v1",
+    "evaluation",
+    "analyze.js"
   );
-  const cacheRoot = path.join(root, "cache");
-  fs.mkdirSync(analyzerDirectory, { recursive: true });
+  assert.equal(fs.existsSync(artifactAnalyzer), true);
   fs.mkdirSync(cacheRoot);
   const item = corpus.cases[0];
-  const acceptedRun = item.labels.run?.accepted?.[0];
-  const acceptedTest = item.labels.test?.accepted?.[0];
-  fs.writeFileSync(
-    path.join(analyzerDirectory, "analyze.js"),
-    `export function analyzeRepo() {
-      return ${JSON.stringify({
-        state: {
-          version: "1.0.0",
-          important_files: item.labels.important_files.map(
-            (label) => ({ path: label.path })
-          ),
-          commands: {
-            run: acceptedRun ? [acceptedRun] : [],
-            test: acceptedTest ? [acceptedTest] : []
-          },
-          scan: { complete: true }
-        }
-      })};
-    }\n`
-  );
   const cached = path.join(
     cacheRoot,
     repositoryCacheName(item.repository, item.revision)
@@ -627,6 +656,50 @@ test("artifact-bound development evaluation loads the shipped runtime path", () 
   assert.equal(report.artifact.conformance.passed, true);
   assert.equal(report.results.length, 1);
   assert.equal(report.results[0].analysis_error, null);
+
+  const traceDirectory = path.join(root, "trace-output");
+  fs.mkdirSync(traceDirectory);
+  const traceBinding = {
+    protocolSha256: "a".repeat(64),
+    traceSourceCommit: head.stdout.trim(),
+    artifactSha256: sha256File(tarball),
+    corpusSha256: corpus._manifest.sha256,
+    caseId: "fixture/artifact-trace",
+    revision: "b".repeat(40),
+    ordinal: 1
+  };
+  assert.throws(
+    () => analyzeCase(
+      artifactAnalyzer,
+      artifactRoot,
+      {
+        id: traceBinding.caseId,
+        revision: traceBinding.revision
+      },
+      20_000,
+      {
+        output_directory: traceDirectory,
+        file_name: "case-001.json",
+        binding: traceBinding
+      }
+    ),
+    /trace-attempt mode is retired/u
+  );
+  assert.deepEqual(fs.readdirSync(traceDirectory), []);
+
+  const retiredTraceRoot = path.join(root, "retired-trace-attempt");
+  const retired = spawnSync(
+    process.execPath,
+    [
+      "scripts/eval-corpus.js",
+      "--ranking-trace-directory",
+      retiredTraceRoot
+    ],
+    commandOptions(20_000)
+  );
+  assert.equal(retired.status, 2);
+  assert.match(retired.stderr, /trace-attempt mode is retired/u);
+  assert.equal(fs.existsSync(retiredTraceRoot), false);
 
   const substitutedRoot = path.join(root, "substituted-root");
   fs.mkdirSync(substitutedRoot);

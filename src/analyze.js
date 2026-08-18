@@ -15,7 +15,9 @@ import { selectRootReadme } from "./readme.js";
 import { verifyReadme } from "./verify.js";
 import { STATE_SCHEMA_VERSION, VERSION } from "./version.js";
 import { sanitizeRepositoryData } from "./trust.js";
-import { validatePersistedState } from "./persistence/state.js";
+import {
+  validatePersistedState
+} from "./v1/compatibility/state.js";
 import { buildCurrentState } from "./analyze/current-state.js";
 import { detectEntrypoints, detectTodos } from "./analyze/entrypoints.js";
 import { detectCommands, detectImportantFiles } from "./analyze/findings.js";

@@ -569,6 +569,56 @@ test("compatibility state and option validators reject accessors and proxies", (
   assert.equal(proxyTrapCalls, 0);
 });
 
+test("compact state adapter retains exact schema-two nested validation", () => {
+  const root = makeFixture({ "README.md": "# State adapter\n" });
+  const state = analyzeRepo(root, { inspectGit: false }).state;
+  assert.deepEqual(validatePersistedState(state), {
+    valid: true,
+    field: null,
+    reason: null
+  });
+
+  for (const [mutate, expected] of [
+    [
+      (candidate) => {
+        candidate.repo.unexpected = true;
+      },
+      { field: "repo.unexpected", reason: "Unknown field." }
+    ],
+    [
+      (candidate) => {
+        candidate.scan.max_files = -1;
+      },
+      {
+        field: "scan.max_files",
+        reason: "Expected a nonnegative integer."
+      }
+    ],
+    [
+      (candidate) => {
+        candidate.files.fingerprints[0].sha256 = "A".repeat(64);
+      },
+      {
+        field: "files.fingerprints[0].sha256",
+        reason: "Expected a lowercase SHA-256 or null."
+      }
+    ],
+    [
+      (candidate) => {
+        candidate.configuration.command_execution = "always";
+      },
+      { field: "value", reason: "Expected one of: ask, never." }
+    ]
+  ]) {
+    const candidate = structuredClone(state);
+    mutate(candidate);
+    assert.deepEqual(validatePersistedState(candidate), {
+      valid: false,
+      ...expected
+    });
+  }
+});
+
 test("deep package export metadata remains bounded during analysis", () => {
   let exportsValue = "./src/index.js";
   for (let index = 0; index < 256; index += 1) {

@@ -85,8 +85,10 @@ remain explainable without naming a labeled repository and must be registered
 in `src/code-intel/heuristics.js`. A substring tripwire is only a regression
 alarm; it is not contamination control.
 
-`eval/RESULTS.md` is generated from a committed raw report with
-`scripts/render-results.js`; it must not be hand-edited.
+`eval/RESULTS.md` retains the compact rendering of the archived D.2B raw
+report. New development renderings are generated from a committed raw report
+with `scripts/render-results.js`; generated result content must not be
+hand-edited.
 
 ## Incremental-value experiment
 

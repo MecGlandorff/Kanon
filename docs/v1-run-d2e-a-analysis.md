@@ -1,5 +1,11 @@
 # Run D.2E-A: development-only mechanism analysis
 
+Archive note for v1.1.0: the 203,117-byte all-candidate mechanism-analysis
+payload is no longer duplicated in the maintained tree. Its exact blob remains
+at `v1.0.0:eval/results/d2e-analysis-b84a9706ebe948303c9e6bc67641fc0dcbef81c0a873098c1d65c2be2dfef81b/mechanism-analysis.json`;
+the compact governed conclusion and this narrative remain current-tree records.
+See the [historical evaluation archive](../eval/results/README.md) for retrieval.
+
 Status: complete; hard stop after D.2E-A.
 
 ## Boundary and authority

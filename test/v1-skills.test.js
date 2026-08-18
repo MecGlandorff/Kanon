@@ -61,6 +61,141 @@ test("orient is structurally equivalent across both host adapters", async () => 
   assert.doesNotMatch(JSON.stringify(codex), /\u001b|\u202e/);
 });
 
+test("stable results preserve one exact envelope and bounded vocabulary", async () => {
+  const root = makeFixture({
+    "README.md": "# Fixture\n\nUse `npm test`.\n",
+    "package.json": JSON.stringify({
+      name: "fixture",
+      scripts: { test: "node --test" }
+    })
+  });
+  const cases = [
+    [
+      "orient",
+      { task: "understand the fixture" },
+      "kanon-orient-report-v1"
+    ],
+    [
+      "resume",
+      { task: "resume the fixture" },
+      "kanon-resume-report-v1"
+    ],
+    [
+      "verify",
+      { task: "verify README.md", target: "README.md" },
+      "kanon-verify-report-v1"
+    ],
+    ["status", {}, "kanon-status-report-v1"],
+    [
+      "steer",
+      { steer_state: null },
+      "kanon-steer-report-v1"
+    ],
+    [
+      "aswitch",
+      { aswitch_request: null },
+      "kanon-aswitch-report-v1"
+    ]
+  ];
+
+  for (const [skill, fields, reportSchema] of cases) {
+    const result = await invokeCodexSkill(
+      stableInvocation(skill, root, fields),
+      adapterContext([])
+    );
+    assert.deepEqual(Object.keys(result).sort(), [
+      "deprecation",
+      "diagnostics",
+      "host",
+      "ok",
+      "report",
+      "schema",
+      "skill",
+      "status",
+      "version"
+    ]);
+    assert.equal(result.schema, "kanon-stable-skill-result-v1");
+    assert.equal(result.version, PACKAGE_VERSION);
+    assert.equal(result.skill, skill);
+    assert.equal(result.ok, result.report.ok);
+    assert.equal(result.status, result.report.status);
+    assert.ok(["Known", "Stale", "Unknown"].includes(result.status));
+    assert.equal(result.report.schema, reportSchema);
+    assert.deepEqual(result.host, {
+      name: "codex-cli",
+      mode: "notice",
+      enforcement: false,
+      hook_status: "Unknown",
+      lifecycle_notice_hook: "Unavailable",
+      notice_delivery: "explicit-skill-and-status-output"
+    });
+    assert.deepEqual(Object.keys(result.deprecation).sort(), [
+      "cache",
+      "checked_at",
+      "diagnostics",
+      "installed_version",
+      "ok",
+      "package_name",
+      "status"
+    ]);
+    assert.equal(result.deprecation.status, "Current");
+    assert.deepEqual(
+      result.diagnostics,
+      Array.from(new Set([
+        ...result.report.diagnostics,
+        ...result.deprecation.diagnostics
+      ])).slice(0, 16)
+    );
+    assert.equal(new Set(result.diagnostics).size, result.diagnostics.length);
+    assert.ok(
+      result.diagnostics.every(
+        (diagnostic) =>
+          typeof diagnostic === "string" &&
+          Buffer.byteLength(diagnostic, "utf8") <= 512
+      )
+    );
+  }
+
+  const malformed = await invokeCodexSkill(
+    { schema: "wrong", skill: "orient" },
+    adapterContext([])
+  );
+  assert.equal(malformed.skill, "Unknown");
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.status, "Unknown");
+  assert.deepEqual(malformed.report, {
+    schema: "kanon-invalid-invocation-v1",
+    ok: false,
+    status: "Unknown",
+    enforcement: false,
+    diagnostic:
+      "Stable skill invocation input was unavailable or invalid.",
+    diagnostics: []
+  });
+
+  const unavailableDeprecation = await invokeCodexSkill(
+    stableInvocation("orient", root, { task: "offline fixture" }),
+    {
+      ...adapterContext([]),
+      transport: async () => ({
+        ok: false,
+        status: "Unknown",
+        failure: "offline"
+      })
+    }
+  );
+  assert.equal(unavailableDeprecation.ok, true);
+  assert.equal(unavailableDeprecation.status, "Known");
+  assert.equal(unavailableDeprecation.version, PACKAGE_VERSION);
+  assert.equal(unavailableDeprecation.deprecation.status, "Unknown");
+  assert.equal(
+    unavailableDeprecation.diagnostics.includes(
+      unavailableDeprecation.deprecation.diagnostic
+    ),
+    false
+  );
+});
+
 test("the minimal receipt verifies current bindings and detects direct change", async () => {
   const root = makeFixture({
     "README.md": "# Fixture\n\nUse `npm test`.\n",
@@ -129,6 +264,7 @@ test("the minimal receipt verifies current bindings and detects direct change", 
     context
   );
   assert.equal(stale.report.receipt.status, "Stale");
+  assert.equal(stale.status, "Stale");
   assert.match(
     stale.report.receipt.diagnostic,
     /directly contradicts current/
@@ -196,6 +332,7 @@ test("resume uses the shared continuity engine and leaves the repository unchang
   const oldText = "# Prior purpose\n";
   const previous = {
     repo: { root: canonicalRealpath(root) },
+    historical_extension: { ignored_by_projection: true },
     generated_at: "2026-07-27T08:00:00.000Z",
     files: {
       fingerprints: [
@@ -246,6 +383,10 @@ test("resume uses the shared continuity engine and leaves the repository unchang
     "kanon-continuity-report-v1"
   );
   assert.equal(resumed.report.continuity.authority, "live");
+  assert.equal(
+    resumed.report.continuity.sources.checkpoint.status,
+    "Known"
+  );
   assert.ok(
     resumed.report.continuity.observations.changed.some(
       (item) => item.path === "README.md"
@@ -340,6 +481,46 @@ test("verify separates contradictions, non-observation, and declarations", async
       .repository_value.value,
     "docs/missing.md"
   );
+});
+
+test("verify keeps scan-backed conclusions independent from Git availability", async () => {
+  const root = makeFixture({
+    "README.md": "# Fixture\n",
+    "package.json": JSON.stringify({
+      name: "fixture",
+      version: "1.2.3",
+      scripts: { test: "node --test" }
+    }),
+    "runtime/build-metadata.json": JSON.stringify({
+      package_version: "1.2.3"
+    }),
+    "src/v1/example.js": "export const value = 1;\n",
+    "runtime/example.js": "export const value = 1;\n"
+  });
+  const result = await invokeCodexSkill(
+    stableInvocation("verify", root, {
+      task: "verify README.md",
+      target: "README.md"
+    }),
+    {
+      ...adapterContext([]),
+      git_runner() {
+        return {
+          ok: false,
+          status: 128,
+          stdout: "",
+          stderr: "Git unavailable",
+          timeout: false,
+          overflow: false
+        };
+      }
+    }
+  );
+
+  assert.equal(result.report.live.coverage.complete, true);
+  assert.equal(result.report.documentation.status, "Known");
+  assert.equal(result.report.generated_artifacts.status, "Known");
+  assert.equal(result.report.receipt.status, "Unknown");
 });
 
 test("declared-validation Unknown prevents an aggregate Known claim", async () => {

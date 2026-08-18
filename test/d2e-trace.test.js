@@ -13,7 +13,6 @@ import {
   validateD2eAnalysis
 } from "../scripts/lib/d2e-evidence.js";
 import { finalizeTraceAttempt } from "../scripts/lib/d2e-finalize.js";
-import { analyzeCase } from "../scripts/lib/eval-corpus/runner.js";
 import {
   createRankingTraceCollector,
   EXPECTED_TRACE_STAGES,
@@ -34,7 +33,6 @@ const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
-const analyzerModule = path.join(repoRoot, "src", "analyze.js");
 
 test("trace-off, trace-on, mutating, and failing observers are semantically equivalent", () => {
   const root = rankingFixture();
@@ -395,62 +393,6 @@ test("collector bounds excessive candidate detail and hostile generated text", (
     trace.completeness.failures.includes("candidate-detail-limit")
   );
   assert.ok(trace.limits.serialized_bytes <= TRACE_LIMITS.bytesPerCase);
-});
-
-test("worker trace success or failure cannot alter prediction output", () => {
-  const root = rankingFixture();
-  const item = {
-    id: "fixture/repository",
-    revision: "f".repeat(40)
-  };
-  const plain = analyzeCase(analyzerModule, root, item, 10_000);
-  const outputDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "kanon-d2e-worker-")
-  );
-  const binding = {
-    ...traceBinding(),
-    caseId: item.id,
-    revision: item.revision
-  };
-  const traced = analyzeCase(
-    analyzerModule,
-    root,
-    item,
-    10_000,
-    {
-      output_directory: outputDirectory,
-      file_name: "case-001.json",
-      binding
-    }
-  );
-  const failed = analyzeCase(
-    analyzerModule,
-    root,
-    item,
-    10_000,
-    {
-      output_directory: path.join(outputDirectory, "missing"),
-      file_name: "case-001.json",
-      binding
-    }
-  );
-
-  assert.deepEqual(traced.state, plain.state);
-  assert.deepEqual(failed.state, plain.state);
-  assert.equal(traced.ranking_trace.status, "written");
-  assert.equal(traced.ranking_trace.complete, true);
-  assert.equal(failed.ranking_trace.status, "failed");
-  assert.equal(failed.ranking_trace.complete, false);
-  const persisted = JSON.parse(
-    fs.readFileSync(
-      path.join(outputDirectory, "case-001.json"),
-      "utf8"
-    )
-  );
-  assert.deepEqual(validateRankingTrace(persisted, binding), {
-    valid: true,
-    failures: []
-  });
 });
 
 test("top-level D.2E finalization writes the exact safe manifest and rejects a bad receipt binding", () => {

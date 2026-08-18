@@ -137,17 +137,18 @@ The retained and preserved files are byte-identical, both 203 bytes, and both
 have SHA-256
 `1f2ba552106a4c13eace2088e1277cc0b4bbf066dca0113e10b243db46b902c7`.
 
-The canonical evidence manifest is:
+The canonical evidence manifest is archive-only at:
 
-`eval/results/d2d-ranking-1f2ba552/evidence-manifest.json`
+`v1.0.0:eval/results/d2d-ranking-1f2ba552/evidence-manifest.json`
 
 Its SHA-256 is
 `4dbb12cca8020fd17020cb22c274d7b544242767ac81c10a4c381e0f2818e401`.
-The manifest binds the preparation commit; packet, manifest, snapshot, copied
-source, prompt, schema, and result hashes; result byte count; formal
-validation; exact reviewer outcome; 28/185 coverage; preserved path;
-unchanged production artifact; controlled-state proof; and evidence
-limitations.
+It remains byte-identical in the immutable v1.0.0 tag. The manifest binds the
+preparation commit; packet, manifest, snapshot, copied source, prompt, schema,
+and result hashes; result byte count; formal validation; exact reviewer
+outcome; 28/185 coverage; preserved path; unchanged production artifact;
+controlled-state proof; and evidence limitations. The current tree retains the
+203-byte `ranking-result.json` because active D.2E analysis tooling reads it.
 
 The complete evidence was independently generated twice. The result bytes and
 canonical manifest bytes were identical before one absent-directory atomic

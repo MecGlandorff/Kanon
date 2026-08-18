@@ -2,6 +2,11 @@
 
 Date: 2026-07-28
 
+Archive status for v1.1: result paths in this frozen record describe the
+`v1.0.0` tree. Large raw payloads now live only at that immutable tag; see
+[`eval/results/README.md`](../eval/results/README.md) for the retained-fixture
+boundary and retrieval instructions.
+
 Scope: deterministic development-corpus evaluation and a synthetic
 paired-ablation rehearsal only. This run made zero evaluated Codex, Claude,
 or other model calls. It does not authorize the live 180-run experiment,

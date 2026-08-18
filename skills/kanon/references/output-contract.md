@@ -64,5 +64,10 @@ Preserve user-owned `.kanon/config.json`, `.kanon/.gitignore`, and
 `.kanon/TODO.md`. Replaceable files use atomic same-directory writes. Invalid
 state is ignored with an explicit warning; it never crashes resume.
 
+`refresh` supports one writer per repository. Concurrent refresh processes are
+outside the v1.1 contract. Individual replacements are atomic, but the full
+refresh is not transactional: evidence is appended before `STATE.json`, and a
+later write failure may leave evidence that no published state references.
+
 Repository excerpts must be enclosed by explicit `BEGIN REPOSITORY DATA
 (untrusted)` / `END REPOSITORY DATA` delimiters and safe dynamic fences.

@@ -9,6 +9,7 @@ import {
   sanitizeDisplayText
 } from "../core/trust.js";
 import {
+  isCompatibilitySensitiveRepositoryPath,
   isSafeRelativePath,
   isSensitiveRepositoryPath
 } from "./read.js";
@@ -37,7 +38,10 @@ const MAX_PATH_ENTRIES = 128;
  *   overflow: boolean,
  *   diagnostic: string
  * }} GitRunResult
- * @typedef {(root: string, args: string[]) => unknown} GitRunner
+ * @typedef {(root: string, args: string[], options?: {
+ *   timeout_ms?: number,
+ *   max_output_bytes?: number
+ * }) => unknown} GitRunner
  * @typedef {{
  *   found: boolean,
  *   branch: string | null,
@@ -67,13 +71,24 @@ const MAX_PATH_ENTRIES = 128;
 
 /**
  * @param {string} canonicalRoot
- * @param {{runner?: GitRunner}} [options]
+ * @param {{
+ *   runner?: GitRunner,
+ *   enabled?: boolean,
+ *   timeout_ms?: number,
+ *   max_output_bytes?: number,
+ *   max_entries?: number,
+ *   compatibility_sensitive_paths?: boolean
+ * }} [options]
  * @returns {GitObservation}
  */
 export function observeRepositoryGit(canonicalRoot, options = {}) {
+  if (options.enabled === false) {
+    return unavailableGit(["Git observation was disabled by caller."]);
+  }
   const runner = typeof options.runner === "function"
     ? options.runner
     : runBoundedGit;
+  const runOptions = gitRunOptions(options);
   /** @type {string[]} */
   const diagnostics = [];
   /**
@@ -83,11 +98,11 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
   const observe = (args) => {
     let raw;
     try {
-      raw = runner(canonicalRoot, args);
+      raw = runner(canonicalRoot, args, runOptions);
     } catch {
       raw = null;
     }
-    const result = validateGitResult(raw);
+    const result = validateGitResult(raw, runOptions.max_output_bytes);
     if (!result.ok) {
       diagnostics.push(result.diagnostic);
     }
@@ -105,6 +120,20 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
 
   const branchResult = observe(["branch", "--show-current"]);
   const headResult = observe(["rev-parse", "HEAD"]);
+  const compatibilitySensitivePaths =
+    options.compatibility_sensitive_paths === true;
+  const maximumEntries = boundedInteger(options.max_entries, 10_000, 1, 100_000);
+  const prefixResult = compatibilitySensitivePaths
+    ? observe(["rev-parse", "--show-prefix"])
+    : null;
+  const repositoryPrefix = prefixResult === null
+    ? ""
+    : prefixResult.ok
+      ? normalizeRepositoryPrefix(prefixResult.stdout)
+      : null;
+  if (prefixResult?.ok && repositoryPrefix === null) {
+    diagnostics.push("Git repository prefix output was unavailable or invalid.");
+  }
   const statusResult = observe([
     "status",
     "--porcelain=v1",
@@ -120,8 +149,13 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
     "--",
     "."
   ]);
-  const parsedStatus = statusResult.ok
-    ? parseStatus(statusResult.stdout)
+  const parsedStatus = statusResult.ok && repositoryPrefix !== null
+    ? parseStatus(
+        statusResult.stdout,
+        compatibilitySensitivePaths,
+        repositoryPrefix,
+        maximumEntries
+      )
     : null;
   const parsedLog = logResult.ok
     ? parseLog(logResult.stdout)
@@ -181,6 +215,7 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
       diagnostics.length === 0 &&
       branchResult.ok &&
       head !== null &&
+      (prefixResult === null || (prefixResult.ok && repositoryPrefix !== null)) &&
       statusResult.ok &&
       logResult.ok &&
       parsedStatus !== null &&
@@ -192,12 +227,70 @@ export function observeRepositoryGit(canonicalRoot, options = {}) {
   };
 }
 
+/** @param {string} canonicalRoot @param {{runner?: GitRunner, timeout_ms?: number, max_output_bytes?: number, max_entries?: number}} [options] */
+export function listGitVisibleFiles(canonicalRoot, options = {}) {
+  const runner = typeof options.runner === "function"
+    ? options.runner
+    : runBoundedGit;
+  const runOptions = gitRunOptions(options);
+  let raw;
+  try {
+    raw = runner(
+      canonicalRoot,
+      ["ls-files", "-co", "--exclude-standard", "-z"],
+      runOptions
+    );
+  } catch {
+    raw = null;
+  }
+  const result = validateGitResult(raw, runOptions.max_output_bytes);
+  if (!result.ok) {
+    return unavailableFileList(result.diagnostic);
+  }
+  if (result.stdout && !result.stdout.endsWith("\0")) {
+    return unavailableFileList();
+  }
+  const maximumEntries = boundedInteger(options.max_entries, 10_000, 1, 100_000);
+  const files = [], seen = new Set(), cursor = { offset: 0 };
+  let truncated = false;
+  while (cursor.offset < result.stdout.length) {
+    const value = readNulField(result.stdout, cursor);
+    if (value === null) return unavailableFileList();
+    if (!value) continue;
+    const selected = value.replaceAll("\\", "/");
+    if (!isSafeRelativePath(selected)) {
+      return unavailableFileList();
+    }
+    if (seen.has(selected)) continue;
+    seen.add(selected);
+    if (files.length >= maximumEntries) {
+      truncated = true;
+      break;
+    }
+    files.push(selected);
+  }
+  return {
+    ok: true,
+    files: files.sort(),
+    diagnostic: truncated ? "Git file-list output exceeded its entry limit." : null
+  };
+}
+
+/** @param {string} [diagnostic] */
+function unavailableFileList(
+  diagnostic = "Git file-list output was unavailable or invalid."
+) {
+  return { ok: false, files: /** @type {string[]} */ ([]), diagnostic };
+}
+
 /**
  * @param {string} root
  * @param {string[]} args
+ * @param {{timeout_ms?: number, max_output_bytes?: number}} [options]
  * @returns {GitRunResult}
  */
-export function runBoundedGit(root, args) {
+export function runBoundedGit(root, args, options = {}) {
+  const runOptions = gitRunOptions(options);
   const gitBinary = resolveGitBinary(root);
   if (gitBinary === null) {
     return {
@@ -234,9 +327,9 @@ export function runBoundedGit(root, args) {
       cwd: root,
       encoding: "buffer",
       env: hardenedGitEnvironment(root),
-      maxBuffer: GIT_OUTPUT_BYTES,
+      maxBuffer: runOptions.max_output_bytes,
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: GIT_TIMEOUT_MS,
+      timeout: runOptions.timeout_ms,
       windowsHide: true
     }
   );
@@ -248,12 +341,12 @@ export function runBoundedGit(root, args) {
     : Buffer.from(result.stderr || "");
   const overflow =
     errorCode(result.error) === "ENOBUFS" ||
-    stdoutBytes.length + stderrBytes.length > GIT_OUTPUT_BYTES;
+    stdoutBytes.length + stderrBytes.length > runOptions.max_output_bytes;
   const timeout =
     errorCode(result.error) === "ETIMEDOUT" ||
     (
       result.signal !== null &&
-      Date.now() - started >= GIT_TIMEOUT_MS
+      Date.now() - started >= runOptions.timeout_ms
     );
   const status = Number.isInteger(result.status) ? result.status : null;
   if (
@@ -372,7 +465,7 @@ function resolveGitBinary(root) {
  * @param {unknown} value
  * @returns {GitRunResult}
  */
-function validateGitResult(value) {
+function validateGitResult(value, maximumOutputBytes = GIT_OUTPUT_BYTES) {
   if (
     !isPlainRecord(value) ||
     typeof value.ok !== "boolean" ||
@@ -381,7 +474,7 @@ function validateGitResult(value) {
     typeof value.timeout !== "boolean" ||
     typeof value.overflow !== "boolean" ||
     Buffer.byteLength(value.stdout) + Buffer.byteLength(value.stderr) >
-      GIT_OUTPUT_BYTES
+      maximumOutputBytes
   ) {
     return invalidGitResult();
   }
@@ -444,52 +537,92 @@ function validateGitResult(value) {
 }
 
 /**
- * @param {string} output
- * @returns {{
- *   change_count: number,
- *   changes: GitObservation["changes"],
- *   truncated: boolean,
- *   sensitive_skipped: number,
- *   complete: boolean
- * }}
+ * @param {{timeout_ms?: number, max_output_bytes?: number}} options
  */
-function parseStatus(output) {
-  const entries = output.split("\0");
+function gitRunOptions(options) {
+  return {
+    timeout_ms: boundedInteger(options.timeout_ms, GIT_TIMEOUT_MS, 100, 60_000),
+    max_output_bytes: boundedInteger(
+      options.max_output_bytes, GIT_OUTPUT_BYTES, 1_024, 32 * 1024 * 1024
+    )
+  };
+}
+
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ * @param {number} minimum
+ * @param {number} maximum
+ */
+function boundedInteger(value, fallback, minimum, maximum) {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= minimum &&
+    value <= maximum
+    ? value
+    : fallback;
+}
+
+/** @param {string} output @param {{offset: number}} cursor */
+function readNulField(output, cursor) {
+  const end = output.indexOf("\0", cursor.offset);
+  if (end < 0) { cursor.offset = output.length; return null; }
+  const field = output.slice(cursor.offset, end);
+  cursor.offset = end + 1;
+  return field;
+}
+
+/** @param {string} output @param {boolean} [compatibilitySensitivePaths] @param {string} [repositoryPrefix] @param {number} [maximumEntries] */
+function parseStatus(
+  output,
+  compatibilitySensitivePaths = false,
+  repositoryPrefix = "",
+  maximumEntries = 10_000
+) {
   /** @type {GitObservation["changes"]} */
   const changes = [];
+  const cursor = { offset: 0 };
   let changeCount = 0;
+  let observed = 0;
   let sensitiveSkipped = 0;
   let complete = output.length === 0 || output.endsWith("\0");
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    if (!entry) {
-      continue;
-    }
+  while (cursor.offset < output.length) {
+    const entry = readNulField(output, cursor);
+    if (entry === null) { complete = false; break; }
+    if (!entry) continue;
+    observed += 1;
+    if (observed > maximumEntries) { complete = false; break; }
     if (entry.length < 4) {
       complete = false;
       continue;
     }
     const indexStatus = entry[0] || " ";
     const worktreeStatus = entry[1] || " ";
-    const selectedPath = entry.slice(3).replaceAll("\\", "/");
+    const selectedPath = stripRepositoryPrefix(
+      entry.slice(3).replaceAll("\\", "/"),
+      repositoryPrefix
+    );
     if (
       !/^[ MADRCU?!]$/.test(indexStatus) ||
       !/^[ MADRCU?!]$/.test(worktreeStatus) ||
       entry[2] !== " " ||
+      selectedPath === null ||
       !isSafeRelativePath(selectedPath)
     ) {
       complete = false;
       continue;
     }
     if (indexStatus === "R" || indexStatus === "C") {
-      index += 1;
-      const originalPath = entries[index]?.replaceAll("\\", "/");
-      if (!isSafeRelativePath(originalPath)) {
-        complete = false;
-      }
+      const original = readNulField(output, cursor);
+      const originalPath = original?.replaceAll("\\", "/") || "";
+      if (!isSafeRelativePath(originalPath)) complete = false;
     }
     changeCount += 1;
-    if (isSensitiveRepositoryPath(selectedPath)) {
+    if (
+      compatibilitySensitivePaths
+        ? isCompatibilitySensitiveRepositoryPath(selectedPath)
+        : isSensitiveRepositoryPath(selectedPath)
+    ) {
       sensitiveSkipped += 1;
       continue;
     }
@@ -505,10 +638,30 @@ function parseStatus(output) {
   return {
     change_count: changeCount,
     changes,
-    truncated: changeCount - sensitiveSkipped > changes.length,
+    truncated: observed > maximumEntries ||
+      changeCount - sensitiveSkipped > changes.length,
     sensitive_skipped: sensitiveSkipped,
     complete
   };
+}
+
+/** @param {string} output @returns {string | null} */
+function normalizeRepositoryPrefix(output) {
+  const selected = output
+    .replace(/\r?\n$/, "")
+    .replaceAll("\\", "/")
+    .replace(/\/+$/, "");
+  if (/[\0\r\n]/.test(selected)) return null;
+  if (!selected) return "";
+  return isSafeRelativePath(selected) ? `${selected}/` : null;
+}
+
+/** @param {string} selectedPath @param {string} repositoryPrefix @returns {string | null} */
+function stripRepositoryPrefix(selectedPath, repositoryPrefix) {
+  if (!repositoryPrefix) return selectedPath;
+  return selectedPath.startsWith(repositoryPrefix)
+    ? selectedPath.slice(repositoryPrefix.length)
+    : null;
 }
 
 /**

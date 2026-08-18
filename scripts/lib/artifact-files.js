@@ -28,6 +28,23 @@ export const COMPATIBILITY_RUNTIME_ARTIFACT = Object.freeze([
   "runtime/bin/kanon-write.js"
 ]);
 
+export const EVALUATION_RUNTIME_ENTRY =
+  "src/v1/evaluation/analyze.js";
+
+export const COMPATIBILITY_WRITE_WORKFLOW_ENTRIES = Object.freeze({
+  refresh: Object.freeze([
+    COMPATIBILITY_RUNTIME_ARTIFACT[0],
+    "src/v1/compatibility/refresh.js",
+    "src/v1/repository/inspect.js",
+    "src/continuity/engine.js"
+  ]),
+  todo: Object.freeze([
+    COMPATIBILITY_RUNTIME_ARTIFACT[0],
+    "src/v1/compatibility/todo.js",
+    "src/v1/repository/read.js"
+  ])
+});
+
 export const SHARED_WRAPPER_ARTIFACTS = Object.freeze([
   "runtime/bin/kanon-dispatch",
   "runtime/bin/kanon-dispatch.ps1"
@@ -46,6 +63,7 @@ export function generatedExtensionlessWrappers() {
 }
 
 export const V1_RUNTIME_ARTIFACTS = Object.freeze([
+  ["src/continuity/engine.js", "runtime/src/continuity/engine.js"],
   ["src/v1/adapters/claude.js", "runtime/adapters/claude.js"],
   ["src/v1/adapters/codex.js", "runtime/adapters/codex.js"],
   ["src/v1/adapters/shared.js", "runtime/adapters/shared.js"],
@@ -119,6 +137,39 @@ export function collectRuntimeDependencies(
 }
 
 /**
+ * Include each fixed lazy workflow root and its static imports in the shipped
+ * compatibility runtime. The shared router imports only the selected root at
+ * execution time.
+ *
+ * @param {string} repoRoot
+ * @returns {[string, string][]}
+ */
+export function compatibilityRuntimeArtifacts(repoRoot) {
+  const sources = new Set([EVALUATION_RUNTIME_ENTRY]);
+  for (const dependency of collectRuntimeDependencies(
+    repoRoot,
+    EVALUATION_RUNTIME_ENTRY
+  )) {
+    sources.add(dependency);
+  }
+  for (const entries of Object.values(COMPATIBILITY_WRITE_WORKFLOW_ENTRIES)) {
+    for (const entry of entries) {
+      sources.add(entry);
+      for (const dependency of collectRuntimeDependencies(repoRoot, entry)) {
+        sources.add(dependency);
+      }
+    }
+  }
+  const stableSources = new Set(
+    V1_RUNTIME_ARTIFACTS.map(([source]) => source)
+  );
+  return Array.from(sources)
+    .filter((source) => !stableSources.has(source))
+    .sort()
+    .map((source) => [source, `runtime/${source}`]);
+}
+
+/**
  * Return the exact checked-source to installed-runtime mapping for every
  * executable JavaScript module in the stable artifact.
  *
@@ -126,12 +177,7 @@ export function collectRuntimeDependencies(
  * @returns {[string, string][]}
  */
 export function stableRuntimeArtifacts(repoRoot) {
-  const compatibility = [
-    [...COMPATIBILITY_RUNTIME_ARTIFACT],
-    ...collectRuntimeDependencies(repoRoot).map(
-      (source) => [source, `runtime/${source}`]
-    )
-  ];
+  const compatibility = compatibilityRuntimeArtifacts(repoRoot);
   return [...compatibility, ...V1_RUNTIME_ARTIFACTS]
     .map(([source, target]) => [source, target])
     .sort((left, right) => left[1].localeCompare(right[1]));

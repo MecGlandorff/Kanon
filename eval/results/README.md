@@ -1,15 +1,50 @@
-# Raw development reports
+# Historical evaluation archive
 
-Committed development summaries must be generated from a raw JSON report in
-this directory with:
+The large v1.0.0 historical evaluation payloads are preserved byte-for-byte in
+the immutable `v1.0.0` tag at commit
+`21c6d1df2cd2676354a9de6bab96e4651781a608` instead of being duplicated in
+the maintained tree.
 
-```bash
-npm run results:dev -- --input eval/results/<report>.json
+Retrieve an archived file with `git show v1.0.0:<path>`, or archive the listed
+historical materials with:
+
+```sh
+git archive --format=tar v1.0.0 -- \
+  eval/results \
+  eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5 \
+  docs/v1-run-package-declarations-withdrawal.md \
+  docs/v1-run-d2e-trace-to-decision.md \
+  docs/v1-run-d2d-dual-docket-prep.md
 ```
 
-Raw reports are in-sample compatibility records. They are not held-out
-capability estimates.
+The v1.1 tree retains only compact records still used as characterization
+fixtures or exact release-policy bindings, together with the deterministic
+simulation definitions and synthetic fixtures. In particular, the following
+raw payloads and frozen evidence records are archive-only:
 
-Directories named `d2c-unblind-<result-hash-prefix>/` contain an exact masked
-adjudication result plus additive unblinded evaluation analysis. They do not
-replace frozen labels or define an official score.
+- six D.2A schedule, score, mapping, injection, and raw-record files;
+- the D.2E analysis admission and evidence manifest;
+- 30 failed and 30 recovered D.2E per-case trace records plus their raw
+  reports and intermediate manifests;
+- the original standalone development report;
+- 30 post-correction traces, the paired raw reports, and their intermediate
+  manifests;
+- the candidate-level post-correction comparison and evaluation payloads;
+- the package-declarations withdrawal and restoration decision record, whose
+  material outcome remains summarized in the compact risk ledger;
+- the failed D.2E trace-to-decision run record, whose exact frozen copy remains
+  archive-bound;
+- the failed D.2B raw development report and its case/path predeclared
+  taxonomy;
+- the D.2D ranking evidence manifest (the compact ranking result remains for
+  active analysis tooling);
+- the frozen D.2D dual-docket preparation record (the active builders,
+  schemas, compact result, and characterization tests remain in HEAD);
+- the all-candidate D.2E mechanism-analysis payload; and
+- the 84-file synthetic tabletop evidence packet, including its access
+  ledgers, handoffs, predictions, traces, and frozen result records.
+
+This removal covers 205 files, 113,013,691 tracked bytes, and 30,341 physical
+lines as measured from the pre-removal working trees. It does not alter the
+active development corpus, runtime, published package, compact frozen
+summaries, or simulation characterization fixtures that current tests use.

@@ -5,11 +5,12 @@ It targets conventional JavaScript/TypeScript, Python, Go, and Rust layouts.
 
 Today it can:
 
-- read local imports and rank files by fan-in;
-- find content-backed entrypoints such as Python `__main__`, Go/Rust `main`,
-  package binaries, and JavaScript executables;
-- extract commands from package metadata, build targets, selected contributor
-  documentation, and conventional Cargo, Go, and Django layouts;
+- read bounded JavaScript/TypeScript and Python imports and rank files by
+  fan-in;
+- find fixed conventional JavaScript/Python entrypoint paths and root package
+  exports or binaries;
+- extract directly declared commands from package metadata, Python project
+  scripts, and bounded Poe, Make, and Just targets;
 - detect direct README/package-script contradictions and report unobserved
   Node or Python targets as Unknown;
 - report whether conventional CI and deployment configuration was found.
@@ -18,6 +19,16 @@ Kanon does not execute repository code or prove that a detected command will
 succeed in the user's environment. Explicit configuration is **Known**;
 documented or conventional inference is **Likely**; absence remains
 **Unknown**.
+
+The v1.1 compatibility refresh intentionally does not synthesize conventional
+Cargo, Go, or Django commands or project Go/Rust import and entrypoint code
+intelligence. Their manifests and paths can still be observed as bounded
+repository evidence.
+
+The same versioned compact contract does not restore broad executable-syntax
+or nested-manifest entrypoint discovery, and it does not rank literal local-file
+references. Installed evaluation takes the first five files from the compact
+important-file projection and records only the two ranking stages that run.
 
 The visible 30-repository corpus is development and regression data. Its
 results are in-sample and are not presented as performance on unseen
@@ -145,6 +156,12 @@ snapshots/      historical state
 `EVIDENCE.jsonl` is append-only and both evidence and snapshots have configured
 hard retention limits. Reaching a limit produces a warning rather than
 unbounded growth.
+
+`refresh` is a single-writer workflow: do not run concurrent refresh
+processes for the same repository. Each replaced file is written atomically,
+but a refresh is not a cross-file transaction. Evidence is appended before
+the new state is published, so an interrupted write may leave unreferenced
+evidence but cannot publish state that points to evidence it did not append.
 
 The complete package root is the supported integration artifact. Its Bash and
 PowerShell wrappers call the shared root runtime from the repository being

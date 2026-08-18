@@ -13,6 +13,7 @@ import {
   PRODUCTION_ARTIFACT_SHA256,
   RISK_IDS,
   WAIVER_RISK_IDS,
+  assertArchivedEvidenceFile,
   assertMaintainerPath,
   deriveMaintainerConclusion,
   loadCanonicalJson,
@@ -93,6 +94,67 @@ test("maintainer namespace is separate and excluded from production", () => {
   );
 });
 
+test("archive-only evidence retains its exact frozen bindings", () => {
+  const d2bTaxonomy =
+    "eval/results/d2b-predeclared-taxonomy.json";
+  const d2dRankingManifest =
+    "eval/results/d2d-ranking-1f2ba552/evidence-manifest.json";
+  const d2dDocketPreparation = "docs/v1-run-d2d-dual-docket-prep.md";
+  const d2eTraceDecision = "docs/v1-run-d2e-trace-to-decision.md";
+  const archived = [
+    d2bTaxonomy,
+    d2dDocketPreparation,
+    d2dRankingManifest,
+    d2eTraceDecision,
+    "docs/v1-run-package-declarations-withdrawal.md",
+    "eval/results/development-0.4.0-rc.1-d2b-7da293a5.json",
+    "eval/results/post-correction-evidence-sha256-" +
+      "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
+      "comparison.json",
+    "eval/results/post-correction-evidence-sha256-" +
+      "b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/" +
+      "evaluation-record.json",
+    "eval/results/d2e-analysis-" +
+      "b84a9706ebe948303c9e6bc67641fc0dcbef81c0a873098c1d65c2be2dfef81b/" +
+      "mechanism-analysis.json",
+    "eval/v1.0.0-simulation/evidence-sha256-" +
+      "42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/" +
+      "complete-tree-commitment.json"
+  ];
+  for (const relative of archived) {
+    assert.equal(fs.existsSync(path.join(repoRoot, relative)), false, relative);
+  }
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2bTaxonomy,
+      "c266146f2282d777bd87d2ba5beaa30fecf6281b5618dc77074101e091fd2c33"
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2dDocketPreparation,
+      "af27305d8674f4d97f68336859cbb0a855950df25374f96229341989e219e72d"
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2dRankingManifest,
+      "4dbb12cca8020fd17020cb22c274d7b544242767ac81c10a4c381e0f2818e401"
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertArchivedEvidenceFile(
+      repoRoot,
+      d2eTraceDecision,
+      "7f44faf8c2cc610cbb13b6485735f7b95ffec14f14fef67e53946ae5e9ea007a"
+    )
+  );
+  assert.doesNotThrow(() => validateProtocol(bundle.protocol, repoRoot));
+});
+
 test("prospective and simulation authorities retain exact frozen bytes", () => {
   const exact = {
     "6-people-sim.md":
@@ -125,27 +187,6 @@ test("evidence classifications preserve absent human and holdout evidence", () =
     six_person_simulation: "simulated-process-assurance",
     unseen_holdout: "absent"
   });
-  const run = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/run-record.json"
-      ),
-      "utf8"
-    )
-  );
-  const conclusion = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/v1.0.0-simulation/evidence-sha256-42f36e5fea80a84523995c5b394bcb8c4fc5b300a39b763d14277408cff96dc5/conclusion.json"
-      ),
-      "utf8"
-    )
-  );
-  assert.equal(run.human_independence, false);
-  assert.equal(run.release_authority, false);
-  assert.equal(conclusion.payload.release_supported_conclusion, false);
 });
 
 test("risk ledger is complete, exact, unaccepted, and unresolved", () => {
@@ -176,33 +217,31 @@ test("risk ledger is complete, exact, unaccepted, and unresolved", () => {
   assert.equal(documentation.waiver_eligible, false);
 });
 
-test("visible metrics, seven failures, nine incomplete scans, and zero correction benefit remain exact", () => {
-  const evaluation = JSON.parse(
-    fs.readFileSync(
-      path.join(
-        repoRoot,
-        "eval/results/post-correction-evidence-sha256-b2259cef72b0bba7b37fbab37f1d0edcbd592235f92b5813da7f814855f74636/evaluation-record.json"
-      ),
-      "utf8"
-    )
+test("compact risk ledger retains visible metrics and correction outcome", () => {
+  const risks = Object.fromEntries(
+    bundle.ledger.records.map((record) => [record.id, record.residual_risk])
   );
-  const scores = evaluation.aggregate.scores.all_frozen_score_fields.post;
-  assert.deepEqual(scores.totals, {
-    fn: 68,
-    fp: 46,
-    precision: 0.7486338797814208,
-    precision_interval: scores.totals.precision_interval,
-    recall: 0.6682926829268293,
-    recall_interval: scores.totals.recall_interval,
-    tp: 137,
-    weighted_error: 298,
-    weighted_error_per_case: 9.933333333333334
-  });
-  assert.equal(scores.failures.length, 7);
-  assert.equal(scores.incomplete_scan_count, 9);
-  assert.equal(evaluation.aggregate.counts.removed_public_false_positives, 7);
-  assert.equal(evaluation.aggregate.counts.new_public_false_positives, 7);
-  assert.equal(evaluation.aggregate.scores.all_frozen_score_fields.delta.totals.fp, 0);
+  assert.equal(
+    risks["RISK-VISIBLE-FP-FN"],
+    "Visible development evidence has TP 137, FP 46, FN 68, precision " +
+      "0.7486338797814208, recall 0.6682926829268293, and weighted error 298."
+  );
+  assert.equal(
+    risks["RISK-VISIBLE-PERFORMANCE-THRESHOLDS"],
+    "The seven failures are overall precision 0.7486338797814208 below 0.8, " +
+      "weighted error per case 9.933333333333334 above 4, important-file " +
+      "precision 0.6917808219178082 below 0.8, run-command recall 0.5 below " +
+      "0.6, and go-service, monorepo, and python-ml precision below 0.8."
+  );
+  assert.equal(
+    risks["RISK-NINE-INCOMPLETE-SCANS"],
+    "Nine visible development cases have incomplete scans."
+  );
+  assert.equal(
+    risks["RISK-WITHDRAWN-CORRECTION"],
+    "The attempted correction removed seven false positives but introduced " +
+      "seven others, producing zero aggregate benefit."
+  );
 });
 
 test("failed, accepted, resolved, and non-waivable states remain distinct", () => {

@@ -1,38 +1,25 @@
 #!/usr/bin/env node
 
-import crypto from "node:crypto";
-import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { atomicWriteContained } from "../../../src/persistence/safe-fs.js";
-import { resolveContainedPath } from "../../../src/path-security.js";
-import {
-  createRankingTraceCollector,
-  validateRankingTrace
-} from "../d2e-trace.js";
-import { canonicalJson } from "../d2e-evidence.js";
 
 try {
   const input = JSON.parse(await readStdin(64 * 1024));
+  if (input.ranking_trace) {
+    throw new Error("D.2E ranking trace-attempt mode is retired in v1.1.");
+  }
   const module = await import(pathToFileURL(input.analyzer_module).href);
   if (typeof module.analyzeRepo !== "function") {
     throw new Error("Analyzer module does not export analyzeRepo.");
   }
-  const collector = input.ranking_trace
-    ? createRankingTraceCollector(input.ranking_trace.binding)
-    : null;
   const analysis = await module.analyzeRepo(input.repository_root, {
     runId: input.run_id,
     inspectGit: false,
-    scan: input.scan,
-    ...(collector ? { _rankingObserver: collector.observer } : {})
+    scan: input.scan
   });
   const state = analysis?.state;
   if (!state || typeof state !== "object") {
     throw new Error("Analyzer returned no state object.");
   }
-  const rankingTraceReceipt = collector
-    ? preserveRankingTrace(input.ranking_trace, collector, analysis)
-    : null;
   process.stdout.write(`${JSON.stringify({
     state: {
       version: state.version,
@@ -42,133 +29,13 @@ try {
         test: state.commands?.test || []
       },
       scan: boundedScanDiagnostics(state.scan)
-    },
-    ...(rankingTraceReceipt
-      ? { ranking_trace: rankingTraceReceipt }
-      : {})
+    }
   })}\n`);
 } catch (error) {
   process.stderr.write(
     `${String(error?.stack || error?.message || error).slice(0, 8_000)}\n`
   );
   process.exitCode = 1;
-}
-
-function preserveRankingTrace(request, collector, analysis) {
-  try {
-    if (
-      !request ||
-      typeof request.output_directory !== "string" ||
-      !/^(?:case-)?\d{3}\.json$/.test(String(request.file_name || ""))
-    ) {
-      throw new Error("Invalid ranking trace output request.");
-    }
-    const trace = collector.finalize(analysis);
-    const validation = validateRankingTrace(
-      trace,
-      request.binding
-    );
-    const bytes = request.canonical_serialization === true
-      ? `${canonicalJson(trace)}\n`
-      : `${JSON.stringify(trace)}\n`;
-    if (request.exclusive_creation === true) {
-      writeExclusiveContained(
-        request.output_directory,
-        request.file_name,
-        bytes
-      );
-    } else {
-      atomicWriteContained(
-        request.output_directory,
-        request.file_name,
-        bytes
-      );
-    }
-    return {
-      status: "written",
-      file_name: request.file_name,
-      sha256: crypto
-        .createHash("sha256")
-        .update(bytes)
-        .digest("hex"),
-      bytes: Buffer.byteLength(bytes),
-      complete:
-        trace.completeness.complete === true &&
-        validation.valid,
-      validation_failures: validation.failures
-    };
-  } catch (error) {
-    return {
-      status: "failed",
-      file_name:
-        typeof request?.file_name === "string"
-          ? request.file_name.slice(0, 64)
-          : null,
-      sha256: null,
-      bytes: 0,
-      complete: false,
-      validation_failures: [
-        String(error?.message || error || "trace failure").slice(0, 1_000)
-      ]
-    };
-  }
-}
-
-function writeExclusiveContained(rootPath, relative, contents) {
-  const root = resolveContainedPath(rootPath, ".", {
-    allowRoot: true,
-    type: "directory"
-  });
-  if (!root.ok) {
-    throw new Error("Unsafe ranking trace output directory.");
-  }
-  const target = resolveContainedPath(root.root, relative, {
-    type: "file"
-  });
-  if (target.status !== "missing" || target.path === null) {
-    throw new Error("Ranking trace output must be previously absent.");
-  }
-  const descriptor = fs.openSync(
-    target.path,
-    fs.constants.O_CREAT |
-      fs.constants.O_EXCL |
-      fs.constants.O_WRONLY |
-      (fs.constants.O_NOFOLLOW || 0),
-    0o600
-  );
-  try {
-    fs.writeFileSync(descriptor, contents, "utf8");
-    fs.fchmodSync(descriptor, 0o600);
-    fs.fsyncSync(descriptor);
-  } finally {
-    fs.closeSync(descriptor);
-  }
-  syncDirectory(root.root);
-}
-
-function syncDirectory(directory) {
-  const parent = fs.openSync(directory, fs.constants.O_RDONLY);
-  try {
-    fs.fsyncSync(parent);
-  } catch (error) {
-    if (!isUnsupportedDirectorySync(error)) {
-      throw error;
-    }
-  } finally {
-    fs.closeSync(parent);
-  }
-}
-
-function isUnsupportedDirectorySync(error) {
-  return (
-    process.platform === "win32" &&
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    ["EBADF", "EINVAL", "ENOSYS", "ENOTSUP", "EPERM"].includes(
-      String(error.code)
-    )
-  );
 }
 
 function boundedScanDiagnostics(value) {
