@@ -455,12 +455,17 @@ function availableEvidenceRetention(root, limits) {
     limits.max_evidence_bytes
   );
   if (!existing.ok) {
-    return { maxRecords: 0, maxBytes: 0 };
+    throw new Error(`Unsafe evidence ledger: ${existing.reason}`);
   }
   const currentRecords = boundedRecordCount(
     existing.text,
     limits.max_evidence_records
   );
+  if (currentRecords > limits.max_evidence_records) {
+    throw new Error(
+      `Unsafe evidence ledger: the input exceeds its ${limits.max_evidence_records}-record limit.`
+    );
+  }
   return {
     maxRecords: Math.max(
       0,
@@ -468,7 +473,7 @@ function availableEvidenceRetention(root, limits) {
     ),
     maxBytes: Math.max(
       0,
-      limits.max_evidence_bytes - target.stat.size
+      limits.max_evidence_bytes - existing.size
     )
   };
 }
@@ -1458,9 +1463,10 @@ function projectReadmeVerification(input) {
     );
     const expectation = packageScriptExpectation(command);
     if (expectation && input.packageInfo) {
+      const declaredScript = scripts[expectation.script];
       if (
-        typeof scripts[expectation.script] !== "string" ||
-        !scripts[expectation.script].trim()
+        typeof declaredScript !== "string" ||
+        !declaredScript.trim()
       ) {
         const packageEvidence = evidenceFor(
           input.evidence,
@@ -1944,55 +1950,29 @@ function persistRefresh(analysis, config, options) {
       "Evidence retention limit was reached; unsupported claims were downgraded to Unknown."
     );
   }
+  const brief = renderBrief(analysis, options);
+  const state = `${safeJsonStringify(analysis.state)}\n`;
+  const renderedHandoff = renderHandoff(analysis, previous.state, {
+    todos: todos.todos,
+    stateWarning: previous.warning,
+    todoWarning: todos.warning,
+    handoffWarning: handoff.warning,
+    handoff: handoff.handoff,
+    continuity
+  });
+  appendEvidence(root, analysis.evidence);
   writeKanonGitignore(root);
   ensureConfig(root);
-  /** @type {[string, string][]} */
-  const outputs = [
-    [".kanon/KANON.md", renderBrief(analysis, options)],
-    [".kanon/STATE.json", `${safeJsonStringify(analysis.state)}\n`],
-    [".kanon/HANDOFF.md", renderHandoff(analysis, previous.state, {
-      todos: todos.todos,
-      stateWarning: previous.warning,
-      todoWarning: todos.warning,
-      handoffWarning: handoff.warning,
-      handoff: handoff.handoff,
-      continuity
-    })]
-  ];
-  let snapshot = null;
-  appendEvidence(root, analysis.evidence, config.persistence, () => {
-    const prior = outputs.map(([relative]) => {
-      const read = readContainedText(root, relative, 8 * 1024 * 1024, {
-        optional: true
-      });
-      if (!read.ok && read.status === "missing") return null;
-      if (!read.ok) throw new Error(`Unsafe ${relative}: ${read.reason}`);
-      return read.text;
-    });
-    let written = 0;
-    try {
-      for (const [relative, contents] of outputs) {
-        atomicWriteContained(root, relative, contents);
-        written += 1;
-      }
-      snapshot = writeSnapshot(
-        root,
-        analysis.state.run_id,
-        analysis.state,
-        config.persistence,
-        warnings
-      );
-    } catch (error) {
-      while (written > 0) {
-        written -= 1;
-        const output = outputs[written];
-        if (output) {
-          atomicWriteContained(root, output[0], prior[written] ?? null);
-        }
-      }
-      throw error;
-    }
-  });
+  atomicWriteContained(root, ".kanon/KANON.md", brief);
+  atomicWriteContained(root, ".kanon/HANDOFF.md", renderedHandoff);
+  const snapshot = writeSnapshot(
+    root,
+    analysis.state.run_id,
+    analysis.state,
+    config.persistence,
+    warnings
+  );
+  atomicWriteContained(root, ".kanon/STATE.json", state);
   return {
     kanonDir: path.join(root, ".kanon"),
     written: [
@@ -2034,17 +2014,13 @@ function writeSnapshot(root, id, state, limits, warnings) {
   atomicWriteContained(root, relative, `${safeJsonStringify(state)}\n`);
   return relative;
 }
-/** @param {string} root @param {EvidenceRecord[]} records @param {typeof DEFAULT_CONFIG.persistence} limits @param {() => void} publish */
-function appendEvidence(root, records, limits, publish) {
+/** @param {string} root @param {EvidenceRecord[]} records */
+function appendEvidence(root, records) {
   const relative = ".kanon/EVIDENCE.jsonl";
   const payload = records.length
     ? `${records.map((record) => safeJsonStringify(record, 0)).join("\n")}\n`
     : "";
-  appendContained(root, relative, payload, {
-    maximumBytes: limits.max_evidence_bytes,
-    maximumRecords: limits.max_evidence_records,
-    publish
-  });
+  appendContained(root, relative, payload);
 }
 /** @param {ReturnType<typeof buildRefreshAnalysis>} analysis @param {{deep?: boolean}} options */
 function renderBrief(analysis, options) {

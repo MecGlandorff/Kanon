@@ -157,6 +157,12 @@ snapshots/      historical state
 hard retention limits. Reaching a limit produces a warning rather than
 unbounded growth.
 
+`refresh` is a single-writer workflow: do not run concurrent refresh
+processes for the same repository. Each replaced file is written atomically,
+but a refresh is not a cross-file transaction. Evidence is appended before
+the new state is published, so an interrupted write may leave unreferenced
+evidence but cannot publish state that points to evidence it did not append.
+
 The complete package root is the supported integration artifact. Its Bash and
 PowerShell wrappers call the shared root runtime from the repository being
 inspected; they are agent hooks, not a global terminal package. Codex CLI and

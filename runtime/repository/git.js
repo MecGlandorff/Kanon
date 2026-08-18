@@ -252,23 +252,27 @@ export function listGitVisibleFiles(canonicalRoot, options = {}) {
   }
   const maximumEntries = boundedInteger(options.max_entries, 10_000, 1, 100_000);
   const files = [], seen = new Set(), cursor = { offset: 0 };
-  let observed = 0;
+  let truncated = false;
   while (cursor.offset < result.stdout.length) {
     const value = readNulField(result.stdout, cursor);
     if (value === null) return unavailableFileList();
     if (!value) continue;
-    observed += 1;
-    if (observed > maximumEntries) break;
     const selected = value.replaceAll("\\", "/");
     if (!isSafeRelativePath(selected)) {
       return unavailableFileList();
     }
-    if (!seen.has(selected)) { seen.add(selected); files.push(selected); }
+    if (seen.has(selected)) continue;
+    seen.add(selected);
+    if (files.length >= maximumEntries) {
+      truncated = true;
+      break;
+    }
+    files.push(selected);
   }
   return {
     ok: true,
     files: files.sort(),
-    diagnostic: observed > maximumEntries ? "Git file-list output exceeded its entry limit." : null
+    diagnostic: truncated ? "Git file-list output exceeded its entry limit." : null
   };
 }
 

@@ -1,24 +1,17 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import crypto from "node:crypto";
-import { once } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { runWriteCli } from "../src/v1/compatibility/cli.js";
 import { DEFAULT_CONFIG } from "../src/config.js";
-import { stableRuntimeArtifacts } from "../scripts/lib/artifact-files.js";
-import {
-  inspectPreviousState,
-  readKanonTodos
-} from "../src/persist.js";
+import { inspectPreviousState } from "../src/persist.js";
 import {
   canSymlink,
   captureCli,
   fileIdentity,
-  makeFixture,
-  readJson
+  makeFixture
 } from "./helpers.js";
 
 const repoRoot = path.resolve(
@@ -267,215 +260,7 @@ test("TODO mutation rejects an over-budget existing store without replacement", 
   assert.deepEqual(fileIdentity(todoPath), before);
 });
 
-test("concurrent compatibility writers leave complete bounded artifacts", async () => {
-  const root = makeFixture({
-    "README.md": "# Concurrent writers\n",
-    "package.json": JSON.stringify({ name: "concurrent-writers" }),
-    ".kanon/.gitignore": kanonGitignore,
-    ".kanon/config.json": `${JSON.stringify(DEFAULT_CONFIG)}\n`,
-    ".kanon/TODO.md": "# Kanon TODO\n\n"
-  });
-  fs.mkdirSync(path.join(root, ".kanon", "snapshots"));
-  const todoTexts = Array.from(
-    { length: 6 },
-    (_, index) => `concurrent item ${index + 1}`
-  );
-  const jobs = [
-    ...todoTexts.map((text) => ({
-      kind: "todo",
-      run: spawnWrite([
-        "todo",
-        "add",
-        text,
-        "--json",
-        "--root",
-        root
-      ])
-    })),
-    ...Array.from({ length: 2 }, () => ({
-      kind: "refresh",
-      run: spawnWrite(["refresh", "--root", root])
-    }))
-  ];
-  const results = await Promise.all(
-    jobs.map(async (job) => ({ ...job, result: await job.run }))
-  );
-
-  for (const { kind, result } of results) {
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.equal(result.signal, null);
-    assert.equal(result.stderr, "");
-    if (kind === "todo") {
-      const parsed = JSON.parse(result.stdout);
-      assert.equal(parsed.path, ".kanon/TODO.md");
-      assert.ok(todoTexts.includes(parsed.todo.text));
-    } else {
-      assert.match(result.stdout, /^Kanon refreshed /);
-    }
-  }
-
-  const todoSource = fs.readFileSync(
-    path.join(root, ".kanon", "TODO.md"),
-    "utf8"
-  );
-  const todos = readKanonTodos(root);
-  assert.match(todoSource, /^# Kanon TODO\n\n/);
-  assert.equal(todoSource.endsWith("\n"), true);
-  assert.ok(todos.length >= 1 && todos.length <= todoTexts.length);
-  assert.ok(todos.every((todo) => todoTexts.includes(todo.text)));
-
-  const state = inspectPreviousState(root);
-  assert.equal(state.valid, true);
-  assert.equal(state.state?.schema_version, 2);
-  const evidenceLines = fs
-    .readFileSync(path.join(root, ".kanon", "EVIDENCE.jsonl"), "utf8")
-    .split(/\r?\n/)
-    .filter(Boolean);
-  assert.ok(evidenceLines.length > 0);
-  const retainedEvidence = new Set();
-  for (const line of evidenceLines) {
-    const record = JSON.parse(line);
-    retainedEvidence.add(record.id);
-  }
-  for (const evidenceId of collectEvidenceIds(state.state)) {
-    assert.equal(retainedEvidence.has(evidenceId), true, evidenceId);
-  }
-  for (const directory of [
-    path.join(root, ".kanon"),
-    path.join(root, ".kanon", "snapshots")
-  ]) {
-    assert.equal(
-      fs.readdirSync(directory).some((name) => name.endsWith(".tmp")),
-      false
-    );
-  }
-  for (const snapshot of fs.readdirSync(path.join(root, ".kanon", "snapshots"))) {
-    assert.doesNotThrow(() => readJson(
-      path.join(root, ".kanon", "snapshots", snapshot)
-    ));
-  }
-});
-
-test("concurrent refresh publishes only retained evidence references", async () => {
-  const config = structuredClone(DEFAULT_CONFIG);
-  config.persistence.max_evidence_records = 1;
-  const root = makeFixture({
-    "README.md": "# Concurrent evidence\n",
-    "package.json": JSON.stringify({
-      name: "concurrent-evidence",
-      description: "Concurrency-safe retained evidence"
-    }),
-    ".kanon/config.json": `${JSON.stringify(config)}\n`
-  });
-  fs.mkdirSync(path.join(root, ".kanon", "snapshots"));
-  const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
-  fs.writeFileSync(reservationPath, await deadReservationMarker());
-  const results = await Promise.all(
-    Array.from({ length: 8 }, () =>
-      spawnWrite(["refresh", "--root", root])
-    )
-  );
-
-  assert.ok(results.some((result) => result.status === 0));
-  for (const result of results) {
-    assert.equal(result.signal, null);
-    if (result.status === 0) {
-      assert.match(result.stdout, /^Kanon refreshed /);
-    } else {
-      assert.equal(result.status, 1);
-      assert.match(
-        result.stderr,
-        /Evidence retention changed before refresh publication|reservation ownership changed|could not be canonicalized/
-      );
-    }
-  }
-
-  const state = inspectPreviousState(root);
-  assert.equal(state.valid, true);
-  const ledger = fs.readFileSync(
-    path.join(root, ".kanon", "EVIDENCE.jsonl"),
-    "utf8"
-  ).trim().split("\n").map((line) => JSON.parse(line));
-  assert.equal(ledger.length, 1);
-  const retained = new Set(ledger.map((record) => record.id));
-  for (const evidenceId of collectEvidenceIds(state.state)) {
-    assert.equal(retained.has(evidenceId), true, evidenceId);
-  }
-  for (const relative of ["KANON.md", "HANDOFF.md"]) {
-    const output = fs.readFileSync(path.join(root, ".kanon", relative), "utf8");
-    for (const match of output.matchAll(/\be_[A-Za-z0-9-]+_\d{3}\b/g)) {
-      assert.equal(retained.has(match[0]), true, match[0]);
-    }
-  }
-  assert.equal(
-    fs.readdirSync(path.join(root, ".kanon"))
-      .some((name) => name.startsWith("EVIDENCE.jsonl.tmp")),
-    false
-  );
-});
-
-test("failed refresh restores published artifacts and evidence capacity", async () => {
-  const root = makeFixture({
-    "README.md": "# Publication rollback\n",
-    "package.json": JSON.stringify({
-      name: "publication-rollback",
-      description: "Retained publication before failure"
-    })
-  });
-  await captureCli(runWriteCli, ["refresh", "--root", root]);
-  const relativeOutputs = [
-    "KANON.md",
-    "STATE.json",
-    "EVIDENCE.jsonl",
-    "HANDOFF.md"
-  ];
-  const before = new Map(relativeOutputs.map((relative) => [
-    relative,
-    fs.readFileSync(path.join(root, ".kanon", relative), "utf8")
-  ]));
-  const snapshotsBefore = fs.readdirSync(path.join(root, ".kanon", "snapshots"));
-  const originalRename = fs.renameSync;
-  let injected = false;
-  fs.renameSync = (source, destination) => {
-    if (
-      !injected &&
-      destination === path.join(root, ".kanon", "HANDOFF.md")
-    ) {
-      injected = true;
-      throw Object.assign(new Error("injected publication failure"), {
-        code: "EIO"
-      });
-    }
-    return originalRename(source, destination);
-  };
-  try {
-    await assert.rejects(
-      () => captureCli(runWriteCli, ["refresh", "--root", root]),
-      /injected publication failure/
-    );
-  } finally {
-    fs.renameSync = originalRename;
-  }
-
-  assert.equal(injected, true);
-  for (const relative of relativeOutputs) {
-    assert.equal(
-      fs.readFileSync(path.join(root, ".kanon", relative), "utf8"),
-      before.get(relative)
-    );
-  }
-  assert.deepEqual(
-    fs.readdirSync(path.join(root, ".kanon", "snapshots")),
-    snapshotsBefore
-  );
-  assert.equal(
-    fs.readdirSync(path.join(root, ".kanon"))
-      .some((name) => name.endsWith(".tmp")),
-    false
-  );
-});
-
-test("refresh bounds evidence reads before retention counting", async () => {
+test("refresh rejects an over-limit evidence ledger with bounded memory", async () => {
   const config = structuredClone(DEFAULT_CONFIG);
   config.persistence.max_evidence_bytes = 1_024;
   const root = makeFixture({
@@ -494,16 +279,12 @@ test("refresh bounds evidence reads before retention counting", async () => {
 
   assert.equal(result.status, 1, result.stderr || result.stdout);
   assert.equal(result.signal, null);
-  assert.match(
-    result.stderr,
-    /Evidence retention changed before refresh publication/
-  );
+  assert.match(result.stderr, /Unsafe evidence ledger.*1024-byte limit/i);
   assert.doesNotMatch(result.stderr, /heap out of memory|allocation failed/i);
   assert.equal(fs.statSync(evidencePath).size, oversized);
-  assert.equal(fs.existsSync(`${evidencePath}.tmp`), false);
 
   const denseConfig = structuredClone(DEFAULT_CONFIG);
-  denseConfig.persistence.max_evidence_bytes = 32 * 1024 * 1024;
+  denseConfig.persistence.max_evidence_bytes = 4 * 1024 * 1024;
   denseConfig.persistence.max_evidence_records = 1;
   const denseRoot = makeFixture({
     "README.md": "# Bounded evidence count\n",
@@ -511,201 +292,17 @@ test("refresh bounds evidence reads before retention counting", async () => {
     ".kanon/EVIDENCE.jsonl": ""
   });
   const denseEvidence = path.join(denseRoot, ".kanon", "EVIDENCE.jsonl");
-  fs.writeFileSync(denseEvidence, Buffer.alloc(32 * 1024 * 1024, "x\n"));
+  fs.writeFileSync(denseEvidence, Buffer.alloc(4 * 1024 * 1024, "x\n"));
   const dense = await spawnWrite(
     ["refresh", "--root", denseRoot],
-    ["--max-old-space-size=96"]
+    ["--max-old-space-size=64"]
   );
+
   assert.equal(dense.status, 1, dense.stderr || dense.stdout);
   assert.equal(dense.signal, null);
-  assert.match(dense.stderr, /Evidence retention changed before refresh publication/);
+  assert.match(dense.stderr, /Unsafe evidence ledger.*1-record limit/i);
   assert.doesNotMatch(dense.stderr, /heap out of memory|allocation failed/i);
 });
-
-test("refresh fails closed on ambiguous or live reservations and recovers dead owners", async (t) => {
-  const root = makeFixture({
-    "README.md": "# Recover evidence reservation\n",
-    "package.json": JSON.stringify({ name: "reservation-recovery" })
-  });
-  const reservationPath = path.join(
-    root,
-    ".kanon",
-    "EVIDENCE.jsonl.tmp"
-  );
-  fs.mkdirSync(path.dirname(reservationPath));
-  fs.writeFileSync(reservationPath, "1\n");
-  const preseeded = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(preseeded.status, 1, preseeded.stderr || preseeded.stdout);
-  assert.match(preseeded.stderr, /EEXIST|file already exists/i);
-  assert.equal(fs.readFileSync(reservationPath, "utf8"), "1\n");
-  fs.unlinkSync(reservationPath);
-
-  const owner = spawn(
-    process.execPath,
-    ["-e", "setInterval(() => {}, 60_000)"],
-    { stdio: "ignore", windowsHide: true }
-  );
-  await once(owner, "spawn");
-  t.after(() => {
-    if (owner.exitCode === null && owner.signalCode === null) owner.kill();
-  });
-  const ownerToken = crypto.randomUUID();
-  fs.writeFileSync(reservationPath, `${owner.pid} ${ownerToken}\n`);
-  const staleTime = new Date(Date.now() - 31_000);
-  fs.utimesSync(reservationPath, staleTime, staleTime);
-
-  const blocked = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(blocked.status, 1, blocked.stderr || blocked.stdout);
-  assert.equal(blocked.signal, null);
-  assert.match(blocked.stderr, /EEXIST|file already exists/i);
-  assert.equal(
-    fs.readFileSync(reservationPath, "utf8"),
-    `${owner.pid} ${ownerToken}\n`
-  );
-
-  const exited = once(owner, "close");
-  assert.equal(owner.kill(), true);
-  await exited;
-  const recovered = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(recovered.status, 0, recovered.stderr || recovered.stdout);
-  assert.equal(fs.existsSync(reservationPath), false);
-
-  fs.writeFileSync(
-    reservationPath,
-    `${process.pid} ${crypto.randomUUID()}\n`
-  );
-  fs.utimesSync(reservationPath, staleTime, staleTime);
-  const reused = await spawnWrite(["refresh", "--root", root]);
-  assert.equal(reused.status, 1, reused.stderr || reused.stdout);
-  assert.match(reused.stderr, /EEXIST|file already exists/i);
-  assert.equal(fs.existsSync(reservationPath), true);
-  fs.unlinkSync(reservationPath);
-});
-
-test("stale takeover preserves a concurrently acquired reservation", async () => {
-  const root = makeFixture({
-    "README.md": "# Reservation takeover\n",
-    "package.json": JSON.stringify({ name: "reservation-takeover" })
-  });
-  const reservationPath = path.join(root, ".kanon", "EVIDENCE.jsonl.tmp");
-  const displacedPath = `${reservationPath}.displaced`;
-  fs.mkdirSync(path.dirname(reservationPath));
-  fs.writeFileSync(reservationPath, await deadReservationMarker());
-  const freshMarker = `${process.pid} ${crypto.randomUUID()}\n`;
-  const originalLink = fs.linkSync;
-  let injected = false;
-  fs.linkSync = (source, destination) => {
-    if (
-      !injected &&
-      source === reservationPath &&
-      String(destination).endsWith(".claim")
-    ) {
-      injected = true;
-      originalLink(source, destination);
-      fs.renameSync(source, displacedPath);
-      fs.writeFileSync(reservationPath, freshMarker);
-      return;
-    }
-    return originalLink(source, destination);
-  };
-  try {
-    await assert.rejects(
-      () => captureCli(runWriteCli, ["refresh", "--root", root]),
-      /EEXIST|file already exists/i
-    );
-  } finally {
-    fs.linkSync = originalLink;
-  }
-  assert.equal(injected, true);
-  assert.equal(fs.readFileSync(reservationPath, "utf8"), freshMarker);
-  assert.equal(
-    fs.readdirSync(path.dirname(reservationPath))
-      .some((name) => name.endsWith(".owner") || name.endsWith(".claim")),
-    false
-  );
-  fs.unlinkSync(reservationPath);
-  fs.unlinkSync(displacedPath);
-});
-
-test("refresh reports evidence reservation cleanup failures", async () => {
-  const root = makeFixture({
-    "README.md": "# Reservation cleanup\n",
-    "package.json": JSON.stringify({ name: "reservation-cleanup" })
-  });
-  const reservationPath = path.join(
-    root,
-    ".kanon",
-    "EVIDENCE.jsonl.tmp"
-  );
-  const originalUnlink = fs.unlinkSync;
-  let injected = false;
-  fs.unlinkSync = (target) => {
-    if (!injected && target === reservationPath) {
-      injected = true;
-      throw Object.assign(new Error("injected reservation cleanup failure"), {
-        code: "EIO"
-      });
-    }
-    return originalUnlink(target);
-  };
-  try {
-    await assert.rejects(
-      () => captureCli(runWriteCli, ["refresh", "--root", root]),
-      /injected reservation cleanup failure/
-    );
-    assert.equal(fs.existsSync(reservationPath), true);
-  } finally {
-    fs.unlinkSync = originalUnlink;
-    if (fs.existsSync(reservationPath)) originalUnlink(reservationPath);
-  }
-  assert.equal(injected, true);
-  assert.equal(inspectPreviousState(root).valid, true);
-
-  fs.writeFileSync(reservationPath, await deadReservationMarker());
-  let claimCleanupInjected = false;
-  fs.unlinkSync = (target) => {
-    if (!claimCleanupInjected && String(target).endsWith(".claim")) {
-      claimCleanupInjected = true;
-      throw Object.assign(new Error("injected claim cleanup failure"), {
-        code: "EIO"
-      });
-    }
-    return originalUnlink(target);
-  };
-  try {
-    await assert.rejects(
-      () => captureCli(runWriteCli, ["refresh", "--root", root]),
-      /injected claim cleanup failure/
-    );
-  } finally {
-    fs.unlinkSync = originalUnlink;
-    for (const name of fs.readdirSync(path.dirname(reservationPath))) {
-      if (name.endsWith(".claim")) originalUnlink(path.join(path.dirname(reservationPath), name));
-    }
-  }
-  assert.equal(claimCleanupInjected, true);
-});
-
-test("compatibility persistence mirrors and release metrics stay exact", () => {
-  const mappings = stableRuntimeArtifacts(repoRoot);
-  let lines = 0;
-  let bytes = 0;
-  for (const [sourceRelative, targetRelative] of mappings) {
-    const source = fs.readFileSync(path.join(repoRoot, sourceRelative));
-    assert.deepEqual(
-      fs.readFileSync(path.join(repoRoot, targetRelative)),
-      source,
-      `${targetRelative} must mirror ${sourceRelative}`
-    );
-    lines += source.toString("utf8").split("\n").length - 1;
-    bytes += source.length;
-  }
-  assert.deepEqual(
-    { files: mappings.length, lines, bytes },
-    { files: 39, lines: 17_678, bytes: 496_856 }
-  );
-});
-
 function configWithInputLimits(inputLimits) {
   return {
     ...DEFAULT_CONFIG,
@@ -747,33 +344,4 @@ function spawnWrite(args, nodeArgs = []) {
       resolve({ status, signal, stdout, stderr });
     });
   });
-}
-
-async function deadReservationMarker() {
-  const owner = spawn(process.execPath, ["-e", "setInterval(() => {}, 60_000)"], {
-    stdio: "ignore",
-    windowsHide: true
-  });
-  await once(owner, "spawn");
-  const closed = once(owner, "close");
-  const pid = owner.pid;
-  owner.kill();
-  await closed;
-  if (!Number.isInteger(pid)) throw new Error("Reservation owner PID was unavailable.");
-  return `${pid} ${crypto.randomUUID()}\n`;
-}
-
-function collectEvidenceIds(value, output = new Set()) {
-  if (typeof value === "string") {
-    if (/^e_[A-Za-z0-9-]+_\d{3}$/.test(value)) output.add(value);
-    return output;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) collectEvidenceIds(item, output);
-    return output;
-  }
-  if (value && typeof value === "object") {
-    for (const item of Object.values(value)) collectEvidenceIds(item, output);
-  }
-  return output;
 }

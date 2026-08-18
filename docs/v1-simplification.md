@@ -440,6 +440,5 @@ Suggested:
 
 No P0 or P1 remains from this review. Deferred lower-risk residuals are the
 unavailable native platform proofs, the intentionally retained legacy
-refresh/TODO analyzer closure, and the pre-existing same-user concurrent
-replacement risks already documented for persisted state. None changes a
-public capability or safety claim.
+refresh/TODO analyzer closure, and the explicit single-writer constraint for
+refresh persistence. None changes a public capability or safety claim.

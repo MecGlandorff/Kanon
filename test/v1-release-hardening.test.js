@@ -237,7 +237,7 @@ test("package metadata and expected inventory are exact and dependency-free", ()
   assert.equal(
     stagedFiles.reduce((bytes, relative) =>
       bytes + fs.statSync(path.join(output, relative)).size, 0),
-    586_595
+    580_908
   );
   assert.equal(
     fs.readFileSync(path.join(output, "SECURITY.md"), "utf8"),

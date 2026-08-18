@@ -6,8 +6,6 @@ import {
   isSafeRelativePath,
   resolveRepositoryPath
 } from "#kanon-repository-read";
-const APPEND_WAIT = new Int32Array(new SharedArrayBuffer(4));
-const RETENTION_CHANGED = "Evidence retention changed before refresh publication.";
 
 /**
  * @typedef {{ok: true, status: "ok", root: string, path: string, relativePath: string, stat: fs.Stats}} ContainedPathSuccess
@@ -39,13 +37,9 @@ export function ensureContainedDirectory(root, relativePath) {
   return resolveContainedPath(root, relativePath, { type: "directory" });
 }
 
-/** @param {string} root @param {string} relativePath @param {string | null} contents */
+/** @param {string} root @param {string} relativePath @param {string} contents */
 export function atomicWriteContained(root, relativePath, contents) {
   const destination = prepareDestination(root, relativePath);
-  if (contents === null) {
-    if (destination.ok) fs.unlinkSync(destination.path);
-    return;
-  }
   const parentRelative = path.posix.dirname(relativePath.replaceAll("\\", "/"));
   const tempName = `.kanon.${process.pid}.${crypto.randomUUID()}.tmp`;
   const tempRelative = parentRelative === "." ? tempName : `${parentRelative}/${tempName}`;
@@ -71,132 +65,23 @@ export function atomicWriteContained(root, relativePath, contents) {
   }
 }
 
-/** @param {string} root @param {string} relativePath @param {string} contents
- * @param {{maximumBytes: number, maximumRecords: number, publish: () => void}} [transaction] */
-export function appendContained(root, relativePath, contents, transaction) {
-  const reservationRelative = `${relativePath}.tmp`;
+/** @param {string} root @param {string} relativePath @param {string} contents */
+export function appendContained(root, relativePath, contents) {
   const destination = prepareDestination(root, relativePath);
   const noFollow = Number(fs.constants.O_NOFOLLOW) || 0;
-  const reservationToken = transaction ? crypto.randomUUID() : "";
-  const ownerRelative = `${reservationRelative}.${reservationToken}.owner`;
-  let reservation, owner, ownerFd, ownerStat;
-  let reservationOwned = false;
-  let fd, originalSize;
+  const fd = fs.openSync(destination.path,
+    fs.constants.O_APPEND | fs.constants.O_CREAT |
+      fs.constants.O_WRONLY | noFollow, 0o600);
   try {
-    if (transaction) {
-      owner = prepareDestination(root, ownerRelative);
-      ownerFd = fs.openSync(owner.path, fs.constants.O_CREAT |
-        fs.constants.O_EXCL | fs.constants.O_WRONLY | noFollow, 0o600);
-      fs.writeFileSync(ownerFd, `${process.pid} ${reservationToken}\n`, "utf8");
-      fs.fsyncSync(ownerFd);
-      ownerStat = fs.fstatSync(ownerFd);
-      const deadline = Date.now() + 5_000;
-      for (;;) {
-        reservation = prepareDestination(root, reservationRelative);
-        try { fs.linkSync(owner.path, reservation.path); reservationOwned = true; break; }
-        catch (error) {
-          if (errorCode(error) !== "EEXIST") throw error;
-          if (removeStaleReservation(root, reservationRelative)) continue;
-          if (Date.now() >= deadline) throw error;
-          Atomics.wait(APPEND_WAIT, 0, 0, 10);
-        }
-      }
-      fs.closeSync(ownerFd);
-      ownerFd = undefined;
-      fs.unlinkSync(owner.path);
-      owner = undefined;
-    }
-    fd = fs.openSync(destination.path,
-      fs.constants.O_APPEND | fs.constants.O_CREAT |
-        (transaction ? fs.constants.O_RDWR : fs.constants.O_WRONLY) | noFollow, 0o600);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() ||
       (destination.ok && fileIdentityChanged(destination.stat, stat)))
       throw new Error(`${relativePath}: append target changed after containment validation.`);
-    originalSize = stat.size;
-    if (transaction) {
-      const payloadBytes = Buffer.byteLength(contents);
-      if (stat.size > transaction.maximumBytes - payloadBytes)
-        throw new Error(RETENTION_CHANGED);
-      const existing = stat.size ? fs.readFileSync(fd, "utf8") : "";
-      const incomingRecords = boundedRecordCount(contents,
-        transaction.maximumRecords);
-      const remaining = transaction.maximumRecords - incomingRecords;
-      if (remaining < 0 || boundedRecordCount(existing, remaining) > remaining)
-        throw new Error(RETENTION_CHANGED);
-      assertReservationOwner(root, reservationRelative, ownerStat);
-    }
     fs.writeFileSync(fd, contents, "utf8");
     fs.fsyncSync(fd);
-    if (transaction) assertReservationOwner(root, reservationRelative, ownerStat);
-    transaction?.publish();
-  } catch (error) {
-    if (transaction && fd !== undefined && originalSize !== undefined)
-      { fs.ftruncateSync(fd, originalSize); fs.fsyncSync(fd); }
-    throw error;
   } finally {
-    if (fd !== undefined) fs.closeSync(fd);
-    if (ownerFd !== undefined) fs.closeSync(ownerFd);
-    if (reservationOwned && ownerStat)
-      fs.unlinkSync(assertReservationOwner(root, reservationRelative, ownerStat).path);
-    if (owner) fs.unlinkSync(owner.path);
+    fs.closeSync(fd);
   }
-}
-
-/** @param {string} root @param {string} relativePath */
-function removeStaleReservation(root, relativePath) {
-  const current = resolveContainedPath(root, relativePath, { type: "file" });
-  if (!current.ok) return current.status === "missing";
-  const read = readContainedText(root, relativePath, 64);
-  const match = read.ok ? /^([1-9]\d{0,9}) ([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\n?$/.exec(read.text) : null;
-  if (!match || Number(match[1]) > 2_147_483_647) return false;
-  try { process.kill(Number(match[1]), 0); return false; }
-  catch (error) {
-    if (errorCode(error) !== "ESRCH") return false;
-  }
-  const claimRelative = `${relativePath}.${match[2]}.claim`;
-  const claim = prepareDestination(root, claimRelative);
-  let claimed = false;
-  try {
-    try { fs.linkSync(current.path, claim.path); claimed = true; }
-    catch (error) {
-      if (errorCode(error) === "ENOENT") return true;
-      if (errorCode(error) === "EEXIST") return false;
-      throw error;
-    }
-    const pinned = resolveContainedPath(root, claimRelative, { type: "file" });
-    const pinnedRead = readContainedText(root, claimRelative, 64);
-    if (!pinned.ok || fileIdentityChanged(current.stat, pinned.stat) ||
-      !pinnedRead.ok || pinnedRead.text !== read.text) return false;
-    const latest = resolveContainedPath(root, relativePath, { type: "file" });
-    if (!latest.ok) return latest.status === "missing";
-    if (fileIdentityChanged(pinned.stat, latest.stat)) return false;
-    fs.unlinkSync(latest.path);
-    return true;
-  } finally {
-    if (claimed) fs.unlinkSync(claim.path);
-  }
-}
-
-/** @param {string} text @param {number} maximum */
-function boundedRecordCount(text, maximum) {
-  let count = 0;
-  let start = 0;
-  for (let index = 0; index < text.length; index += 1) {
-    if (text.charCodeAt(index) !== 10) continue;
-    const end = index > start && text.charCodeAt(index - 1) === 13 ? index - 1 : index;
-    if (end > start && ++count > maximum) return count;
-    start = index + 1;
-  }
-  return start < text.length ? count + 1 : count;
-}
-
-/** @param {string} root @param {string} relativePath @param {fs.Stats | undefined} ownerStat */
-function assertReservationOwner(root, relativePath, ownerStat) {
-  const current = resolveContainedPath(root, relativePath, { type: "file" });
-  if (!ownerStat || !current.ok || fileIdentityChanged(ownerStat, current.stat))
-    throw new Error(`${relativePath}: reservation ownership changed.`);
-  return current;
 }
 
 /** @param {string} root @param {string} relativePath @param {number} maximumBytes

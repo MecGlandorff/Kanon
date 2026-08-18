@@ -12,6 +12,7 @@ import {
   isContextReceipt
 } from "../src/v1/core/receipt.js";
 import {
+  listGitVisibleFiles,
   observeRepositoryGit
 } from "../src/v1/repository/git.js";
 import {
@@ -688,6 +689,23 @@ test("invalid structured Git paths prevent completeness and absence claims", () 
   assert.match(git.diagnostics.join(" "), /Git status output/);
   assert.match(git.diagnostics.join(" "), /Git log output/);
   assert.doesNotMatch(JSON.stringify(git), /outside-secret/);
+});
+
+test("Git enumeration counts first-seen paths toward its entry bound", () => {
+  const nul = "\0";
+  const listing = listGitVisibleFiles("/unused", {
+    max_entries: 2,
+    runner: () => gitSuccess(
+      `a.js${nul}a.js${nul}b.js${nul}b.js${nul}c.js${nul}`
+    )
+  });
+
+  assert.equal(listing.ok, true);
+  assert.deepEqual(listing.files, ["a.js", "b.js"]);
+  assert.equal(
+    listing.diagnostic,
+    "Git file-list output exceeded its entry limit."
+  );
 });
 
 test("Git enumeration and status stop at the configured entry sentinel", () => {
