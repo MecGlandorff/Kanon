@@ -1,4 +1,21 @@
-export const nodeId = name => name.replace(/[^A-Za-z0-9_]/g, '_');
+export function nodeId(name) {
+  const id = name.replace(/[^A-Za-z0-9_]/g, '_');
+  return /^(end|subgraph|graph|flowchart|direction|classDef|class|style|linkStyle|acc_title|acc_descr)$/.test(id) ? `module_${id}` : id;
+}
+
+export function nodeIds(model) {
+  const names = new Set([...model.modules.map(module => module.name), ...model.modules.flatMap(module => module.uses.map(ref => ref.name)), ...(model.flows ?? []).flatMap(flow => flow.modules)]);
+  const ids = Object.create(null);
+  const used = new Set();
+  for (const name of [...names].sort()) {
+    const base = nodeId(name);
+    let id = base;
+    let suffix = 2;
+    while (used.has(id)) id = `${base}_${suffix++}`;
+    ids[name] = id; used.add(id);
+  }
+  return ids;
+}
 const escape = value => String(value).replaceAll('#', '#35;').replaceAll('&', '#38;').replaceAll('"', '#quot;').replaceAll('<', '#lt;').replaceAll('>', '#gt;').replaceAll('|', '#124;').replace(/[\r\n]/g, ' ');
 const styles = [
   'classDef proposed fill:#fef3c7,stroke:#a16207,color:#713f12',
@@ -10,21 +27,22 @@ const styles = [
 const shapes = { agent: ['[[', ']]'], human: ['[/', '\\]'], tool: ['(', ')'], trigger: ['>', ']'],
   service: ['([', '])'], library: ['[', ']'], store: ['[(', ')]'], external: ['{{', '}}'] };
 
-export function diagram(model, flow = null) {
+export function diagram(model, flow = null, sharedIds = null) {
   const lines = ['flowchart LR', ...styles];
+  const ids = sharedIds ?? nodeIds(flow && !model.flows?.includes(flow) ? { ...model, flows: [...(model.flows ?? []), flow] } : model);
   const modules = [...model.modules].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   const names = new Set(modules.map(module => module.name));
   const missing = new Set(modules.flatMap(module => module.uses.map(ref => ref.name)).filter(name => !names.has(name)));
   for (const name of flow?.modules ?? []) if (!names.has(name)) missing.add(name);
   for (const module of modules) {
-    const [left, right] = shapes[module.kind] ?? ['[', ']'];
+    const [left, right] = Object.hasOwn(shapes, module.kind) ? shapes[module.kind] : ['[', ']'];
     const status = flow && !flow.modules.includes(module.name) ? 'dim' : module.status;
-    lines.push(`${nodeId(module.name)}${left}"${escape(module.name)}"${right}:::${status}`);
+    lines.push(`${ids[module.name]}${left}"${escape(module.name)}"${right}:::${status}`);
   }
-  for (const name of [...missing].sort()) lines.push(`${nodeId(name)}["${escape(name)} (missing)"]:::missing`);
+  for (const name of [...missing].sort()) lines.push(`${ids[name]}["${escape(name)} (missing)"]:::missing`);
   if (!flow) {
     for (const module of modules) for (const ref of module.uses) {
-      lines.push(`${nodeId(module.name)} -->${ref.label ? `|"${escape(ref.label)}"|` : ''} ${nodeId(ref.name)}`);
+      lines.push(`${ids[module.name]} -->${ref.label ? `|"${escape(ref.label)}"|` : ''} ${ids[ref.name]}`);
     }
   } else {
     const source = number => {
@@ -33,11 +51,11 @@ export function diagram(model, flow = null) {
     };
     for (const step of flow.steps) {
       if (step.type === 'transfer') {
-        lines.push(`${nodeId(step.from)} -->|"${step.number} ${step.fanOut ? `x${step.fanOut} ` : ''}${escape(step.text)}"| ${nodeId(step.to)}`);
+        lines.push(`${ids[step.from]} -->|"${step.number} ${step.fanOut ? `x${step.fanOut} ` : ''}${escape(step.text)}"| ${ids[step.to]}`);
       } else if (step.fromStep > 0 && step.fromStep < step.number) {
         const from = source(step.number - 1);
         const to = source(step.fromStep);
-        if (from && to) lines.push(`${nodeId(from)} -.->|"${step.number} repeat until ${escape(step.text)}"| ${nodeId(to)}`);
+        if (from && to) lines.push(`${ids[from]} -.->|"${step.number} repeat until ${escape(step.text)}"| ${ids[to]}`);
       }
     }
   }

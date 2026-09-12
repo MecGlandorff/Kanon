@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Kanon · System design</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f5f6f8; --panel:#fff; --nav:#f9fafb; --ink:#202b3b; --muted:#667085; --line:#e1e6ed; --accent:#285bc5; --tint:#eaf0fc; --red:#b42318; --red-bg:#fff2f0; --green:#16805a; --shadow:0 2px 7px #16243a04; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#10151d; --panel:#181f2a; --nav:#141b25; --ink:#e4eaf3; --muted:#a2aec0; --line:#2b3748; --accent:#91b2ff; --tint:#223455; --red:#ffb4a9; --red-bg:#3b2427; --green:#78d6b4; --shadow:none; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    button { font:inherit; cursor:pointer; border:1px solid var(--line); border-radius:7px; background:var(--panel); color:var(--ink); padding:6px 12px; }
+    button:hover { border-color:var(--accent); }
+    :focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+    .sidebar { width:232px; height:100vh; position:fixed; inset:0 auto 0 0; overflow:auto; background:var(--nav); border-right:1px solid var(--line); padding:26px 17px 20px; }
+    .brand { display:flex; align-items:center; gap:11px; padding:0 11px 27px; font-size:19px; font-weight:750; letter-spacing:-.5px; }
+    .brand-mark { display:grid; place-items:center; width:31px; height:31px; border-radius:9px; background:var(--ink); color:var(--nav); font-size:18px; }
+    .nav a { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; margin:2px 0; color:var(--muted); border-radius:7px; }
+    .nav a:hover { background:var(--tint); text-decoration:none; color:var(--ink); }
+    .nav a[aria-current=page] { background:var(--tint); color:var(--accent); font-weight:650; }
+    .nav-label { margin:25px 12px 7px; font-size:10px; font-weight:750; color:var(--muted); letter-spacing:1.4px; text-transform:uppercase; }
+    .module-link { gap:8px; font-size:12px; overflow-wrap:anywhere; }
+    .module-link span:last-child { margin-right:auto; }
+    .dot { width:7px; height:7px; flex:0 0 7px; border-radius:50%; display:inline-block; background:#d6a136; }
+    .dot.agreed { background:#5c8fec; } .dot.built { background:#43b484; }
+    .connection { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; margin:27px 12px 0; }
+    .connection .dot { background:var(--green); } .connection.offline .dot { background:#d6a136; }
+    .sidebar-note { font-size:11px; color:var(--muted); padding:8px 12px; margin:0; }
+    main { margin-left:232px; padding:36px 42px 64px; max-width:1560px; }
+    .eyebrow { color:var(--muted); font-size:10px; letter-spacing:1.8px; text-transform:uppercase; font-weight:700; margin-bottom:4px; }
+    h1 { font-size:27px; font-weight:680; letter-spacing:-.7px; line-height:1.25; margin:0; overflow-wrap:anywhere; }
+    h2 { font-size:19px; line-height:1.4; font-weight:650; margin:0 0 13px; letter-spacing:-.25px; }
+    h3 { font-size:14px; font-weight:650; margin:0 0 8px; }
+    .header { display:flex; align-items:center; gap:18px; justify-content:space-between; padding-bottom:27px; border-bottom:1px solid var(--line); margin-bottom:29px; }
+    .counts { display:flex; flex-wrap:wrap; gap:7px; justify-content:flex-end; }
+    .count { color:var(--muted); font-size:11px; border:1px solid var(--line); padding:4px 9px; border-radius:6px; white-space:nowrap; }
+    .count strong { color:var(--ink); margin-right:3px; font-weight:650; }
+    .count.errors { color:var(--red); background:var(--red-bg); border-color:transparent; }
+    .count.errors strong { color:var(--red); }
+    .view-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:17px; }
+    .view-heading h2 { margin:0; }
+    .subtitle { color:var(--muted); font-size:12px; margin:3px 0 0; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:11px; padding:23px 25px; margin:0 0 18px; box-shadow:var(--shadow); }
+    .graph-card { padding:26px 18px 17px; }
+    .diagram { display:flex; justify-content:center; overflow-x:auto; min-height:80px; }
+    .diagram svg { display:block; flex-shrink:0; height:auto; }
+    .diagram .node[role=link] { cursor:pointer; }
+    .diagram .node[role=link]:hover { filter:brightness(.96); }
+    .diagram .node[role=link]:focus { outline:none; filter:drop-shadow(0 0 3px var(--accent)); }
+    .legend { display:flex; justify-content:center; flex-wrap:wrap; gap:19px; margin-top:20px; padding-top:15px; border-top:1px solid var(--line); color:var(--muted); font-size:11px; }
+    .legend span { display:flex; align-items:center; gap:7px; }
+    .badge { display:inline-block; border-radius:5px; border:1px solid var(--line); padding:2px 8px; color:var(--muted); font-size:11px; font-weight:600; vertical-align:middle; }
+    .badge.proposed { background:#fef3c7; color:#713f12; border-color:transparent; }
+    .badge.agreed { background:#dbeafe; color:#1e3a8a; border-color:transparent; }
+    .badge.built { background:#dcfce7; color:#14532d; border-color:transparent; }
+    .badge.blocking { background:var(--red-bg); color:var(--red); border-color:transparent; }
+    .metadata { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:17px; }
+    .columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+    .muted { color:var(--muted); } .empty { padding:22px; text-align:center; color:var(--muted); }
+    .finding { border-left:3px solid var(--red); padding:8px 14px; margin:14px 0; background:var(--red-bg); border-radius:0 5px 5px 0; overflow-wrap:anywhere; }
+    .finding code { font-size:11px; color:var(--muted); }
+    .finding p { margin:2px 0 0; }
+    p { margin:0 0 12px; } p:last-child { margin-bottom:0; }
+    ul,ol { margin:5px 0 13px; padding-left:23px; } li { margin:4px 0; }
+    code,pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:12px; }
+    code { overflow-wrap:anywhere; } pre { padding:14px; background:var(--bg); border:1px solid var(--line); border-radius:7px; overflow:auto; white-space:pre-wrap; }
+    .markdown { overflow-wrap:anywhere; } .markdown h3,.markdown h4,.markdown h5 { margin:17px 0 8px; }
+    .question { padding:14px 0; border-bottom:1px solid var(--line); } .question:last-child { border:0; padding-bottom:0; }
+    .question:first-child { padding-top:0; } .question p { margin-bottom:5px; }
+    .source { font-size:11px; color:var(--muted); }
+    details summary { cursor:pointer; color:var(--muted); font-size:12px; } details[open] summary { margin-bottom:15px; }
+    .diagram-error { color:var(--red); }
+    @media(max-width:1050px) { main { padding:27px 24px 50px; } .header { align-items:flex-start; flex-direction:column; } .counts { justify-content:flex-start; } }
+    @media(max-width:650px) { .sidebar { position:static; width:100%; height:auto; padding:15px; border-right:0; border-bottom:1px solid var(--line); } .brand { padding:0 8px 10px; } #primary-nav { display:flex; flex-wrap:wrap; } #module-nav,.connection,.sidebar-note { display:none; } main { margin-left:0; padding:22px 16px 40px; } .columns { grid-template-columns:1fr; gap:12px; } .card { padding:18px; } }
+  </style>
+</head>
+<body>
+  <aside class="sidebar" aria-label="Design navigation">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">K</span>Kanon</div>
+    <nav id="primary-nav" class="nav" aria-label="Views"></nav>
+    <nav id="module-nav" class="nav" aria-label="Modules"></nav>
+    <div id="connection" class="connection"><span class="dot"></span><span>Connecting…</span></div>
+    <p class="sidebar-note">Read-only view. Design with your agent in the repository.</p>
+  </aside>
+  <main>
+    <header class="header"><div><div class="eyebrow">System design</div><h1 id="system-name">Kanon</h1></div><div id="counts" class="counts"></div></header>
+    <div id="content" aria-live="polite"><p class="muted">Loading the design…</p></div>
+  </main>
+  <script src="/vendor/mermaid.min.js"></script>
+  <script>
+    const content = document.getElementById('content');
+    const dark = matchMedia('(prefers-color-scheme: dark)');
+    const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const inline = text => escapeHTML(text).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    const getSection = (doc, title) => doc?.sections.find(item => item.title.toLowerCase() === title.toLowerCase());
+    const moduleLink = name => `<a href="#module/${encodeURIComponent(name)}">${escapeHTML(name)}</a>`;
+    const badge = (text, style = '') => `<span class="badge ${style}">${escapeHTML(text)}</span>`;
+    let model;
+    let showAll = false;
+    let renderNumber = 0;
+    let renderQueue = Promise.resolve();
+    let requestNumber = 0;
+    let graphNumber = 0;
+
+    function markdown(text = '') {
+      const output = [];
+      let paragraph = [];
+      let list = '';
+      let fence = '';
+      let code = [];
+      const flush = () => { if (paragraph.length) { output.push(`<p>${inline(paragraph.join(' '))}</p>`); paragraph = []; } };
+      const endList = () => { if (list) { output.push(`</${list}>`); list = ''; } };
+      for (const line of text.split(/\r?\n/)) {
+        if (fence) {
+          if (line.startsWith(fence)) { output.push(`<pre><code>${escapeHTML(code.join('\n'))}</code></pre>`); fence = ''; code = []; }
+          else code.push(line);
+          continue;
+        }
+        const marker = line.match(/^(`{3,}|~{3,})/);
+        if (marker) { flush(); endList(); fence = marker[1]; continue; }
+        const heading = line.match(/^(#{1,6})\s+(.+)/);
+        const item = line.match(/^\s*(?:[-*]|(\d+)\.)\s+(.+)/);
+        if (heading) { flush(); endList(); const level = Math.min(5, heading[1].length + 2); output.push(`<h${level}>${inline(heading[2])}</h${level}>`); }
+        else if (item) {
+          flush(); const type = item[1] ? 'ol' : 'ul';
+          if (list !== type) { endList(); list = type; output.push(type === 'ol' ? `<ol start="${Number(item[1])}">` : '<ul>'); }
+          output.push(`<li>${inline(item[2])}</li>`);
+        } else if (!line.trim()) { flush(); endList(); }
+        else { endList(); paragraph.push(line); }
+      }
+      flush(); endList();
+      if (fence) output.push(`<pre><code>${escapeHTML(code.join('\n'))}</code></pre>`);
+      return output.join('');
+    }
+
+    function card(html, classes = '') {
+      const element = document.createElement('section');
+      element.className = `card ${classes}`;
+      element.innerHTML = html;
+      content.append(element);
+      return element;
+    }
+    function heading(title, subtitle = '', extra = '') {
+      const element = document.createElement('div');
+      element.className = 'view-heading';
+      element.innerHTML = `<div><h2>${escapeHTML(title)}</h2>${subtitle ? `<p class="subtitle">${escapeHTML(subtitle)}</p>` : ''}</div>${extra}`;
+      content.append(element);
+      return element;
+    }
+    function sections(doc, exclude = []) {
+      return doc.sections.filter(item => !exclude.includes(item.title.toLowerCase())).map(item => `<section><h3>${escapeHTML(item.title)}</h3><div class="markdown">${markdown(item.text) || '<p class="muted">Nothing recorded yet.</p>'}</div></section>`).join('<hr style="border:0;border-top:1px solid var(--line);margin:21px 0">');
+    }
+    function configureMermaid() {
+      if (!window.mermaid) return;
+      mermaid.initialize({ startOnLoad:false, securityLevel:'strict', theme:dark.matches ? 'dark' : 'default',
+        fontFamily:getComputedStyle(document.body).fontFamily,
+        themeVariables:{ fontFamily:getComputedStyle(document.body).fontFamily, fontSize:'13px' },
+        flowchart:{ htmlLabels:true, useMaxWidth:false, curve:'basis', padding:12, nodeSpacing:35, rankSpacing:45 } });
+    }
+    async function graph(source, element) {
+      const host = document.createElement('div');
+      host.className = 'diagram';
+      element.append(host);
+      try {
+        if (!window.mermaid) throw new Error('The local Mermaid asset is unavailable.');
+        const result = await mermaid.render(`kanon-graph-${++graphNumber}`, source);
+        host.innerHTML = result.svg;
+        await document.fonts.ready;
+        const svg = host.querySelector('svg');
+        const box = svg.getBBox();
+        const margin = 14;
+        svg.setAttribute('viewBox', `${box.x - margin} ${box.y - margin} ${box.width + 2 * margin} ${box.height + 2 * margin}`);
+        svg.removeAttribute('height');
+        svg.setAttribute('width', '100%');
+        svg.style.maxWidth = `${Math.ceil(box.width + 2 * margin)}px`;
+        for (const node of svg.querySelectorAll('.node')) {
+          const id = node.id.match(/(?:^|-)flowchart-(.*)-\d+$/)?.[1];
+          const name = Object.keys(model.nodeIds).find(candidate => model.nodeIds[candidate] === id);
+          if (!name) continue;
+          node.setAttribute('tabindex', '0'); node.setAttribute('role', 'link'); node.setAttribute('aria-label', `Inspect ${name}`);
+          const navigate = () => { location.hash = `module/${encodeURIComponent(name)}`; };
+          node.addEventListener('click', navigate);
+          node.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(); } });
+        }
+      } catch (error) { host.innerHTML = `<div class="diagram-error"><p>Could not render this diagram: ${escapeHTML(error.message)}</p><pre>${escapeHTML(source)}</pre></div>`; }
+    }
+    function navigation(view) {
+      document.getElementById('system-name').textContent = model.name;
+      document.title = `${model.name} · Kanon`;
+      document.getElementById('counts').innerHTML = ['modules','flows','slices'].map(key => `<span class="count"><strong>${model[key].length}</strong> ${key}</span>`).join('') + `<span class="count ${model.findings.length ? 'errors' : ''}"><strong>${model.findings.length}</strong> errors</span>`;
+      document.getElementById('primary-nav').innerHTML = ['Overview','Flows','Decisions','Questions','Slices'].map(label => `<a href="#${label.toLowerCase()}" ${view === label.toLowerCase() ? 'aria-current="page"' : ''}>${label}</a>`).join('');
+      document.getElementById('module-nav').innerHTML = ['proposed','agreed','built'].map(status => {
+        const modules = model.modules.filter(module => module.status === status);
+        return modules.length ? `<div class="nav-label">${status} · ${modules.length}</div>` + modules.map(module => `<a class="module-link" href="#module/${encodeURIComponent(module.name)}" ${view === `module/${module.name}` ? 'aria-current="page"' : ''}><span class="dot ${status}"></span><span>${escapeHTML(module.name)}</span></a>`).join('') : '';
+      }).join('');
+    }
+    async function overview() {
+      const collapsed = model.modules.length > 10 && !showAll;
+      const title = heading('Overview', collapsed ? 'Actors and entry points · select a module to inspect it' : 'Modules and dependencies · select a module to inspect it', model.modules.length > 10 ? `<button id="zoom-toggle">${showAll ? 'Show actors' : 'Show all'}</button>` : '');
+      title.querySelector('button')?.addEventListener('click', () => { showAll = !showAll; scheduleRender(true); });
+      const purpose = getSection(model.system, 'Purpose')?.text;
+      if (purpose) { const summary = document.createElement('div'); summary.className = 'markdown muted'; summary.style.marginBottom = '20px'; summary.innerHTML = markdown(purpose); content.append(summary); }
+      const panel = card('', 'graph-card');
+      if (!model.modules.length || (collapsed && !model.focusedNames.length)) panel.innerHTML = `<p class="empty">${model.modules.length ? 'No actor modules in this view. Choose Show all to see the system.' : 'No modules yet. Add the first module to your design.'}</p>`;
+      else await graph(collapsed ? model.focusedMap : model.map, panel);
+      panel.insertAdjacentHTML('beforeend', '<div class="legend"><span><i class="dot proposed"></i>Proposed</span><span><i class="dot agreed"></i>Agreed</span><span><i class="dot built"></i>Built</span></div>');
+      if (model.findings.length) card(`<h3>Design needs attention</h3>${model.findings.map(finding => `<div class="finding"><code>${escapeHTML(finding.file)}:${finding.line}</code><p>${escapeHTML(finding.message)}</p></div>`).join('')}`);
+      else card('<h3>Checks clear</h3><p class="muted">No structural errors or blocking questions for the current slices.</p>');
+      const constraints = getSection(model.system, 'Constraints')?.text;
+      if (constraints) card(`<details><summary>System constraints</summary><div class="markdown">${markdown(constraints)}</div></details>`);
+    }
+    function moduleView(name) {
+      const module = model.modules.find(item => item.name === name);
+      heading(name, 'Module');
+      if (!module) { card('<p>This module has not been defined.</p><a href="#overview">Back to the overview</a>'); return; }
+      const usedBy = model.modules.filter(item => item.uses.some(ref => ref.name === name));
+      card(`<div class="metadata">${badge(module.status, module.status)}${module.kind ? badge(module.kind) : ''}<span class="source">${escapeHTML(module.file)}</span></div><div class="columns"><div><h3>Uses</h3>${module.uses.length ? '<ul>' + module.uses.map(ref => `<li>${moduleLink(ref.name)}${ref.label ? ` — ${escapeHTML(ref.label)}` : ''}</li>`).join('') + '</ul>' : '<p class="muted">No dependencies.</p>'}</div><div><h3>Used by</h3>${usedBy.length ? '<ul>' + usedBy.map(item => `<li>${moduleLink(item.name)}</li>`).join('') + '</ul>' : '<p class="muted">No dependents.</p>'}</div></div>`);
+      card(sections(module));
+      const flows = model.flows.filter(flow => flow.modules.includes(name));
+      const slices = model.slices.filter(slice => slice.modules.includes(name));
+      card(`<div class="columns"><div><h3>Flows</h3>${flows.length ? flows.map(flow => `<p><a href="#flows">${escapeHTML(flow.name)}</a></p>`).join('') : '<p class="muted">No flows yet.</p>'}</div><div><h3>Slices</h3>${slices.length ? slices.map(slice => `<p><a href="#slices">${escapeHTML(slice.name)}</a> ${badge(slice.done ? 'done' : 'open')}</p>`).join('') : '<p class="muted">No slices yet.</p>'}</div></div>`);
+    }
+    async function flowsView() {
+      heading('Flows', 'Scenarios, fan-out and bounded loops');
+      if (!model.flows.length) { card('<p class="empty">No flows yet.</p>'); return; }
+      for (const flow of model.flows) {
+        const panel = card(`<h2>${escapeHTML(flow.name)}</h2><div class="markdown">${markdown(getSection(flow, 'Scenario')?.text)}</div>`);
+        await graph(model.routes[flow.name], panel);
+        panel.insertAdjacentHTML('beforeend', `<div style="margin-top:23px">${sections(flow, ['scenario'])}</div>`);
+      }
+    }
+    function decisionsView() {
+      heading('Decisions', 'What was chosen and why');
+      if (!model.decisions.length) card('<p class="empty">No decisions recorded yet.</p>');
+      for (const decision of model.decisions) card(`<div class="metadata">${badge(decision.id)}<span class="source">${escapeHTML(decision.date)}</span></div><h2>${escapeHTML(decision.title)}</h2><h3>Decision</h3><div class="markdown">${markdown(decision.decision)}</div><h3>Why</h3><div class="markdown">${markdown(decision.why)}</div><p class="source">${decision.scope.length ? `Scope: ${decision.scope.map(moduleLink).join(', ')}` : 'Applies to the whole system'}${decision.supersedes ? ` · Supersedes ${escapeHTML(decision.supersedes)}` : ''}</p>`);
+    }
+    function questionsView() {
+      const questions = model.questions.filter(question => !question.checked).sort((a, b) => Number(b.blocks.length > 0) - Number(a.blocks.length > 0));
+      heading('Open questions', 'Blocking questions first · answers belong to the engineer');
+      if (!questions.length) { card('<p class="empty">No open questions.</p>'); return; }
+      card(questions.map(question => `<div class="question"><p>${question.blocks.length ? badge('blocking', 'blocking') + ' ' : ''}${escapeHTML(question.text)}</p><div class="source">${question.ownerType === 'module' ? moduleLink(question.owner) : escapeHTML(question.owner)} · ${escapeHTML(question.file)}:${question.line}${question.blocks.length ? ` · Blocks: ${question.blocks.map(escapeHTML).join(', ')}` : ''}</div></div>`).join(''));
+    }
+    function slicesView() {
+      heading('Slices', 'One buildable piece at a time');
+      if (!model.slices.length) card('<p class="empty">No slices yet.</p>');
+      for (const slice of model.slices) card(`<div class="view-heading"><h2>${escapeHTML(slice.name)}</h2>${badge(slice.done ? 'done' : 'open', slice.done ? 'built' : '')}</div><p class="source">Modules: ${slice.modules.length ? slice.modules.map(moduleLink).join(', ') : 'none selected'}</p>${sections(slice)}`);
+    }
+    function scheduleRender(preserveScroll = false) {
+      const version = ++renderNumber;
+      const scroll = { x:window.scrollX, y:window.scrollY, sidebar:document.querySelector('.sidebar').scrollTop };
+      renderQueue = renderQueue.catch(() => {}).then(async () => {
+        if (!model || version !== renderNumber) return;
+        let view;
+        try { view = decodeURIComponent(location.hash.slice(1) || 'overview'); } catch { view = 'overview'; }
+        content.replaceChildren(); navigation(view); configureMermaid();
+        if (view === 'overview') await overview();
+        else if (view.startsWith('module/')) moduleView(view.slice(7));
+        else if (view === 'flows') await flowsView();
+        else if (view === 'decisions') decisionsView();
+        else if (view === 'questions') questionsView();
+        else if (view === 'slices') slicesView();
+        else { heading('Unknown view'); card('<a href="#overview">Back to the overview</a>'); }
+        if (version === renderNumber) {
+          document.querySelector('.sidebar').scrollTop = scroll.sidebar;
+          window.scrollTo(preserveScroll ? scroll.x : 0, preserveScroll ? scroll.y : 0);
+        }
+      }).catch(error => { content.textContent = `Could not display the design: ${error.message}`; });
+    }
+    async function load(preserveScroll = false) {
+      const request = ++requestNumber;
+      try {
+        const response = await fetch('/model', { cache:'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const latest = await response.json();
+        if (request !== requestNumber) return;
+        model = latest; scheduleRender(preserveScroll);
+      } catch (error) {
+        if (!model) content.textContent = `Could not load the design: ${error.message}`;
+        connection(false);
+      }
+    }
+    function connection(live) {
+      const element = document.getElementById('connection');
+      element.classList.toggle('offline', !live);
+      element.lastElementChild.textContent = live ? 'Live' : 'Reconnecting…';
+    }
+    let eventSource;
+    let reconnect;
+    let backoff = 500;
+    let connectedBefore = false;
+    function connect() {
+      eventSource = new EventSource('/events');
+      eventSource.onopen = () => { connection(true); backoff = 500; if (connectedBefore) load(true); connectedBefore = true; };
+      eventSource.onmessage = () => load(true);
+      eventSource.onerror = () => {
+        connection(false); eventSource.close(); clearTimeout(reconnect);
+        reconnect = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 5000);
+      };
+    }
+    addEventListener('hashchange', () => scheduleRender());
+    dark.addEventListener('change', () => scheduleRender(true));
+    addEventListener('beforeunload', () => { clearTimeout(reconnect); eventSource?.close(); });
+    load(); connect();
+  </script>
+</body>
+</html>
