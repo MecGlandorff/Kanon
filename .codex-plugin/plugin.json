@@ -1,0 +1,20 @@
+{
+  "name": "kanon",
+  "version": "2.0.0-dev",
+  "description": "Design systems with an engineer, inspect a live map, and hand agreed slices to coding agents.",
+  "author": { "name": "mecglandorff", "url": "https://github.com/MecGlandorff" },
+  "homepage": "https://github.com/MecGlandorff/Kanon#readme",
+  "repository": "https://github.com/MecGlandorff/Kanon",
+  "license": "MIT",
+  "keywords": ["system-design", "architecture", "handoff", "agents"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Kanon",
+    "shortDescription": "Design together. Hand off agreed work.",
+    "longDescription": "Keep system designs in repository text, inspect modules and flows in a local window, and generate scoped work packets for coding agents.",
+    "developerName": "mecglandorff",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Use Kanon to design this system with me and prepare an agreed slice for implementation."]
+  }
+}
