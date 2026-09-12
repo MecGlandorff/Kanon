@@ -1,0 +1,11 @@
+{
+  "name": "@mecglandorff/kanon",
+  "version": "2.0.0-dev",
+  "description": "Design systems with agents, inspect a live map, and hand agreed slices to coding agents.",
+  "type": "module",
+  "license": "MIT",
+  "author": "mecglandorff",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test" },
+  "files": [".claude-plugin", ".codex-plugin", "skills", "runtime", "README.md", "LICENSE"]
+}
