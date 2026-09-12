@@ -254,3 +254,155 @@ minimal valid files.
 When done, append a section `## Report` to this file with: what was built;
 every deviation from the spec and why; every choice made where the spec was
 silent; what was not verified and why; new open questions. Then stop.
+
+## Report
+
+Completed 2026-09-13, Europe/Brussels, on branch `v2`. Implementation commit:
+`6416388d4e9b7ae47edd55d61350b82d2bacb7de`.
+
+### Built
+
+- Replaced the v1 working tree with the requested v2 layout. The `v1.0.0`
+  tag and previous branch remain available. A precautionary archive of the
+  previous working files, including ignored notes but excluding replaceable
+  `node_modules`, is at
+  `/private/tmp/kanon-v2-build-kjqbuigq/before-rewrite.tar.gz`.
+- Implemented `check`, `diagram`, `handoff`, and `view`, with a shared parser,
+  deterministic Mermaid output, slice-scoped refusal, and atomic packet writes.
+- Added one 111-line skill, five templates, Bash and PowerShell wrappers,
+  and Claude Code and Codex plugin manifests. Rewrote the package and README.
+- Implemented the loopback-only viewer, all six views, module navigation,
+  status groups, focused overview, light/dark themes, file watching, SSE,
+  reconnection, port reuse, browser discovery, and app-mode launch.
+- Vendored Mermaid 11.17.2 and its license. Its SHA-256 is
+  `581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8`.
+  There are no npm runtime or development dependencies.
+- Built `mecglandorff-kanon-2.0.0-dev.tgz`: 23 entries, 1,001,860 bytes,
+  in `/private/tmp/kanon-v2-build-kjqbuigq/`. No push, tag, publication, or
+  global plugin installation was performed.
+
+### Validation
+
+- All **24 tests passed on Node 20.0.0 and Node 25.8.1** on macOS arm64.
+  This includes exact parser/check locations, golden maps/routes/packets,
+  handoff scope and write boundaries, templates, wrappers from paths with
+  spaces, HTTP routes, SSE broadcasts, port reuse, a busy streaming port,
+  and clean shutdown. The Node 20 archive was checked against its official
+  SHA-256 before use.
+- The official Skill Creator and Codex plugin validators passed. Claude
+  Code's strict plugin-manifest validation passed without warnings. PyYAML,
+  needed by the supplied validators, was installed only in a temporary
+  validation environment, not in this package.
+- Tested actual rendering in isolated headless **Chrome 152.0.7977.84**.
+  Kanon's map has seven nodes; its route has ten edges. All nodes were
+  clickable, every view loaded, and light/dark rendering worked with 13px
+  diagram text and bounded SVG sizing. Screenshots were inspected.
+- A separate 13-module fixture exercised all shapes, a missing dependency,
+  reserved/colliding identifiers, focused/full overview, keyboard activation,
+  fan-out, loops, and HTML-looking text. It rendered 14 separate nodes in
+  full view, including the missing target; injected text created no image
+  elements and executed no script. Browser requests stayed on loopback.
+- Repeated that browser workflow using the unpacked package on Node 20,
+  with CRLF line endings in its test copy of the viewer. A live edit appeared
+  after 168 ms in that run; `#module/worker` and scroll position 250 were
+  preserved. Restarting the fixture server also preserved the view and
+  scroll position and fetched the changes made while disconnected. This is
+  a local observation, not a general performance guarantee.
+- Dogfood `check` and `handoff core-v1` both exited 1 with exactly the
+  required two findings: the proposed runtime at
+  `design/slices/core-v1.md:2`, and its blocking question at
+  `design/modules/runtime.md:24`. The handoff wrote nothing. The original
+  empty `design/handoffs/` directory was already present before this build.
+- Both dogfood diagram commands succeeded and their output was rendered in
+  Chrome. `view --no-open` started at `http://127.0.0.1:4770/#overview`.
+  App-mode launches for Overview and Questions were exercised against the
+  installed Google Chrome and reused one server. The viewer was left running;
+  the isolated headless browser and temporary fixture servers were stopped.
+- All 11 original files under `design/`, `KANON_V2_DESIGN.md`, `LICENSE`,
+  `.gitignore`, and `.gitattributes` remain byte-identical. This packet's
+  original text is preserved with only this Report appended.
+
+Detailed test output, screenshots, browser assertions, package metadata,
+dogfood results, and input hashes are retained under
+`/private/tmp/kanon-v2-build-kjqbuigq/`.
+
+### Deviations and choices
+
+- **Mermaid identifiers:** ordinary names use the specified punctuation-to-
+  underscore rule. Reserved words get a `module_` prefix; colliding IDs get
+  deterministic numeric suffixes. Literal `end` and `subgraph` failed the
+  real Mermaid parser, and the original rule merged names such as `a-b` and
+  `a_b`. A shared ID mapping keeps full, focused, and route views consistent.
+- **Offline assets:** chose the build packet's no-runtime-network rule.
+  Mermaid was available to vendor, so there is no CDN fallback. Missing
+  local assets must be restored from the package. The older design wording
+  suggesting runtime CDN access was not implemented.
+- **Markdown:** implemented a small renderer inside `page.html` rather than
+  vendoring another library mentioned in the broader design. It formats the
+  documented subset and escapes raw HTML. Mermaid uses strict mode with
+  sanitized HTML labels; the SVG-only label mode visibly printed entity
+  names instead of quotation marks in the browser test.
+- **Checking:** used the build packet's ordered error list. Interface,
+  Purpose, and Constraints are useful design sections but are not extra
+  mandatory checker rules. No cycle rule or warning category was added.
+- **Handoff relevance:** block on the selected slice or its modules, questions
+  explicitly blocking that slice regardless of owner, and parser problems in
+  copied shared files or external dependency files. Questions blocking other
+  slices and unrelated flow/slice errors do not block this packet. External
+  modules contribute only their Interface sections; dependencies are direct,
+  not transitive. Scoped decisions are retained in file order, including
+  superseded entries as the packet requests.
+- **Text parsing:** preserve raw files for packet inclusion; accept CRLF and
+  a UTF-8 BOM. Section lookup is case-insensitive. Blank lines in frontmatter
+  and Steps are ignored. Scalars remain text; single/double quotes and quoted
+  commas are supported, but nested YAML and multiline operators are not.
+  Duplicate fields and invalid field types are parser problems. Fan-out is
+  a positive safe integer. Questions accept `[x]` and `[X]` and retain their
+  exact source line. Absent sections use an explicit “None specified” marker
+  where a packet section is still required.
+- **Output:** use UTC ISO timestamps and the current Git HEAD, or `no git`.
+  Copy complete module sources in fenced blocks whose delimiter cannot be
+  closed by an embedded fence. De-duplicate repeated slice module names in
+  the packet. Replace packets atomically and refuse symlinked design entries,
+  handoff directories, or handoff targets. CLI source locations use forward
+  slashes while filesystem operations use platform path functions.
+- **Viewer behavior:** hash the absolute design path as UTF-8 with FNV-1a32;
+  the chosen starting port is the first of at most twenty attempts. Port
+  probes have a 350 ms total deadline, including streaming responses. CLI
+  ports must be 1–65535. Unknown commands/options/views fail with exit 1.
+  The first viewer process stays in the foreground; later invocations reuse
+  it. SSE retries start at 500 ms and back off to five seconds. Heartbeats
+  keep idle streams alive. The overview also shows Purpose and collapsible
+  Constraints, and the model includes the system document and focused map.
+- **Presentation and boundaries:** use system fonts and amber/blue/green for
+  proposed/agreed/built, with red missing targets and gray inactive nodes.
+  Diagram layout and window placement are delegated to Mermaid and the
+  browser/OS. Click handlers are attached by the viewer, not by design text.
+  A local Content Security Policy and Host checks constrain the page. Script
+  hashing normalizes HTML line endings so CRLF checkouts still load.
+- **Distribution:** ship the full plugin, runtime, vendored asset, README,
+  and license. Tests and the engineer's working design stay in the source
+  checkout. No global executable, marketplace entry, or implicit replacement
+  of an older installed Kanon was added.
+
+### Not verified
+
+- Native Linux/Windows execution, PowerShell execution, and the fallback
+  browser launch paths were not exercised on those platforms. Their paths
+  were checked in tests; Node 20 and CRLF behavior were exercised locally.
+- Physical window placement and persistence per URL were not measured.
+  App-mode launch was exercised; rendered UI behavior was verified headlessly.
+- Fresh installed-host skill selection and the broader design document's
+  proposed real cross-host coding trial were not run. This build packet's
+  dogfood intentionally keeps `core-v1` blocked. The functional tests do not
+  establish that a coding agent produces better code from these packets.
+
+### New open questions
+
+- Which engineer-approved feature should be the first real cross-host handoff
+  trial, and which acceptance examples will determine whether it succeeded?
+- Should the engineer supersede the remaining “hand-written Mermaid” wording
+  in D-001 with D-006 and reconcile the older CDN question? Those source files
+  were deliberately preserved.
+- Is browser-managed window placement sufficient across the engineer's
+  multi-monitor setup, or is explicit placement persistence needed later?
