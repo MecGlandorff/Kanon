@@ -1,5 +1,5 @@
 import { createServer, get } from 'node:http';
-import { accessSync, constants, readFileSync, watch } from 'node:fs';
+import { accessSync, constants, readFileSync, realpathSync, watch } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
@@ -166,7 +166,8 @@ export async function startViewer(directory, { port, view = 'overview', open = t
   };
   const stop = () => { void close(); };
   try {
-    watcher = watch(designDir, { recursive: true }, (_event, filename) => {
+    // Expand Windows short-path aliases before libuv matches notification paths.
+    watcher = watch(realpathSync.native(designDir), { recursive: true }, (_event, filename) => {
       clearTimeout(debounce);
       debounce = setTimeout(() => {
         try { model = snapshot(designDir); }

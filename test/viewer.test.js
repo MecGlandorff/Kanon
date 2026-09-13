@@ -127,7 +127,9 @@ test('viewer serves fixed routes and vendored bytes, broadcasts live changes, re
   const start = Date.now();
   writeFileSync(file, readFileSync(file, 'utf8').replace('Process a parcel and acknowledge it once.', 'Process a parcel after validation.'));
   let timer;
-  const paths = await Promise.race([received, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('no SSE event within two seconds')), 2000); })]).finally(() => clearTimeout(timer));
+  const paths = await Promise.race([received, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no SSE event within two seconds; viewer exit=${instance.child.exitCode}, signal=${instance.child.signalCode}, stderr=${instance.output().stderr}`)), 2000);
+  })]).finally(() => clearTimeout(timer));
   assert.ok(Date.now() - start < 2000);
   assert.ok(paths.every(path => path.includes('worker.md')), paths.join(', '));
   const updated = JSON.parse((await request(base, '/model')).body);
