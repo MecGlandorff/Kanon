@@ -72,3 +72,63 @@ test('the bundled flowchart parser accepts keyword declarations and edge endpoin
     });
   }
 });
+
+test('public Mermaid parsing preserves literal design labels without applying directives', async t => {
+  const context = {};
+  runInNewContext(readFileSync(new URL('../runtime/vendor/mermaid.min.js', import.meta.url), 'utf8'), context);
+  const { mermaid } = context;
+  const settings = { startOnLoad: false, theme: 'default', wrap: false, flowchart: { curve: 'basis' } };
+  mermaid.initialize(settings);
+  const empty = await mermaid.mermaidAPI.getDiagramFromText('flowchart LR\n');
+  Object.getPrototypeOf(empty.db).sanitizeText = text => text;
+  const rawDirective = `flowchart LR\ncontrol["before %%{init: {'theme': 'dark'}}%% after"]\n`;
+  assert.equal((await mermaid.parse(rawDirective)).config.theme, 'dark');
+  assert.equal(mermaid.mermaidAPI.getConfig().theme, 'dark');
+  assert.equal((await mermaid.mermaidAPI.getDiagramFromText(rawDirective)).db.getVertices().get('control').text, 'before  after');
+
+  const labels = [
+    ['init', "before %%{init: {'theme': 'dark'}}%% after", "before #37;#37;{init: {'theme': 'dark'}}#37;#37; after"],
+    ['initialize', "%%{initialize: {'flowchart': {'curve': 'linear'}}}%%", "#37;#37;{initialize: {'flowchart': {'curve': 'linear'}}}#37;#37;"],
+    ['wrap', '%%{wrap}%%', '#37;#37;{wrap}#37;#37;'],
+    ['percent and entities', '50% %% #37; &#37; &amp; #quot; " < > |', '50#37; #37;#37; #35;37; #38;#35;37; #38;amp; #35;quot; #quot; #lt; #gt; #124;'],
+    ['entity-like directive', "#37;#37;{init: {'theme': 'dark'}}#37;#37;", "#35;37;#35;37;{init: {'theme': 'dark'}}#35;37;#35;37;"],
+    ['ordinary', 'an ordinary label', 'an ordinary label'],
+  ];
+  for (const [name, label, literalEncoding] of labels) {
+    await t.test(name, async () => {
+      mermaid.initialize(settings);
+      const reference = await mermaid.mermaidAPI.getDiagramFromText(`flowchart LR\nreference["${literalEncoding}"]\n`);
+      const expected = reference.db.getVertices().get('reference').text;
+      const sample = {
+        modules: [
+          { name: 'a', status: 'agreed', kind: 'library', uses: [{ name: 'b', label }] },
+          { name: 'b', status: 'agreed', kind: 'library', uses: [] },
+          { name: label, status: 'agreed', kind: 'library', uses: [] },
+        ],
+        flows: [{ name: 'route', modules: ['a', 'b'], steps: [
+          { number: 1, type: 'transfer', from: 'a', to: 'b', text: label },
+          { number: 2, type: 'transfer', from: 'b', to: 'a', text: 'ordinary transfer' },
+          { number: 3, type: 'repeat', fromStep: 1, text: label },
+        ] }],
+      };
+      const ids = nodeIds(sample);
+      for (const flow of [null, sample.flows[0]]) {
+        const source = diagram(sample, flow);
+        const result = await mermaid.parse(source);
+        assert.equal(result.diagramType, 'flowchart-v2');
+        assert.deepEqual(Object.keys(result.config), []);
+        const config = mermaid.mermaidAPI.getConfig();
+        assert.equal(config.theme, 'default');
+        assert.equal(config.wrap, false);
+        assert.equal(config.flowchart.curve, 'basis');
+        const parsed = await mermaid.mermaidAPI.getDiagramFromText(source);
+        assert.equal(parsed.db.getVertices().size, 3);
+        assert.equal(parsed.db.getVertices().get(ids.a).text, 'a');
+        assert.equal(parsed.db.getVertices().get(ids[label]).text, expected);
+        assert.deepEqual(Array.from(parsed.db.getEdges(), edge => edge.text), flow
+          ? [`1 ${expected}`, '2 ordinary transfer', `3 repeat until ${expected}`]
+          : [expected]);
+      }
+    });
+  }
+});
