@@ -67,10 +67,12 @@ test('the first live connection refreshes changes made after the initial model r
 });
 
 test('map nodes with escaped and colliding ids navigate to the original module names', async () => {
-  const names = ['interpolate', 'module_interpolate', '_self', 'module__self', '_blank', '_parent', '_top'];
+  const names = ['interpolate', 'module_interpolate', '_self', 'module__self', '_blank', '_parent', '_top', 'href', 'call', 'click', 'accDescr', 'a-b', 'a_b', 'a_b_2', 'café'];
   const model = { ...snapshot('Inspect the selected module.'), modules: names.map(name => ({ ...snapshot('').modules[0], name })) };
   model.nodeIds = nodeIds(model);
   model.map = diagram(model);
+  model.focusedNames = names;
+  model.focusedMap = model.map;
   const nodes = names.map((name, index) => ({
     id: `kanon-graph-1-flowchart-${model.nodeIds[name]}-${index}`, attributes: {}, events: {},
     setAttribute(key, value) { this.attributes[key] = value; },
@@ -100,12 +102,12 @@ test('map nodes with escaped and colliding ids navigate to the original module n
     assert.equal(node.attributes.role, 'link');
     assert.equal(node.attributes['aria-label'], `Inspect ${names[index]}`);
     node.events.click();
-    assert.equal(location.hash, `module/${names[index]}`);
+    assert.equal(location.hash, `module/${encodeURIComponent(names[index])}`);
     for (const key of ['Enter', ' ']) {
       location.hash = '#overview';
       let prevented = false;
       node.events.keydown({ key, preventDefault() { prevented = true; } });
-      assert.equal(location.hash, `module/${names[index]}`);
+      assert.equal(location.hash, `module/${encodeURIComponent(names[index])}`);
       assert.equal(prevented, true);
     }
   }

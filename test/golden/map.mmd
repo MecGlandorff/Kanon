@@ -4,9 +4,9 @@ classDef agreed fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
 classDef built fill:#dcfce7,stroke:#15803d,color:#14532d
 classDef missing fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-dasharray:5 3
 classDef dim fill:#e5e7eb,stroke:#9ca3af,color:#4b5563
-operator[/"operator"\]:::built
-queue[("queue")]:::agreed
-remote{{"remote"}}:::proposed
-worker[["worker"]]:::agreed
-operator --> worker
-worker -->|"take #quot;parcel#quot; #lt;once#gt; #124; acknowledge"| queue
+module_operator[/"operator"\]:::built
+module_queue[("queue")]:::agreed
+module_remote{{"remote"}}:::proposed
+module_worker[["worker"]]:::agreed
+module_operator --> module_worker
+module_worker -->|"take #quot;parcel#quot; #lt;once#gt; #124; acknowledge"| module_queue

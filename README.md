@@ -129,9 +129,11 @@ also records verified modules as built with evidence and notes untested
 behavior, without waiting for a separate sync request. Kinds change the
 diagram shape:
 `agent`, `human`, `tool`, `trigger`, `service`, `library`, `store`, `external`;
-other kinds use a rectangle. Mermaid IDs normally replace punctuation with
-underscores. Reserved words receive a `module_` prefix and collisions receive
-numeric suffixes, keeping distinct modules distinct.
+other kinds use a rectangle. Every Mermaid node ID starts with `module_`;
+characters outside `[A-Za-z0-9_]` in the module name become underscores.
+Collisions receive numeric suffixes, keeping distinct modules distinct.
+Maps and routes share these IDs; displayed labels and module navigation
+hashes use the original module names.
 
 A flow contains Scenario, Steps, and optional Notes sections:
 
