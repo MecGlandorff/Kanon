@@ -86,7 +86,7 @@ test('public Mermaid parsing preserves literal design labels without interpretin
   assert.equal(mermaid.mermaidAPI.getConfig().theme, 'dark');
   assert.equal((await mermaid.mermaidAPI.getDiagramFromText(rawDirective)).db.getVertices().get('control').text, 'before  after');
 
-  const literalText = text => text.replace(/\uFB02\u00B0(\u00B0?)(\w+)\u00B6\u00DF/g, (entity, numeric, code) =>
+  const literalText = text => text.replace(/<\/?span>/g, '').replace(/\uFB02\u00B0(\u00B0?)(\w+)\u00B6\u00DF/g, (entity, numeric, code) =>
     numeric ? String.fromCodePoint(Number(code)) : ({ quot: '"', lt: '<', gt: '>', amp: '&' }[code] ?? entity));
   const labels = [
     ['init', "before %%{init: {'theme': 'dark'}}%% after"],
@@ -101,6 +101,13 @@ test('public Mermaid parsing preserves literal design labels without interpretin
     ['style entities', 'style:#37; &#37; &amp; #quot;'],
     ['classDef entities', 'classDef:#37; &#37; &amp; #quot;'],
     ['mixed syntax', "`style:50%` %%{init: {'theme': 'dark'}}%% #96; &#58;"],
+    ['math', '$$x$$'],
+    ['invalid math', String.raw`$$\kanon$$`],
+    ['backslashes', String.raw`C:\new line\nnext \\server\name`],
+    ['icons', 'fa:fa-user fab:fa-github fas:fa-home'],
+    ['rendering entities', '#36; &#36; #92; &#92; #58; &#58; #64258; &#64258;'],
+    ['Mermaid entity delimiters', '\uFB02\u00B0\u00B036\u00B6\u00DF \uFB02\u00B0quot\u00B6\u00DF \u00B6\u00DF'],
+    ['literal HTML', '<span>$$x$$</span> <br/> <i class="fa fa-user"></i>'],
     ['ordinary', 'an ordinary label'],
   ];
   for (const [name, label] of labels) {

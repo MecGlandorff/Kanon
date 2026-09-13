@@ -15,7 +15,9 @@ export function nodeIds(model) {
   }
   return ids;
 }
-const escape = value => String(value).replaceAll('#', '#35;').replaceAll('%', '#37;').replaceAll(':', '#58;').replaceAll('`', '#96;').replaceAll('&', '#38;').replaceAll('"', '#quot;').replaceAll('<', '#lt;').replaceAll('>', '#gt;').replaceAll('|', '#124;').replace(/[\r\n]/g, ' ');
+const escape = value => String(value)
+  .replaceAll('#', '#35;').replaceAll('%', '#37;').replaceAll('`', '#96;').replaceAll('&', '#38;').replaceAll('"', '#quot;').replaceAll('<', '#lt;').replaceAll('>', '#gt;').replaceAll('|', '#124;')
+  .replace(/[:$\\\uFB02\u00B6]/g, char => `<span>#${char.codePointAt(0)};</span>`).replace(/[\r\n]/g, ' ');
 const styles = [
   'classDef proposed fill:#fef3c7,stroke:#a16207,color:#713f12',
   'classDef agreed fill:#dbeafe,stroke:#2563eb,color:#1e3a8a',
