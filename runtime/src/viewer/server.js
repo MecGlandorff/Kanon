@@ -35,13 +35,19 @@ export async function openWindow(url, { platform = process.platform, env = proce
   });
   let executable = browser;
   let args = [`--app=${url}`];
+  const options = { detached: true, stdio: 'ignore', windowsHide: true };
   if (!browser) {
     notice('Kanon: app mode is unavailable; opening the default browser.');
     if (platform === 'darwin') { executable = 'open'; args = [url]; }
-    else if (platform === 'win32') { executable = env.ComSpec || 'cmd.exe'; args = ['/d', '/v:off', '/s', '/c', 'start', '""', `"${url}"`]; }
+    else if (platform === 'win32') {
+      executable = env.ComSpec || 'cmd.exe';
+      args = ['/d', '/v:off', '/s', '/c', 'start', '""', '"%KANON_VIEW_URL%"'];
+      options.windowsVerbatimArguments = true;
+      options.env = { ...env, KANON_VIEW_URL: url };
+    }
     else { executable = 'xdg-open'; args = [url]; }
   }
-  const child = spawn(executable, args, { detached: true, stdio: 'ignore', windowsHide: true });
+  const child = spawn(executable, args, options);
   await new Promise((accept, reject) => { child.once('error', reject); child.once('spawn', accept); });
   child.unref();
   return { executable, args, appMode: Boolean(browser) };

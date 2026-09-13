@@ -5,9 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, get } from 'node:http';
-import { spawn } from 'node:child_process';
+import childProcess, { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { defaultPort, browserCandidates, startViewer } from '../runtime/src/viewer/server.js';
+import { syncBuiltinESMExports } from 'node:module';
+import { defaultPort, browserCandidates, openWindow, startViewer } from '../runtime/src/viewer/server.js';
 
 const cli = fileURLToPath(new URL('../runtime/cli.js', import.meta.url));
 const fixture = fileURLToPath(new URL('fixtures/clean/', import.meta.url));
@@ -196,6 +197,64 @@ test('port derivation is deterministic and platform browser paths use the specif
   assert.ok(linux.includes('/opt/chromium/bin/chromium'));
   assert.ok(linux.includes('/usr/bin/chromium'));
 });
+
+for (const native of [false, true]) {
+  test(native ? 'Windows cmd and start pass complete viewer URLs literally to a child program' : 'Windows fallback transfers the viewer URL without changing the parent environment', {
+    skip: native && process.platform !== 'win32', timeout: 15000,
+  }, async t => {
+    const root = copyFixture(t);
+    const name = "café 20% !KANON_CMD_BANG! (draft) %KANON_CMD_PERCENT% & x^y; 'quote'#next";
+    writeFileSync(join(root, 'design/modules', `${name}.md`), '---\nkind: library\nstatus: agreed\n---\n## Responsibility\nExercise literal URL forwarding.\n');
+    const instance = await startViewer(join(root, 'design'), { port: await freePort(), view: `module/${name}`, open: false, log() {} });
+    t.after(() => instance.close());
+    await instance.close();
+    const urls = [`${new URL(instance.url).origin}/#overview`, instance.url];
+    assert.equal(new URL(instance.url).hash, `#module/${encodeURIComponent(name)}`);
+    const recorder = join(root, 'record arguments.cjs');
+    writeFileSync(recorder, 'process.stdout.write(JSON.stringify({ args: process.argv.slice(2), url: process.env.KANON_VIEW_URL ?? null }));\n');
+    const missing = join(root, 'no-browsers');
+    const env = { ...process.env, ProgramFiles: missing, 'ProgramFiles(x86)': missing, LOCALAPPDATA: missing,
+      KANON_VIEW_URL: 'parent value', KANON_CMD_BANG: 'expanded bang', '25KANON_CMD_PERCENT': 'expanded percent',
+      '20': 'expanded space', C3: 'expanded UTF8', A9: 'expanded UTF8 continuation' };
+    const spawnProcess = spawn;
+    let completed;
+    t.mock.method(childProcess, 'spawn', (executable, args, options) => {
+      let command = process.execPath;
+      let forwarded = [recorder];
+      if (native) {
+        command = executable;
+        forwarded = args.slice(0, -1);
+        const start = forwarded.indexOf('start');
+        assert.ok(start >= 0);
+        forwarded.splice(start + 1, 0, '/b', '/wait');
+        forwarded.push('"%KANON_TEST_NODE%"', '"%KANON_TEST_RECORDER%"', args.at(-1));
+      }
+      const child = spawnProcess(command, forwarded, { ...options,
+        ...(native ? {} : { windowsVerbatimArguments: false }),
+        env: { ...(options.env ?? env), KANON_TEST_NODE: process.execPath, KANON_TEST_RECORDER: recorder },
+        detached: false, stdio: ['ignore', 'pipe', 'pipe'], timeout: 5000 });
+      let stdout = '', stderr = '';
+      child.stdout.on('data', chunk => { stdout += chunk; });
+      child.stderr.on('data', chunk => { stderr += chunk; });
+      completed = once(child, 'close').then(([code]) => ({ code, stdout, stderr }));
+      return child;
+    });
+    syncBuiltinESMExports();
+    t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+    const notices = [];
+    for (const url of urls) {
+      const opened = await openWindow(url, { platform: 'win32', env, notice: message => notices.push(message) });
+      assert.equal(opened.appMode, false);
+      const result = await completed;
+      assert.equal(result.code, 0, result.stderr);
+      const received = JSON.parse(result.stdout);
+      assert.equal(received.url, url);
+      if (native) assert.deepEqual(received.args, [url]);
+      assert.equal(env.KANON_VIEW_URL, 'parent value');
+    }
+    assert.equal(notices.length, urls.length);
+  });
+}
 
 test('startup includes edits during a streaming port probe and cannot be held open indefinitely', { timeout: 5000 }, async t => {
   const root = copyFixture(t);
