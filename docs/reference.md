@@ -72,9 +72,11 @@ the URL without launching a browser.
 
 Views are `overview`, `map`, `module/name`, `flows`, `flow/name`,
 `decisions`, `questions`, and `slices`. The overview shows the system’s main
-flow when there is exactly one, or offers the main flows to choose from.
-The module dependency map remains available through **Module map**. For example, `kanon view questions` opens another window connected
-to the same design. The first server stays in its terminal; Ctrl+C stops it.
+flow when there is exactly one, offers a choice when there are several, and
+shows the module dependency map when there are none. The map also remains
+available through **Module map**. For example, `kanon view questions` opens
+another window connected to the same design. The first server stays in its
+terminal; Ctrl+C stops it.
 Pages reconnect after a restart. Changes to design files update connected
 views automatically while preserving their scroll position.
 
@@ -206,8 +208,12 @@ a transfer step. Each block heading must have at least one numbered step.
 Use `kanon view flow/name` to open one flow directly. Browser URLs preserve
 the full path, for example `#flow/daily-run/7/story-matching/5/cached-completion`.
 Breadcrumbs and browser Back return to the parent view. Live design updates
-preserve the selected step and current path; if an edit removes a referenced
-step or flow, the viewer explains the invalid address and offers the flow list.
+preserve the selection while its original step number remains available and
+revalidate the current path. If an edit removes a referenced step or flow,
+or changes which inner flow the step references, the viewer explains the
+invalid address and offers the flow list. If no flows remain, it shows
+“No flows yet.” Inner-flow controls are disabled for missing targets and
+references back to a flow already in the breadcrumb path.
 
 A slice has `modules: [worker, evaluator]` in frontmatter, then Goal,
 Acceptance criteria, optional Out of scope, and Report sections. Report text

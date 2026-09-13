@@ -35,4 +35,4 @@ and package dry run also passed. `test/flow.test.js` exercises grouping,
 reference validation, deep nesting, addresses, and responsive layout.
 
 ## Open questions
-- [x] Is a dependency cycle an error or a warning? Some systems have legitimate cycles through events. Answer: neither in v2; cycle detection is deferred by the accepted checker specification. See D-009. (blocks: core-v1)
+- [x] Is a dependency cycle an error or a warning? Some systems have legitimate cycles through events. Answer: see the [module dependency cycle policy](../../docs/reference.md#agreement-and-handoff), accepted in D-009. (blocks: core-v1)

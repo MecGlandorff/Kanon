@@ -14,6 +14,7 @@ through the model event stream. The active view and selected step stay current.
 4. browser -> engineer: preserve the navigation path, selected step and scroll position
 
 ## Notes
-A flow address invalidated by an edit displays an explanation and a link to
-choose a flow. Missing or cyclic subflow links are disabled. A stale render
-cannot replace a newer model; old layout observers are disconnected.
+For navigation errors and live-update behavior, see
+[nested flows and process blocks](../../docs/reference.md#nested-flows-and-process-blocks).
+A stale render cannot replace a newer model; old layout observers are
+disconnected.

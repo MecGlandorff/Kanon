@@ -239,6 +239,32 @@ test('six module/map windows await both flow assets before SSE and keep flow nav
   }
 });
 
+test('a live edit that changes the parent reference visibly invalidates the nested path', async t => {
+  const client = flowClient({ hash: '#flow/delivery/7/inspect' });
+  t.after(client.unload);
+  await client.ready;
+  client.streams[0].sendModel(processSnapshot('Initial design'));
+  await flush();
+  const content = client.elements.get('content');
+  assert.match(content.textContent, /Inspect: Initial design/);
+
+  const changed = processSnapshot('Updated design');
+  changed.flows[0].steps[1].flow = 'replacement';
+  changed.flows.push({ ...changed.flows[1], name: 'replacement' });
+  client.streams[0].sendModel(changed);
+  await flush();
+  assert.equal(client.location.hash, '#flow/delivery/7/inspect');
+  assert.equal(descendants(content).filter(node => node.className.includes('flow-process')).length, 0);
+  const rendered = content.children.map(node => node.innerHTML).join('\n');
+  assert.match(rendered, /Step 7 does not open &quot;inspect&quot;/);
+  assert.match(rendered, /<a href="#flows">Choose a flow<\/a>/);
+
+  client.streams[0].sendModel(processSnapshot('Restored reference'));
+  await flush();
+  assert.equal(client.location.hash, '#flow/delivery/7/inspect');
+  assert.match(content.textContent, /Inspect: Restored reference/);
+});
+
 test('either failed flow asset displays a reload error without opening SSE', async t => {
   for (const failed of ['/flow.js', '/viewer/flows.js']) {
     await t.test(failed, async t => {
