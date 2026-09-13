@@ -267,7 +267,7 @@
       if (!fromOverview) heading('Flows', 'Connected process blocks · open an authored inner flow with ▸', '<a href="#map">Module map</a>');
       if (!model.flows.length) { card('<p class="empty">No flows yet.</p>'); return; }
       const version = renderNumber;
-      const [helpers, renderer] = await (flowAssets ??= Promise.all([import('/flow.js'), import('/viewer/flows.js')]).catch(error => { flowAssets = undefined; throw error; }));
+      const [helpers, renderer] = await flowAssets;
       if (version !== renderNumber) return;
       const roots = rootFlows();
       const choices = roots.length ? roots : model.flows;
@@ -329,15 +329,17 @@
         pendingScroll = undefined;
       });
     }
-    function connection(live) {
+    function connection(live, label = live ? 'Live' : 'Reconnecting…') {
       const element = document.getElementById('connection');
       element.classList.toggle('offline', !live);
-      element.lastElementChild.textContent = live ? 'Live' : 'Reconnecting…';
+      element.lastElementChild.textContent = label;
     }
     let eventSource;
     let reconnect;
     let backoff = 500;
+    let unloaded = false;
     function connect() {
+      if (unloaded) return;
       eventSource = new EventSource('/events');
       eventSource.onopen = () => { backoff = 500; };
       eventSource.addEventListener('model', event => {
@@ -359,8 +361,13 @@
       if (button) void copyReference(button.getAttribute('data-copy'));
     });
     dark.addEventListener('change', () => scheduleRender(true));
-    addEventListener('beforeunload', () => { clearTimeout(reconnect); clearTimeout(copyTimer); activeFlow?.destroy(); eventSource?.close(); });
-    connect();
+    addEventListener('beforeunload', () => { unloaded = true; clearTimeout(reconnect); clearTimeout(copyTimer); activeFlow?.destroy(); eventSource?.close(); });
+    flowAssets = Promise.all([import('/flow.js'), import('/viewer/flows.js')]);
+    flowAssets.then(connect).catch(error => {
+      if (unloaded) return;
+      content.textContent = `Could not load the viewer: ${error.message}. Reload to try again.`;
+      connection(false, 'Reload required');
+    });
   </script>
 </body>
 </html>
