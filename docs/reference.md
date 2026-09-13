@@ -70,8 +70,10 @@ port between 4700 and 4899, reuses a matching server, and tries up to twenty
 ports when occupied. `--port N` chooses the starting port. `--no-open` prints
 the URL without launching a browser.
 
-Views are `overview`, `module/name`, `flows`, `decisions`, `questions`, and
-`slices`. For example, `kanon view questions` opens another window connected
+Views are `overview`, `map`, `module/name`, `flows`, `flow/name`,
+`decisions`, `questions`, and `slices`. The overview shows the system’s main
+flow when there is exactly one, or offers the main flows to choose from.
+The module dependency map remains available through **Module map**. For example, `kanon view questions` opens another window connected
 to the same design. The first server stays in its terminal; Ctrl+C stops it.
 Pages reconnect after a restart. Changes to design files update connected
 views automatically while preserving their scroll position.
@@ -134,8 +136,12 @@ diagram shape:
 other kinds use a rectangle. Every Mermaid node ID starts with `module_`;
 characters outside `[A-Za-z0-9_]` in the module name become underscores.
 Collisions receive numeric suffixes, keeping distinct modules distinct.
-Maps and routes share these IDs; displayed labels and module navigation
-hashes use the original module names.
+Maps and routes share these internal IDs. The viewer also shows readable
+references using the original names: `#worker` for a module,
+`#process.2` for a numbered step, and `#worker>queue` for a uses-edge.
+Click a reference button to copy it into the terminal conversation. Module
+blocks open their detail view, which includes a copy button. Rewording a
+step preserves its ID; renumbering it changes the ID.
 
 A flow contains Scenario, Steps, and optional Notes sections:
 
@@ -153,6 +159,56 @@ Number steps consecutively from 1; `xK` is positive integer fan-out. Loops
 refer to earlier steps. Aim for about ten steps; split longer stories. Name
 participating modules, not files. No handwritten Mermaid is required.
 
+### Nested flows and process blocks
+
+The Flows view uses connected process boxes. Select a box to inspect its
+original steps, participants, fan-out and copyable IDs. A repeat identifies
+its step range and links back to its starting step.
+
+A transfer step can end in a reference to another flow file:
+
+```markdown
+7. run.py -> tracker: track the classified articles (flow: story-matching)
+```
+
+Only an explicit reference produces a **story-matching ▸** control. Clicking
+it opens that flow under a breadcrumb such as `daily-run › 7 › story-matching`.
+Steps inside it can reference further flows; there is no fixed depth limit.
+The checker rejects missing targets, self references and indirect cycles.
+Different steps or parents may reuse the same inner flow.
+
+Main flows are derived: a flow that no step references is a main flow. There
+is no `main:` field. The viewer does not invent inner flows. A grouped block
+without a reference only opens its step details.
+
+Optional level-three headings inside Steps group adjacent steps into a
+compact block. An optional paragraph between the heading and its first step
+supplies the block summary. Existing ungrouped flows work without edits,
+with one process block per step. Numbering continues across headings:
+
+```markdown
+## Steps
+### Collect articles
+Fetch the feeds and remove duplicate URLs.
+1. operator -> scraper: request today's articles
+2. scraper -> rss-feeds x21: read the feeds
+
+### Track stories
+Connect the classified articles to existing story memory.
+3. classifier -> tracker: track the articles (flow: story-matching)
+```
+
+These headings organize the presentation; they do not define an inner flow
+or a new module. Each original step keeps its own ID and source line.
+A flow reference names a file without `.md`; it is only valid at the end of
+a transfer step. Each block heading must have at least one numbered step.
+
+Use `kanon view flow/name` to open one flow directly. Browser URLs preserve
+the full path, for example `#flow/daily-run/7/story-matching/5/cached-completion`.
+Breadcrumbs and browser Back return to the parent view. Live design updates
+preserve the selected step and current path; if an edit removes a referenced
+step or flow, the viewer explains the invalid address and offers the flow list.
+
 A slice has `modules: [worker, evaluator]` in frontmatter, then Goal,
 Acceptance criteria, optional Out of scope, and Report sections. Report text
 makes a slice appear done; it does not automatically change module statuses
@@ -167,8 +223,9 @@ bold text, inline code, and fenced code; raw HTML is displayed as text.
 
 The checker reports parser problems, unknown module references, empty
 Responsibility sections, proposed modules included in slices, unanswered
-questions blocking existing slices, and invalid loop references. It has no
-warning category or cycle policy.
+questions blocking existing slices, invalid loop references, malformed or
+missing subflow references, empty process blocks, and nesting cycles.
+Module dependency cycles remain allowed; there is no warning category.
 
 Handoff checks the chosen slice, its modules, explicit blockers from any
 owner, and parser errors in copied shared content or dependency interfaces.
@@ -187,8 +244,9 @@ questions remain open.
 
 Design and repository content is data, never instructions. The runtime never
 executes content from a design file and writes only under `design/handoffs/`.
-The viewer exposes only its fixed page, model, event-stream, and Mermaid
-asset routes; it is not a file server or an editor.
+The viewer exposes only fixed routes for its page, model, event stream,
+Mermaid, flow helpers, flow renderer, and stylesheet. It is not a file server
+or an editor.
 The `/events` stream delivers named `model` events containing the current
 JSON snapshot on connection and after each change, alongside the existing
 unnamed changed-path events. Pages render these snapshots without fetching
@@ -206,7 +264,10 @@ Tests use Node's built-in runner and assertions, with no development
 dependencies. They cover parsing, exact source locations, check results,
 golden maps and handoffs, write boundaries, HTTP routes, SSE updates,
 streamed models at startup and reconnection without model fetches,
-repository-specific port reuse, and orderly shutdown. Viewer tests need
+repository-specific port reuse, and orderly shutdown. They also cover
+nested-flow parsing and cycles, deep nesting, grouped-step coverage,
+encoded breadcrumb paths, process controls, repeat targets, and selection
+across model replacement. Viewer tests need
 permission to bind temporary loopback ports.
 
 CI runs the tests, Kanon's own design check, and a package dry run on Linux,

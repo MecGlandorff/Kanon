@@ -7,6 +7,7 @@ import { posix, resolve, win32 } from 'node:path';
 import { parseDesign } from '../parse.js';
 import { check } from '../check.js';
 import { diagram, nodeIds } from '../diagram.js';
+import { flowHash, flowTrail, mainFlowNames } from '../flow.js';
 
 export function defaultPort(designDir) {
   let hash = 0x811c9dc5;
@@ -79,13 +80,17 @@ function snapshot(designDir) {
   const focused = model.modules.filter(module => ['agent', 'human', 'external', 'trigger'].includes(module.kind));
   const names = new Set(focused.map(module => module.name));
   const focusedModel = { ...model, modules: focused.map(module => ({ ...module, uses: module.uses.filter(ref => names.has(ref.name)) })) };
-  return { ...model, findings: check(model), nodeIds: nodeIds(model), map: diagram(model), focusedMap: diagram(focusedModel, null, nodeIds(model)), focusedNames: [...names],
+  return { ...model, mainFlows: mainFlowNames(model), findings: check(model), nodeIds: nodeIds(model), map: diagram(model, null, null, { references: true }), focusedMap: diagram(focusedModel, null, nodeIds(model), { references: true }), focusedNames: [...names],
     routes: Object.fromEntries(model.flows.map(flow => [flow.name, diagram(model, flow)])) };
 }
 
 function viewHash(view, model) {
-  if (['overview', 'flows', 'decisions', 'questions', 'slices'].includes(view)) return view;
+  if (['overview', 'map', 'flows', 'decisions', 'questions', 'slices'].includes(view)) return view;
   if (view.startsWith('module/') && model.modules.some(module => module.name === view.slice(7))) return `module/${encodeURIComponent(view.slice(7))}`;
+  if (view.startsWith('flow/')) {
+    if (model.flows.some(flow => flow.name === view.slice(5))) return flowHash([{ flow: view.slice(5), step: null }]).slice(1);
+    return flowHash(flowTrail(view, model)).slice(1);
+  }
   throw new Error(`unknown view "${view}"`);
 }
 
@@ -98,6 +103,11 @@ export async function startViewer(directory, { port, view = 'overview', open = t
   const inline = page.toString().match(/<script>([\s\S]*?)<\/script>/)?.[1];
   const scriptHash = createHash('sha256').update((inline ?? '').replace(/\r\n?/g, '\n')).digest('base64');
   const vendor = readFileSync(new URL('../../vendor/mermaid.min.js', import.meta.url));
+  const assets = new Map([
+    ['/flow.js', { type: 'text/javascript; charset=utf-8', body: readFileSync(new URL('../flow.js', import.meta.url)) }],
+    ['/viewer/flows.js', { type: 'text/javascript; charset=utf-8', body: readFileSync(new URL('flows.js', import.meta.url)) }],
+    ['/viewer/flows.css', { type: 'text/css; charset=utf-8', body: readFileSync(new URL('flows.css', import.meta.url)) }],
+  ]);
   const clients = new Set();
   let server;
   let chosenPort;
@@ -125,6 +135,9 @@ export async function startViewer(directory, { port, view = 'overview', open = t
       response.writeHead(200, { 'Content-Type': contentTypes.json }); response.end(JSON.stringify(model));
     } else if (route === '/vendor/mermaid.min.js') {
       response.writeHead(200, { 'Content-Type': contentTypes.js }); response.end(vendor);
+    } else if (assets.has(route)) {
+      const asset = assets.get(route);
+      response.writeHead(200, { 'Content-Type': asset.type }); response.end(asset.body);
     } else { response.writeHead(404); response.end('Not found'); }
   };
   for (let offset = 0; offset < 20 && firstPort + offset <= 65535; offset++) {
@@ -172,7 +185,7 @@ export async function startViewer(directory, { port, view = 'overview', open = t
       clearTimeout(debounce);
       debounce = setTimeout(() => {
         try { model = snapshot(designDir); }
-        catch (error) { model = { ...model, modules: [], flows: [], slices: [], decisions: [], questions: [], map: '', routes: {}, findings: [{ level: 'error', file: 'design', line: 1, message: error.message }] }; }
+        catch (error) { model = { ...model, modules: [], flows: [], mainFlows: [], slices: [], decisions: [], questions: [], map: '', routes: {}, findings: [{ level: 'error', file: 'design', line: 1, message: error.message }] }; }
         const changed = String(filename ?? 'design/').replaceAll('\\', '/').replace(/[\r\n]/g, ' ');
         const event = `data: ${changed}\n\nevent: model\ndata: ${JSON.stringify(model)}\n\n`;
         for (const client of clients) client.write(event);

@@ -12,7 +12,12 @@ detail, questions, decisions, slices, flows. Each view has its own URL.
 ## Interface
 - in: started by runtime on a port derived from the repository path
 - out: HTTP on localhost, plus server-sent changed-path and model events
-- routes: #overview, #module/name, #questions, #decisions, #slices, #flows
+- routes: #overview, #map, #module/name, #questions, #decisions, #slices, #flows, #flow/name
+- nested flow paths: #flow/parent/step/child, with breadcrumbs and copyable step IDs
+
+The overview shows a single main flow or offers the main flows to choose from.
+Flow views use authored process blocks and explicit subflow references. The
+module map remains available. Selection and navigation survive live edits.
 
 The `/events` stream sends `event: model` with the same JSON snapshot as
 `/model` on connection and each update. Unnamed events keep carrying changed
@@ -34,6 +39,14 @@ on macOS. Native Windows and Linux browser launches remain unverified.
 The initial-connection refresh bug was reproduced in Chrome, then verified
 fixed on 2026-09-13. Its regression test is `test/viewer-client.test.js`;
 all 25 tests pass on Node 20.0.0.
+
+The process renderer is in `flows.js` and `flows.css`, with shared navigation
+and grouping in `runtime/src/flow.js`. On 2026-09-14, executable DOM tests in
+`test/flow-viewer.test.js` verified inspection, copied IDs, nested navigation,
+repeat targets, and selection after updates. HTTP/SSE tests verified the new
+assets and model metadata. The full local suite passed 74 tests, with one
+native Windows test skipped. The separate visual prototype was approved by
+the user; the integrated page has not yet been checked in a connected browser.
 
 ## Open questions
 - [x] Vendor Mermaid or load it from a CDN with a vendored fallback? Answer: bundle Mermaid locally, with no runtime CDN access, as required by the accepted build packet. See D-010. (blocks: viewer-v1)

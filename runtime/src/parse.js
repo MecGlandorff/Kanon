@@ -129,8 +129,24 @@ function references(document, key, pairs = false) {
 
 function parseSteps(document) {
   const steps = [];
+  const blocks = [];
+  let block;
+  const finishBlock = () => {
+    if (block && !block.steps.length) document.problems.push({ file: document.file, line: block.line, message: 'flow block has no steps' });
+  };
   for (const { text, line } of section(document, 'Steps')?.lines ?? []) {
     if (!text.trim()) continue;
+    const heading = text.match(/^### (\S.*?)\s*$/);
+    if (heading) {
+      finishBlock();
+      block = { title: heading[1], summary: '', steps: [], line };
+      blocks.push(block);
+      continue;
+    }
+    if (block && !block.steps.length && !/^\s*(?:\d+\.|#)/.test(text)) {
+      block.summary += (block.summary ? ' ' : '') + text.trim();
+      continue;
+    }
     const transfer = text.match(/^(\d+)\. ([^\s:]+) -> ([^\s:]+)(?: x([1-9]\d*))?: (.+)$/);
     const repeat = text.match(/^(\d+)\. repeat from (\d+) until (.+)$/);
     const match = transfer ?? repeat;
@@ -139,11 +155,23 @@ function parseSteps(document) {
       document.problems.push({ file: document.file, line, message: `invalid flow step; expected step ${steps.length + 1}` });
       continue;
     }
-    steps.push(transfer ? { number: Number(transfer[1]), type: 'transfer', from: transfer[2], to: transfer[3],
+    const step = transfer ? { number: Number(transfer[1]), type: 'transfer', from: transfer[2], to: transfer[3],
       fanOut: transfer[4] ? Number(transfer[4]) : null, text: transfer[5], line } :
-      { number: Number(repeat[1]), type: 'repeat', fromStep: Number(repeat[2]), text: repeat[3], line });
+      { number: Number(repeat[1]), type: 'repeat', fromStep: Number(repeat[2]), text: repeat[3], line };
+    if (/\(flow:/.test(step.text)) {
+      const ref = step.text.match(/^(.*?)\s+\(flow:\s*([^()]*)\)\s*$/);
+      if (step.type !== 'transfer' || !ref || !ref[1].trim() || !ref[2].trim() || /[/\\]/.test(ref[2])) {
+        document.problems.push({ file: document.file, line, message: 'invalid flow reference; use a trailing (flow: name) on a transfer step' });
+      } else {
+        step.text = ref[1].trimEnd();
+        step.flow = ref[2].trim();
+      }
+    }
+    steps.push(step);
+    block?.steps.push(step.number);
   }
-  return steps;
+  finishBlock();
+  return { steps, blocks };
 }
 
 function parseDecisions(document) {
@@ -220,9 +248,9 @@ export function parseDesign(designDirectory = resolve('design')) {
     const document = read(relative);
     if (!document) continue;
     const name = basename(relative, '.md');
-    const steps = parseSteps(document);
+    const { steps, blocks } = parseSteps(document);
     const modules = [...new Set(steps.filter(step => step.type === 'transfer').flatMap(step => [step.from, step.to]))].sort();
-    model.flows.push({ ...document, name, steps, modules });
+    model.flows.push({ ...document, name, steps, blocks, modules });
     collect(document, name, 'flow');
   }
   for (const relative of files('slices')) {

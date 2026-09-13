@@ -9,7 +9,7 @@ const usage = `Kanon — design together, hand off agreed work
 kanon check
 kanon diagram [--flow <name>]
 kanon handoff <slice>
-kanon view [overview|module/<name>|flows|decisions|questions|slices] [--port N] [--no-open]
+kanon view [overview|map|module/<name>|flows|flow/<name>|decisions|questions|slices] [--port N] [--no-open]
 
 Run from the repository containing design/. Node 20 or newer.`;
 

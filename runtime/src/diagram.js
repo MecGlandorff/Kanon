@@ -28,7 +28,7 @@ const styles = [
 const shapes = { agent: ['[[', ']]'], human: ['[/', '\\]'], tool: ['(', ')'], trigger: ['>', ']'],
   service: ['([', '])'], library: ['[', ']'], store: ['[(', ')]'], external: ['{{', '}}'] };
 
-export function diagram(model, flow = null, sharedIds = null) {
+export function diagram(model, flow = null, sharedIds = null, { references = false } = {}) {
   const lines = ['flowchart LR', ...styles];
   const ids = sharedIds ?? nodeIds(flow && !model.flows?.includes(flow) ? { ...model, flows: [...(model.flows ?? []), flow] } : model);
   const modules = [...model.modules].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
@@ -38,12 +38,13 @@ export function diagram(model, flow = null, sharedIds = null) {
   for (const module of modules) {
     const [left, right] = Object.hasOwn(shapes, module.kind) ? shapes[module.kind] : ['[', ']'];
     const status = flow && !flow.modules.includes(module.name) ? 'dim' : module.status;
-    lines.push(`${ids[module.name]}${left}"${escape(module.name)}"${right}:::${status}`);
+    lines.push(`${ids[module.name]}${left}"${escape(module.name)}${references ? `<br/>${escape(`#${module.name}`)}` : ''}"${right}:::${status}`);
   }
   for (const name of [...missing].sort()) lines.push(`${ids[name]}["${escape(name)} (missing)"]:::missing`);
   if (!flow) {
     for (const module of modules) for (const ref of module.uses) {
-      lines.push(`${ids[module.name]} -->${ref.label ? `|"${escape(ref.label)}"|` : ''} ${ids[ref.name]}`);
+      const label = [ref.label && escape(ref.label), references && escape(`#${module.name}>${ref.name}`)].filter(Boolean).join('<br/>');
+      lines.push(`${ids[module.name]} -->${label ? `|"${label}"|` : ''} ${ids[ref.name]}`);
     }
   } else {
     const source = number => {

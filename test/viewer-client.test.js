@@ -194,11 +194,8 @@ test('overlapping live renders preserve scroll and let the latest model and rout
         const latest = snapshot(label);
         latest.name = label;
         latest.modules[0].uses = [{ name: 'worker', label }];
-        latest.flows = [{ name: 'Delivery', modules: ['worker'], sections: [{ title: 'Scenario', text: label }],
-          steps: [{ number: 1, type: 'transfer', from: 'worker', to: 'worker', text: label }] }];
         latest.nodeIds = nodeIds(latest);
         latest.map = diagram(latest);
-        latest.routes = { Delivery: diagram(latest, latest.flows[0]) };
         return latest;
       };
       const renders = [], listeners = {};
@@ -207,7 +204,7 @@ test('overlapping live renders preserve scroll and let the latest model and rout
         renders.push({ source, finish: () => resolve({ svg: '<svg></svg>' }) });
       }) };
       window.mermaid = mermaid;
-      const location = { hash: '#flows' };
+      const location = { hash: '#map' };
       let current = flowModel('Initial design');
       runInNewContext(script, {
         document: {
@@ -238,11 +235,11 @@ test('overlapping live renders preserve scroll and let the latest model and rout
       renders[1].finish();
       await flush();
       assert.equal(renders.length, 3);
-      assert.equal(renders[2].source, changeRoute ? current.map : current.routes.Delivery);
+      assert.equal(renders[2].source, current.map);
       renders[2].finish();
       await flush();
       assert.equal(elements.get('system-name').textContent, 'Latest edit');
-      assert.equal(location.hash, changeRoute ? '#overview' : '#flows');
+      assert.equal(location.hash, changeRoute ? '#overview' : '#map');
       assert.doesNotMatch(rendered(elements.get('content')), /First edit|Second edit|diagram-error/);
       assert.deepEqual([window.scrollX, window.scrollY], changeRoute ? [0, 0] : [80, 700]);
       assert.equal(sidebar.scrollTop, 190);
