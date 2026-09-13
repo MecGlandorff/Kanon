@@ -10,4 +10,5 @@ code.
 ## Interface
 - read by: runtime, skill, coding agents
 - written by: skill and the engineer, in every file except handoffs
+- written by: coding agents, under the [coding-agent contract](coding-agent.md)
 - written by: runtime, only in handoffs/

@@ -1,6 +1,9 @@
 # Kanon v2 Design
 
-Status: draft for discussion. Nothing in this document is built yet.
+Historical design snapshot, retained as provenance. For current usage, see
+[README.md](README.md); for the live design, see [design/system.md](design/system.md).
+
+Status at drafting: draft for discussion. Nothing in this document was built yet.
 
 ## What Kanon is
 

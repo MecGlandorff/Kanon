@@ -27,6 +27,7 @@ Why: The design is reviewed in pull requests like code, and coding agents should
 
 ## D-006 · 2026-09-12 · Flows are a numbered Steps list, rendered as a route over the map
 Scope: runtime, viewer
+Supersedes: D-001
 Decision: A flow is written as steps, `a -> b: text`, with `xK` for fan-out and `repeat from N until` for a loop. Kanon renders it as the overview with edges numbered in step order. No hand-written Mermaid.
 Why: The map shows who touches what; the route shows order, loops, and fan-out on the same picture. That is what makes an agentic system easy to hold in your head, and a steps list is trivial for agents to write and for people to read.
 

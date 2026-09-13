@@ -14,3 +14,6 @@ LICENSE text eol=lf
 
 # The Bash wrapper has no filename extension.
 skills/kanon/scripts/kanon text eol=lf
+
+# Preserve upstream Mermaid bytes; the checksum is recorded in runtime/vendor/VERSION.
+runtime/vendor/mermaid.min.js whitespace=-blank-at-eol

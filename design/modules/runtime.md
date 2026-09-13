@@ -18,7 +18,8 @@ packets, and starts the viewer.
 
 ## Failure behavior
 A missing design folder exits 1 with the path it looked for. A file that
-cannot be parsed is reported and skipped; the rest still loads.
+cannot be read is reported and skipped. For recovery from malformed content,
+see [Design files in the README](../../README.md#design-files).
 
 ## Implementation evidence
 Implemented in `runtime/cli.js` and `runtime/src/`. The authorized v2 build

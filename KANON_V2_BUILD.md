@@ -1,5 +1,9 @@
 # Kanon v2 build packet
 
+This packet and its Report preserve the original build instructions and
+verification. For current usage, see [README.md](README.md); subsequent
+decisions belong to [design/decisions.md](design/decisions.md).
+
 Read this whole file first, then `KANON_V2_DESIGN.md`, then everything under
 `design/`. Build all of it in one run. Do not ask questions: where the spec is
 silent, choose the simplest option that satisfies the tests and record the
