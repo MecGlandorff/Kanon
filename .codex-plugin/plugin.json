@@ -1,30 +1,20 @@
 {
   "name": "kanon",
-  "version": "1.1.0",
-  "description": "Evidence-backed repository orientation and continuity with explicit advisory status.",
-  "author": {
-    "name": "mecglandorff",
-    "url": "https://github.com/MecGlandorff"
-  },
+  "version": "2.0.0-dev",
+  "description": "Build systems in the terminal with an engineer while keeping the live visual map current.",
+  "author": { "name": "mecglandorff", "url": "https://github.com/MecGlandorff" },
   "homepage": "https://github.com/MecGlandorff/Kanon#readme",
   "repository": "https://github.com/MecGlandorff/Kanon",
   "license": "MIT",
-  "keywords": [
-    "repository",
-    "continuity",
-    "codex",
-    "claude"
-  ],
+  "keywords": ["system-design", "live-map", "architecture", "agents"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Kanon",
-    "shortDescription": "Evidence-backed repository continuity.",
-    "longDescription": "Inspect bounded repository evidence without executing repository-controlled code. Notice appears only in explicit output, is advisory and non-enforcing, and has no lifecycle hook.",
+    "shortDescription": "Build in the terminal. See the system evolve.",
+    "longDescription": "Keep modules, flows, and decisions in repository text while Kanon maintains a live system map beside your terminal work. Prepare coding-agent handoffs when needed.",
     "developerName": "mecglandorff",
     "category": "Productivity",
     "capabilities": [],
-    "defaultPrompt": [
-      "Use Kanon to brief this repository from bounded evidence."
-    ]
+    "defaultPrompt": ["Use Kanon to work on this system with me. Open its live map and keep the design and recorded decisions current as we work."]
   }
 }

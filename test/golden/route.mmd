@@ -1,0 +1,13 @@
+flowchart LR
+classDef proposed fill:#fef3c7,stroke:#a16207,color:#713f12
+classDef agreed fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+classDef built fill:#dcfce7,stroke:#15803d,color:#14532d
+classDef missing fill:#fee2e2,stroke:#dc2626,color:#7f1d1d,stroke-dasharray:5 3
+classDef dim fill:#e5e7eb,stroke:#9ca3af,color:#4b5563
+module_operator[/"operator"\]:::built
+module_queue[("queue")]:::agreed
+module_remote{{"remote"}}:::dim
+module_worker[["worker"]]:::agreed
+module_operator -->|"1 submit a parcel"| module_worker
+module_worker -->|"2 x8 take #quot;parcel#quot; #lt;once#gt; #124; acknowledge"| module_queue
+module_worker -.->|"3 repeat until the parcel is acknowledged"| module_operator

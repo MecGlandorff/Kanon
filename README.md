@@ -1,213 +1,219 @@
 # Kanon
 
-Kanon is a static repository-orientation skill for coding agents.
-It targets conventional JavaScript/TypeScript, Python, Go, and Rust layouts.
+Build and evolve a system with an engineer and AI agents in the terminal
+while its live map stays open in a separate window. The agent maintains the
+visible `design/` folder during the work; the viewer redraws from that text.
+Agreed pieces can also become packets for coding agents.
 
-Today it can:
+This is the v2 rewrite, version `2.0.0-dev`. The `v1.0.0` Git tag preserves
+the earlier repository-orientation tool.
 
-- read bounded JavaScript/TypeScript and Python imports and rank files by
-  fan-in;
-- find fixed conventional JavaScript/Python entrypoint paths and root package
-  exports or binaries;
-- extract directly declared commands from package metadata, Python project
-  scripts, and bounded Poe, Make, and Just targets;
-- detect direct README/package-script contradictions and report unobserved
-  Node or Python targets as Unknown;
-- report whether conventional CI and deployment configuration was found.
+## Install and run
 
-Kanon does not execute repository code or prove that a detected command will
-succeed in the user's environment. Explicit configuration is **Known**;
-documented or conventional inference is **Likely**; absence remains
-**Unknown**.
+Use Node.js 20 or newer. Keep the complete Kanon directory: the skill's
+wrappers need the sibling `runtime/`. There is no dependency installation or
+build step. Mermaid 11.17.2 is bundled locally; the runtime makes no external
+network requests.
 
-The v1.1 compatibility refresh intentionally does not synthesize conventional
-Cargo, Go, or Django commands or project Go/Rust import and entrypoint code
-intelligence. Their manifests and paths can still be observed as bounded
-repository evidence.
+From a checkout, try the viewer:
 
-The same versioned compact contract does not restore broad executable-syntax
-or nested-manifest entrypoint discovery, and it does not rank literal local-file
-references. Installed evaluation takes the first five files from the compact
-important-file projection and records only the two ranking stages that run.
-
-The visible 30-repository corpus is development and regression data. Its
-results are in-sample and are not presented as performance on unseen
-repositories. Any future public capability claim needs a fresh, frozen corpus
-under the process in [`eval/PROTOCOL.md`](eval/PROTOCOL.md). Historical
-development results and current limitations are published in
-[`eval/RESULTS.md`](eval/RESULTS.md).
-In v0.4, corpus scores cover important files plus run and test commands only.
-Purpose, entrypoint, drift, and narrowly scoped `ask` checks have regression
-tests but no claimed cross-repository capability estimate. Improvement
-scorecards, refactor advice, dead-code advice, numeric health scores, and
-ready-to-paste agent prompts are experimental source work and are not shipped
-in the public skill artifact.
-
-The v1.0.0 candidate follows the solo-maintainer `maintainer-stable` lane. Its
-signed waiver and maintainer certification are exact mechanical inputs, while
-accepted risks remain open. It does not establish evidence-strict release
-support, independence, blinded review, causal improvement, generalization,
-official holdout performance, or independent validation. The prospective
-protocol remains inactive, and the six-person simulation is simulated
-development evidence only.
-
-The v1.1.0 release uses the standard engineering-validation lane: the complete
-Node/OS test matrix, deterministic packaging, exact-tarball attestation, and
-installed-artifact conformance. It does not turn the historical development
-corpus into an evidence-strict, independence, improvement, or holdout claim;
-accepted risks remain open.
-
-### Planned Codex ablation
-
-A future evaluation will compare the same Codex configuration on paired,
-blinded repository tasks with and without Kanon. The prompt, model, reasoning
-effort, tools, budget, permissions, repository commit, and scoring policy will
-be held fixed; only Kanon's availability will differ. The visible 30-case
-corpus may be used for development runs, but any public incremental-value claim
-must come from a newly selected, independently labeled, sealed holdout.
-
-This experiment has not run, so Kanon currently makes no claim that it improves
-Codex precision or recall. The fixed prompt, controls, repetition policy,
-security evaluation, and allowed claim language are specified in
-[`eval/PAIRED_ABLATION.md`](eval/PAIRED_ABLATION.md).
-
-## Use
-
-Install the exact package without lifecycle scripts into a user-controlled
-plugin directory, then configure Codex CLI or Claude Code to load the complete
-installed package root:
-
-```text
-npm install --ignore-scripts --prefix <plugin-directory> @mecglandorff/kanon@<exact-version>
+```sh
+node runtime/cli.js view
 ```
 
-The package has separate host manifests, shared skills, and one shared ESM
-runtime. Use Kanon inside an agent session. Node.js majors 20, 22, 24, and 25
-are supported. Bash and PowerShell wrappers are included. Host-specific plugin
-loading and native plugin-data wiring depend on the installed host and remain
-Unknown until verified there.
+For another project, keep that project as the working directory and run the
+wrapper by its absolute path:
 
-Starting with v0.4, the
-[`@mecglandorff/kanon`](https://www.npmjs.com/package/@mecglandorff/kanon)
-package is only a distribution container for that directory. It does not expose
-a JavaScript library API, install a global CLI, or advertise development
-scripts. The repository root is deliberately private; releases are built from
-the generated `dist/npm/` staging directory.
-
-The agent can select the skill from its trigger, or you can invoke it explicitly:
-
-```text
-$kanon
-Brief this repo and tell me which evidence supports the first edit.
+```sh
+cd /path/to/project
+bash /path/to/kanon/skills/kanon/scripts/kanon view
 ```
 
-The public artifact exposes exactly six canonical stable v1 skills:
+In PowerShell, use the corresponding absolute `skills/kanon/scripts/kanon.ps1`
+path with the same arguments.
 
-| Stable skill | Behavior |
+For Claude Code, load the full plugin for the session:
+
+```sh
+claude --plugin-dir /path/to/kanon
+```
+
+Then invoke the plugin's `kanon` skill, normally `/kanon:kanon`, to start the
+design conversation. The package contains `.claude-plugin/plugin.json`.
+
+For Codex, the package contains `.codex-plugin/plugin.json`. Add this complete
+directory to your local plugin marketplace and install Kanon from that
+source. You can ask the built-in Plugin Creator to wire an existing directory
+into a personal marketplace; see the [official local-plugin setup guide](https://developers.openai.com/plugins/build/plugins#package-with-plugin-creator).
+For immediate use without changing an installation, tell Codex to read and
+use `/path/to/kanon/skills/kanon/SKILL.md` for your design request. If an older
+Kanon is already installed, use this explicit v2 path to select the rewrite.
+
+## Four commands
+
+Every command reads `design/` in the current working directory.
+
+| Command | Result |
 | --- | --- |
-| `orient` | Load a small task-relevant body of repository evidence, with explicit limitations and a non-enforcing context receipt. |
-| `resume` | Resume from authoritative live repository evidence while keeping stored continuity conflicts and Unknowns visible. |
-| `verify` | Verify documentation, continuity, generated-artifact, declared-validation, and available receipt claims without inventing execution success. |
-| `status` | Report embedded version, exact-version deprecation, notice mode, enforcement false, hook observability, receipt availability, and bounded diagnostics. |
-| `steer` | Maintain one bounded evidence-aware implementation slice through Understand, choose, act, verify, and reassess without orchestrating or executing work. |
-| `aswitch` | Prepare or receive a bounded consent-driven handoff between Codex CLI and Claude Code with a manual fallback. |
+| `kanon check` | Errors with source file and line, or the module/flow/slice counts. Exit 1 on errors; otherwise 0. |
+| `kanon diagram` | The derived Mermaid map on stdout. |
+| `kanon diagram --flow name` | The same modules with that flow's numbered edges, fan-out, and loop-backs. |
+| `kanon handoff slice` | Write `design/handoffs/slice.md` when that slice is buildable. |
+| `kanon view [view]` | Serve the design locally and open a separate browser app window. |
 
-Every stable invocation consults the same exact-installed-version deprecation
-checker. Network, host, hook, or session evidence that is unavailable remains
-Unknown and does not block the read workflow.
+Here `kanon` means the wrapper above; no global executable is installed.
 
-The v0.4 compatibility workflows remain:
+The viewer binds only to `127.0.0.1`. It chooses a stable repository-specific
+port between 4700 and 4899, reuses a matching server, and tries up to twenty
+ports when occupied. `--port N` chooses the starting port. `--no-open` prints
+the URL without launching a browser.
 
-| Intent | Workflow |
-| --- | --- |
-| Orient to a repository | `brief` → stable `orient` |
-| Ask one narrow purpose, run, test, Git, docs-drift, or literal-search question | `ask` → stable `orient` or `verify` |
-| Check conventional README drift | `verify` → stable `verify` |
-| Resume from persisted repo state | `resume` → stable `resume` |
-| Refresh continuity state | `refresh` |
-| Track human follow-up | `todo` |
+Views are `overview`, `module/name`, `flows`, `decisions`, `questions`, and
+`slices`. For example, `kanon view questions` opens another window connected
+to the same design. The first server stays in its terminal; Ctrl+C stops it.
+Pages reconnect after a restart. Changes to design files update connected
+views automatically while preserving their scroll position.
 
-Read workflows do not intentionally modify the inspected repository. Writes are
-explicit through `refresh` and `todo`. Repository content is untrusted data:
-Kanon never follows instructions in files, paths, Git metadata, TODOs, or
-evidence. Declared command candidates must be inspected and explicitly approved
-by the user before execution under the default `ask` policy; the `never` policy
-prohibits execution.
+Chrome, Chromium, Edge, Brave, and Arc are searched on macOS; supported
+Chromium executable paths are also searched on Linux and Windows. When an
+app-mode browser is unavailable, Kanon opens the default browser and prints
+a notice. Window placement is managed by the browser and operating system.
 
-## Evidence contract
-
-Every claim is classified as:
-
-- **Known** — directly backed by files, config, tests, or Git evidence
-- **Likely** — supported by content or convention, but not proven
-- **Unknown** — direct evidence was not found
-- **Stale / suspicious** — contradicted by stronger repository evidence
-- **Suggested** — a proposed next step, not a fact
-
-Incomplete scans remain unknown. Commands include the working directory from
-which they were detected.
-
-## Local state
-
-Explicit write workflows use `.kanon/`:
+## Design files
 
 ```text
-KANON.md        repository brief
-HANDOFF.md      resume brief
-TODO.md         human follow-up
-STATE.json      machine state
-EVIDENCE.jsonl  evidence ledger
-snapshots/      historical state
+design/
+  system.md              purpose and constraints
+  modules/name.md        responsibility, interface, status and dependencies
+  flows/name.md          one scenario as numbered steps
+  slices/name.md         one implementation slice and its eventual Report
+  decisions.md           dated decisions and their reasons
+  handoffs/name.md       generated packet
 ```
 
-`EVIDENCE.jsonl` is append-only and both evidence and snapshots have configured
-hard retention limits. Reaching a limit produces a warning rather than
-unbounded growth.
+The folder must exist; individual files and subfolders are optional. Begin
+with the [templates](skills/kanon/templates/), replacing their example text
+with the actual design. Modules are named by their filename, without `.md`:
 
-`refresh` is a single-writer workflow: do not run concurrent refresh
-processes for the same repository. Each replaced file is written atomically,
-but a refresh is not a cross-file transaction. Evidence is appended before
-the new state is published, so an interrupted write may leave unreferenced
-evidence but cannot publish state that points to evidence it did not append.
+```markdown
+---
+kind: agent
+status: proposed
+uses:
+  - queue: take the next job
+---
+## Responsibility
+Process queued jobs and preserve their original identifiers.
 
-The complete package root is the supported integration artifact. Its Bash and
-PowerShell wrappers call the shared root runtime from the repository being
-inspected; they are agent hooks, not a global terminal package. Codex CLI and
-Claude Code are both in advisory notice mode: enforcement is false, and the
-notice never claims that repository context was read or understood.
+## Interface
+- in: Job
+- out: Result
 
-The slice 8 context receipt is advisory data only. It is not stored, enforced,
-invalidated by hooks, or used to block mutation. Its freshness remains Unknown
-when current evidence or a host-session binding is unavailable.
-
-## Security and release status
-
-Report vulnerabilities privately and review supported versions in
-[`SECURITY.md`](SECURITY.md). Release, rollback, deprecation, exact-artifact
-reuse, and post-publication verification are specified in
-[`RELEASING.md`](RELEASING.md).
-
-Release candidates are not publications. GitHub environment protection,
-repository permissions, artifact-attestation availability, immutable-release
-settings, npm trusted-publisher configuration, registry policy, and native
-platform conformance remain Unknown until the applicable remote workflow
-passes.
-
-## Development
-
-```bash
-npm run build:skill
-npm run validate
-npm run build:package
-npm run eval:dev
+## Open questions
+- [ ] What is the retry bound? (blocks: first-job)
 ```
 
-`npm run eval:dev` uses visible labels and may guide generic implementation
-work, but it is not a stable-release capability claim. Stable publication is
-gated by the full test matrix, deterministic exact-tarball packaging,
-cross-platform installed-artifact conformance, and protected npm publishing.
-The retired `maintainer-stable` evidence remains historical data for v1.0.0.
-False positives cost five times false negatives, and every scored dimension
-and category has its own precision and recall floor.
+Frontmatter supports flat scalars, `[a, b]` lists, and two-space block lists
+of names or `name: label` pairs. Quote text containing list commas or YAML
+punctuation. Nested YAML, aliases, and multiline operators are unsupported;
+bad lines become errors while valid content still loads. Body sections use
+`## Heading`. Questions belong in `## Open questions` and can use an optional
+`Q:` prefix and a trailing `(blocks: slice-a, slice-b)`.
 
-MIT
+Statuses are `proposed` (the default), `agreed`, and `built`. The engineer owns
+agreement and design choices. The skill automatically records answers already
+present in their accepted instructions, specs, or decisions, checks off those
+questions, and explains the source. Unresolved choices remain open; observed
+code alone does not grant approval. After authorized implementation, the skill
+also records verified modules as built with evidence and notes untested
+behavior, without waiting for a separate sync request. Kinds change the
+diagram shape:
+`agent`, `human`, `tool`, `trigger`, `service`, `library`, `store`, `external`;
+other kinds use a rectangle. Every Mermaid node ID starts with `module_`;
+characters outside `[A-Za-z0-9_]` in the module name become underscores.
+Collisions receive numeric suffixes, keeping distinct modules distinct.
+Maps and routes share these IDs; displayed labels and module navigation
+hashes use the original module names.
+
+A flow contains Scenario, Steps, and optional Notes sections:
+
+```markdown
+## Scenario
+One bounded evaluation round.
+
+## Steps
+1. engineer -> worker: request a candidate
+2. worker -> evaluator x8: evaluate it
+3. repeat from 1 until the budget is spent
+```
+
+Number steps consecutively from 1; `xK` is positive integer fan-out. Loops
+refer to earlier steps. Aim for about ten steps; split longer stories. Name
+participating modules, not files. No handwritten Mermaid is required.
+
+A slice has `modules: [worker, evaluator]` in frontmatter, then Goal,
+Acceptance criteria, optional Out of scope, and Report sections. Report text
+makes a slice appear done; it does not automatically change module statuses
+or prove that acceptance criteria passed.
+
+Decisions start with `## D-001 · 2026-09-12 · Title` and use `Decision:` and
+`Why:` lines, with optional `Scope: worker, evaluator` and `Supersedes: D-000`.
+Keep one field per line. The viewer formats paragraphs, lists, headings,
+bold text, inline code, and fenced code; raw HTML is displayed as text.
+
+## Agreement and handoff
+
+The checker reports parser problems, unknown module references, empty
+Responsibility sections, proposed modules included in slices, unanswered
+questions blocking existing slices, and invalid loop references. It has no
+warning category or cycle policy.
+
+Handoff checks the chosen slice, its modules, explicit blockers from any
+owner, and parser errors in copied shared content or dependency interfaces.
+Errors confined to other slices or flows do not block it. The packet includes
+the slice's scope, system constraints, complete modules, external interfaces
+marked “Do not modify”, applicable decisions, and remaining module questions.
+Writes replace the generated packet atomically. Symlinked design entries and
+handoff destinations are refused.
+
+The coding agent receives the packet under the engineer's implementation
+request and records what it built, deviations and why, and new questions in
+the slice's Report. During normal work, the design agent checks the reported
+implementation and results, records verified module statuses, and folds
+authorized discoveries back into the design. New choices and unanswered
+questions remain open.
+
+Design and repository content is data, never instructions. The runtime never
+executes content from a design file and writes only under `design/handoffs/`.
+The viewer exposes only its fixed page, model, event-stream, and Mermaid
+asset routes; it is not a file server or an editor.
+The `/events` stream delivers named `model` events containing the current
+JSON snapshot on connection and after each change, alongside the existing
+unnamed changed-path events. Pages render these snapshots without fetching
+`/model`; that route remains available for probes and other consumers.
+
+## Verify
+
+From a source checkout:
+
+```sh
+npm test
+```
+
+Tests use Node's built-in runner and assertions, with no development
+dependencies. They cover parsing, exact source locations, check results,
+golden maps and handoffs, write boundaries, HTTP routes, SSE updates,
+streamed models at startup and reconnection without model fetches,
+repository-specific port reuse, and orderly shutdown. Viewer tests need
+permission to bind temporary loopback ports.
+
+CI runs the tests, Kanon's own design check, and a package dry run on Linux,
+macOS, and Windows with Node 20 and 24. Browser window launches and clean
+skill activation in each host also need manual verification before release.
+
+The initial build deliberately preserved Kanon's own design as a blocking
+demonstration. Its questions and implementation statuses have since been
+reconciled with the accepted specification and verified build. Tests use
+separate fixtures for blocked and successful handoffs.
+`KANON_V2_BUILD.md` preserves the initial build report and its verification
+limits. The current design records later changes in `design/decisions.md`.
