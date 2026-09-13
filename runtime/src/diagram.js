@@ -1,6 +1,6 @@
 export function nodeId(name) {
   const id = name.replace(/[^A-Za-z0-9_]/g, '_');
-  return /^(end|subgraph|graph|flowchart|direction|classDef|class|style|linkStyle|acc_title|acc_descr)$/.test(id) ? `module_${id}` : id;
+  return /^(end|subgraph|graph|flowchart|direction|classDef|class|style|linkStyle|acc_title|acc_descr|interpolate|_self|_blank|_parent|_top)$/.test(id) ? `module_${id}` : id;
 }
 
 export function nodeIds(model) {

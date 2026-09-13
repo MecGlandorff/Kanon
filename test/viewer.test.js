@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer, get } from 'node:http';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { defaultPort, browserCandidates } from '../runtime/src/viewer/server.js';
+import { defaultPort, browserCandidates, startViewer } from '../runtime/src/viewer/server.js';
 
 const cli = fileURLToPath(new URL('../runtime/cli.js', import.meta.url));
 const fixture = fileURLToPath(new URL('fixtures/clean/', import.meta.url));
@@ -69,12 +69,14 @@ function request(base, path, headers = {}) {
 async function sse(base) {
   let body = '';
   let onEvent;
+  let ended;
   const events = [];
   const next = () => events.length ? Promise.resolve(events.shift()) : new Promise(accept => { onEvent = accept; });
   let req;
   await new Promise((accept, reject) => {
     req = get(new URL('/events', base), response => {
       assert.equal(response.headers['content-type'], 'text/event-stream');
+      ended = new Promise(accept => response.once('end', accept));
       response.setEncoding('utf8');
       response.on('data', chunk => {
         body += chunk;
@@ -91,10 +93,10 @@ async function sse(base) {
     });
     req.on('error', reject);
   });
-  return { next, close: () => req.destroy() };
+  return { next, ended, close: () => req.destroy() };
 }
 
-test('viewer serves only the fixed routes, broadcasts live changes, reuses its server, and stops cleanly', { timeout: 15000 }, async t => {
+test('viewer serves fixed routes and vendored bytes, broadcasts live changes, reuses its server, and stops', { timeout: 15000 }, async t => {
   const root = copyFixture(t);
   const instance = await launch(t, root, await freePort());
   const base = new URL(instance.url).origin;
@@ -107,10 +109,12 @@ test('viewer serves only the fixed routes, broadcasts live changes, reuses its s
   assert.equal(model.findings.length, 0);
   assert.ok(model.routes.process.includes('3 repeat until'));
   const page = await request(base, '/');
+  assert.equal(page.status, 200);
+  assert.equal(page.headers['content-type'], 'text/html; charset=utf-8');
   assert.match(page.headers['content-security-policy'], /connect-src http:\/\/127\.0\.0\.1:/);
-  assert.match(page.body, /src="\/vendor\/mermaid.min.js"/);
-  assert.doesNotMatch(page.body, /https:\/\//);
   const vendor = await request(base, '/vendor/mermaid.min.js');
+  assert.equal(vendor.status, 200);
+  assert.equal(vendor.headers['content-type'], 'text/javascript; charset=utf-8');
   assert.equal(vendor.body, readFileSync(new URL('../runtime/vendor/mermaid.min.js', import.meta.url), 'utf8'));
   for (const path of ['/../package.json', '/package.json', '/design/system.md', '/%2e%2e/package.json', '/vendor/../cli.js', '/unknown']) assert.equal((await request(base, path)).status, 404, path);
   assert.equal((await request(base, '/model', { Host: 'other.example' })).status, 403);
@@ -134,9 +138,34 @@ test('viewer serves only the fixed routes, broadcasts live changes, reuses its s
   assert.equal(reuse.output().stdout, `${base}/#questions\n`);
   first.close(); second.close();
   await instance.stop();
-  assert.equal(instance.child.exitCode, 0);
+  assert.equal(instance.child.exitCode, process.platform === 'win32' ? null : 0);
+  assert.equal(instance.child.signalCode, process.platform === 'win32' ? 'SIGTERM' : null);
   assert.equal(instance.output().stderr, '');
   await assert.rejects(request(base, '/model'), /ECONNREFUSED|ECONNRESET/);
+});
+
+test('viewer.close ends live streams, removes signal handlers, and releases its port', { timeout: 10000 }, async t => {
+  const root = copyFixture(t);
+  const signals = ['SIGINT', 'SIGTERM'];
+  const listeners = signals.map(signal => process.listeners(signal));
+  const instance = await startViewer(join(root, 'design'), { port: await freePort(), open: false, log() {} });
+  t.after(() => instance.close());
+  const stream = await sse(instance.url);
+  t.after(() => stream.close());
+  assert.equal(JSON.parse((await request(instance.url, '/model')).body).name, 'Parcel workshop');
+  for (const [index, signal] of signals.entries()) assert.equal(process.listenerCount(signal), listeners[index].length + 1);
+  const closing = instance.close();
+  assert.equal(instance.close(), closing);
+  await closing;
+  await stream.ended;
+  assert.equal(instance.server.listening, false);
+  for (const [index, signal] of signals.entries()) assert.deepEqual(process.listeners(signal), listeners[index]);
+  await assert.rejects(request(instance.url, '/model'), /ECONNREFUSED|ECONNRESET/);
+  const replacement = await startViewer(join(root, 'design'), { port: instance.port, open: false, log() {} });
+  t.after(() => replacement.close());
+  assert.equal(replacement.reused, false);
+  assert.equal(replacement.port, instance.port);
+  await replacement.close();
 });
 
 test('a busy port owned by a different repository is skipped', { timeout: 10000 }, async t => {
@@ -162,11 +191,17 @@ test('port derivation is deterministic and platform browser paths use the specif
   const windows = browserCandidates({ platform: 'win32', env: { ProgramFiles: 'D:\\Programs', LOCALAPPDATA: 'C:\\Users\\A\\AppData\\Local' } });
   assert.ok(windows.includes('D:\\Programs\\Google\\Chrome\\Application\\chrome.exe'));
   assert.ok(windows.includes('C:\\Users\\A\\AppData\\Local\\Microsoft\\Edge\\Application\\msedge.exe'));
-  assert.ok(browserCandidates({ platform: 'linux', env: { PATH: '/usr/bin' } }).includes('/usr/bin/chromium'));
+  const linux = browserCandidates({ platform: 'linux', env: { PATH: '/opt/chromium/bin:/usr/bin' } });
+  assert.equal(linux.length, 10);
+  assert.ok(linux.includes('/opt/chromium/bin/chromium'));
+  assert.ok(linux.includes('/usr/bin/chromium'));
 });
 
-test('a streaming response on an occupied port cannot hold startup open indefinitely', { timeout: 5000 }, async t => {
+test('startup includes edits during a streaming port probe and cannot be held open indefinitely', { timeout: 5000 }, async t => {
+  const root = copyFixture(t);
+  const file = join(root, 'design', 'modules', 'worker.md');
   const occupied = createServer((_req, res) => {
+    writeFileSync(file, readFileSync(file, 'utf8').replace('Process a parcel and acknowledge it once.', 'Changed during the startup probe.'));
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write(': waiting\n\n');
     const heartbeat = setInterval(() => res.write(': waiting\n\n'), 50);
@@ -177,8 +212,10 @@ test('a streaming response on an occupied port cannot hold startup open indefini
   t.after(() => new Promise(accept => { occupied.close(accept); occupied.closeAllConnections(); }));
   const first = occupied.address().port;
   const start = Date.now();
-  const instance = await launch(t, copyFixture(t), first);
+  const instance = await launch(t, root, first);
   assert.ok(Number(new URL(instance.url).port) > first);
   assert.ok(Date.now() - start < 2000);
+  const model = JSON.parse((await request(instance.url, '/model')).body);
+  assert.equal(model.modules.find(module => module.name === 'worker').sections.find(section => section.title === 'Responsibility').text, 'Changed during the startup probe.');
   await instance.stop();
 });

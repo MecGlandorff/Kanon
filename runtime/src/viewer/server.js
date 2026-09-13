@@ -3,7 +3,7 @@ import { accessSync, constants, readFileSync, watch } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
-import { delimiter, join, resolve, win32 } from 'node:path';
+import { posix, resolve, win32 } from 'node:path';
 import { parseDesign } from '../parse.js';
 import { check } from '../check.js';
 import { diagram, nodeIds } from '../diagram.js';
@@ -17,7 +17,7 @@ export function defaultPort(designDir) {
 export function browserCandidates({ platform = process.platform, env = process.env, userHome = homedir() } = {}) {
   if (platform === 'darwin') {
     const names = ['Google Chrome', 'Chromium', 'Microsoft Edge', 'Brave Browser', 'Arc'];
-    return ['/Applications', join(userHome, 'Applications')].flatMap(folder => names.map(name => join(folder, `${name}.app`, 'Contents', 'MacOS', name)));
+    return ['/Applications', posix.join(userHome, 'Applications')].flatMap(folder => names.map(name => posix.join(folder, `${name}.app`, 'Contents', 'MacOS', name)));
   }
   if (platform === 'win32') {
     return [env.ProgramFiles || 'C:\\Program Files', env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', env.LOCALAPPDATA].filter(Boolean).flatMap(folder => [
@@ -26,7 +26,7 @@ export function browserCandidates({ platform = process.platform, env = process.e
       win32.join(folder, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe'),
     ]);
   }
-  return (env.PATH ?? '').split(delimiter).filter(Boolean).flatMap(folder => ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge', 'brave-browser'].map(name => join(folder, name)));
+  return (env.PATH ?? '').split(posix.delimiter).filter(Boolean).flatMap(folder => ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge', 'brave-browser'].map(name => posix.join(folder, name)));
 }
 
 export async function openWindow(url, { platform = process.platform, env = process.env, notice = console.error } = {}) {
@@ -170,6 +170,7 @@ export async function startViewer(directory, { port, view = 'overview', open = t
       }, 150);
     });
     watcher.on('error', error => { notice(`Kanon: file watcher stopped (${error.message}). Restart the viewer to reconnect.`); void close(); });
+    model = snapshot(designDir);
   } catch (error) { await close(); throw error; }
   process.once('SIGINT', stop);
   process.once('SIGTERM', stop);
