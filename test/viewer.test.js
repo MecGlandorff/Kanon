@@ -69,10 +69,10 @@ function request(base, path, headers = {}) {
 
 async function sse(base) {
   let body = '';
-  let onEvent;
+  const onEvent = new Map();
   let ended;
-  const events = [];
-  const next = () => events.length ? Promise.resolve(events.shift()) : new Promise(accept => { onEvent = accept; });
+  const events = new Map([['message', []], ['model', []]]);
+  const next = (type = 'message') => events.get(type).length ? Promise.resolve(events.get(type).shift()) : new Promise(accept => { onEvent.set(type, accept); });
   let req;
   await new Promise((accept, reject) => {
     req = get(new URL('/events', base), response => {
@@ -84,10 +84,15 @@ async function sse(base) {
         let end;
         while ((end = body.indexOf('\n\n')) !== -1) {
           const frame = body.slice(0, end); body = body.slice(end + 2);
-          if (frame.startsWith('data: ')) {
-            const value = frame.slice(6);
-            if (onEvent) { const callback = onEvent; onEvent = null; callback(value); } else events.push(value);
+          let type = 'message';
+          const data = [];
+          for (const line of frame.split('\n')) {
+            if (line.startsWith('event: ')) type = line.slice(7);
+            if (line.startsWith('data: ')) data.push(line.slice(6));
           }
+          if (!data.length || !events.has(type)) continue;
+          const value = data.join('\n');
+          if (onEvent.has(type)) { const callback = onEvent.get(type); onEvent.delete(type); callback(value); } else events.get(type).push(value);
         }
       });
       accept();
@@ -122,18 +127,26 @@ test('viewer serves fixed routes and vendored bytes, broadcasts live changes, re
   const first = await sse(base);
   const second = await sse(base);
   t.after(() => { first.close(); second.close(); });
-  const received = Promise.all([first.next(), second.next()]);
+  const initialModels = await Promise.all([first.next('model'), second.next('model')]);
+  for (const initial of initialModels) assert.deepEqual(JSON.parse(initial), model);
+  const received = Promise.all([first.next(), second.next(), first.next('model'), second.next('model')]);
   const file = join(root, 'design', 'modules', 'worker.md');
   const start = Date.now();
   writeFileSync(file, readFileSync(file, 'utf8').replace('Process a parcel and acknowledge it once.', 'Process a parcel after validation.'));
   let timer;
-  const paths = await Promise.race([received, new Promise((_, reject) => {
+  const changes = await Promise.race([received, new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`no SSE event within two seconds; viewer exit=${instance.child.exitCode}, signal=${instance.child.signalCode}, stderr=${instance.output().stderr}`)), 2000);
   })]).finally(() => clearTimeout(timer));
   assert.ok(Date.now() - start < 2000);
+  const paths = changes.slice(0, 2);
   assert.ok(paths.every(path => path.includes('worker.md')), paths.join(', '));
   const updated = JSON.parse((await request(base, '/model')).body);
   assert.ok(updated.modules.find(module => module.name === 'worker').raw.includes('after validation'));
+  for (const delivered of changes.slice(2)) assert.deepEqual(JSON.parse(delivered), updated);
+  const reconnected = await sse(base);
+  t.after(() => reconnected.close());
+  assert.deepEqual(JSON.parse(await reconnected.next('model')), updated);
+  reconnected.close();
   const reuse = await launch(t, root, Number(new URL(base).port), 'questions');
   if (reuse.child.exitCode === null) await once(reuse.child, 'exit');
   assert.equal(reuse.child.exitCode, 0);

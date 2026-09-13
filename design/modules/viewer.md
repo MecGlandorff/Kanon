@@ -11,14 +11,19 @@ detail, questions, decisions, slices, flows. Each view has its own URL.
 
 ## Interface
 - in: started by runtime on a port derived from the repository path
-- out: HTTP on localhost, plus a server-sent events stream with changed file paths
+- out: HTTP on localhost, plus server-sent changed-path and model events
 - routes: #overview, #module/name, #questions, #decisions, #slices, #flows
+
+The `/events` stream sends `event: model` with the same JSON snapshot as
+`/model` on connection and each update. Unnamed events keep carrying changed
+file paths. The page renders model events without fetching `/model`.
 
 ## Failure behavior
 No Chromium-family browser: open a normal tab and say so. Port taken: take the
 next one and print it. Pages reconnect on their own after a restart.
-Fetch the current model whenever the live connection opens, including the
-first connection, so edits made while it was opening are not missed.
+Deliver the current model over the live connection on initial connection
+and reconnection, so edits made while it was opening are not missed and
+updates need no additional browser connection.
 
 ## Implementation evidence
 Implemented in `runtime/src/viewer/server.js` and `page.html`, with the

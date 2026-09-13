@@ -116,6 +116,7 @@ export async function startViewer(directory, { port, view = 'overview', open = t
     if (route === '/events') {
       response.writeHead(200, { 'Content-Type': 'text/event-stream', Connection: 'keep-alive' });
       response.write(': connected\n\n');
+      response.write(`event: model\ndata: ${JSON.stringify(model)}\n\n`);
       clients.add(response);
       response.on('close', () => clients.delete(response));
     } else if (route === '/') {
@@ -173,7 +174,8 @@ export async function startViewer(directory, { port, view = 'overview', open = t
         try { model = snapshot(designDir); }
         catch (error) { model = { ...model, modules: [], flows: [], slices: [], decisions: [], questions: [], map: '', routes: {}, findings: [{ level: 'error', file: 'design', line: 1, message: error.message }] }; }
         const changed = String(filename ?? 'design/').replaceAll('\\', '/').replace(/[\r\n]/g, ' ');
-        for (const client of clients) client.write(`data: ${changed}\n\n`);
+        const event = `data: ${changed}\n\nevent: model\ndata: ${JSON.stringify(model)}\n\n`;
+        for (const client of clients) client.write(event);
       }, 150);
     });
     watcher.on('error', error => { notice(`Kanon: file watcher stopped (${error.message}). Restart the viewer to reconnect.`); void close(); });

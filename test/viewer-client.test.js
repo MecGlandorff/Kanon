@@ -26,44 +26,86 @@ function element() {
   };
 }
 
-test('the first live connection refreshes changes made after the initial model request', async () => {
-  const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection', '.sidebar'].map(id => [id, element()]));
-  const document = {
-    getElementById: id => elements.get(id),
-    querySelector: selector => elements.get(selector),
-    createElement: element,
-  };
-  const window = { scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
-  const location = { hash: '#module/worker' };
-  const streams = [];
-  let current = snapshot('Before the live connection.');
+function transport() {
+  const streams = [], requests = [];
   class EventSource {
-    constructor() { streams.push(this); }
-    close() {}
+    constructor(url) { this.url = url; this.listeners = {}; this.closed = false; streams.push(this); }
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    emit(type, data) { this[`on${type}`]?.({ data }); this.listeners[type]?.({ data }); }
+    sendModel(model) { this.emit('model', JSON.stringify(model)); }
+    close() { this.closed = true; }
   }
-  runInNewContext(script, {
-    document, window, location, EventSource,
-    fetch: async () => ({ ok: true, json: async () => structuredClone(current) }),
-    matchMedia: () => ({ matches: false, addEventListener() {} }),
-    addEventListener() {}, setTimeout, clearTimeout,
+  return { streams, requests, EventSource, fetch: url => { requests.push(url); return new Promise(() => {}); } };
+}
+
+test('six live windows render initial, updated, and reconnected stream models without model requests', async () => {
+  const clients = Array.from({ length: 6 }, () => {
+    const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection', '.sidebar'].map(id => [id, element()]));
+    const window = { scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = x; this.scrollY = y; } };
+    const location = { hash: '#module/worker' };
+    const network = transport();
+    let retry;
+    runInNewContext(script, {
+      document: { getElementById: id => elements.get(id), querySelector: selector => elements.get(selector), createElement: element },
+      window, location, EventSource: network.EventSource, fetch: network.fetch,
+      matchMedia: () => ({ matches: false, addEventListener() {} }), addEventListener() {},
+      setTimeout: callback => { retry = callback; }, clearTimeout: () => { retry = undefined; },
+    });
+    return { ...network, elements, window, location, retry: () => { const callback = retry; retry = undefined; callback(); },
+      rendered: () => elements.get('content').children.map(child => child.innerHTML).join('\n') };
   });
-  const rendered = () => elements.get('content').children.map(child => child.innerHTML).join('\n');
   await flush();
-  assert.match(rendered(), /Before the live connection\./);
+  let current = snapshot('Changed before the live connection opened.');
+  for (const [index, client] of clients.entries()) {
+    client.window.scrollY = 120 + index;
+    client.elements.get('.sidebar').scrollTop = 60 + index;
+    assert.equal(client.streams.length, 1);
+    assert.equal(client.streams[0].url, '/events');
+    client.streams[0].emit('open');
+    client.streams[0].sendModel(current);
+  }
+  await flush();
+  for (const [index, client] of clients.entries()) {
+    assert.match(client.rendered(), /Changed before the live connection opened\./);
+    assert.equal(client.location.hash, '#module/worker');
+    assert.equal(client.window.scrollY, 120 + index);
+    assert.equal(client.elements.get('.sidebar').scrollTop, 60 + index);
+    assert.equal(client.elements.get('connection').lastElementChild.textContent, 'Live');
+    assert.deepEqual(client.requests, []);
+  }
 
-  // A file changed while the first event-stream handshake was still pending.
-  current = snapshot('Changed before the live connection opened.');
-  window.scrollY = 120;
-  streams[0].onopen();
+  current = snapshot('A later live edit.\n\n<strong>café & labels</strong>');
+  for (const client of clients) {
+    client.streams[0].emit('message', 'modules/worker.md');
+    client.streams[0].sendModel(current);
+  }
   await flush();
-  assert.match(rendered(), /Changed before the live connection opened\./);
-  assert.equal(location.hash, '#module/worker');
-  assert.equal(window.scrollY, 120);
+  for (const client of clients) {
+    assert.match(client.rendered(), /A later live edit\./);
+    assert.match(client.rendered(), /&lt;strong&gt;café &amp; labels&lt;\/strong&gt;/);
+    assert.doesNotMatch(client.rendered(), /<strong>café/);
+    assert.deepEqual(client.requests, []);
+    client.streams[0].emit('error');
+    assert.equal(client.streams[0].closed, true);
+    assert.equal(client.elements.get('connection').lastElementChild.textContent, 'Reconnecting…');
+  }
 
-  current = snapshot('A later live edit.');
-  streams[0].onmessage();
+  current = snapshot('Changed while disconnected.');
+  for (const client of clients) {
+    client.retry();
+    assert.equal(client.streams.length, 2);
+    client.streams[1].emit('open');
+    client.streams[1].sendModel(current);
+  }
   await flush();
-  assert.match(rendered(), /A later live edit\./);
+  for (const [index, client] of clients.entries()) {
+    assert.match(client.rendered(), /Changed while disconnected\./);
+    assert.equal(client.location.hash, '#module/worker');
+    assert.equal(client.window.scrollY, 120 + index);
+    assert.equal(client.elements.get('.sidebar').scrollTop, 60 + index);
+    assert.equal(client.elements.get('connection').lastElementChild.textContent, 'Live');
+    assert.deepEqual(client.requests, []);
+  }
 });
 
 test('map nodes with escaped and colliding ids navigate to the original module names', async () => {
@@ -86,17 +128,19 @@ test('map nodes with escaped and colliding ids navigate to the original module n
   const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection', '.sidebar'].map(id => [id, makeElement()]));
   const mermaid = { initialize() {}, render: async () => ({ svg: '<svg></svg>' }) };
   const location = { hash: '#overview' };
+  const network = transport();
   runInNewContext(script, {
     document: {
       getElementById: id => elements.get(id), querySelector: selector => elements.get(selector),
       createElement: makeElement, fonts: { ready: Promise.resolve() },
     },
     window: { mermaid, scrollX: 0, scrollY: 0, scrollTo() {} }, mermaid, location,
-    EventSource: class {}, fetch: async () => ({ ok: true, json: async () => model }),
+    EventSource: network.EventSource, fetch: network.fetch,
     getComputedStyle: () => ({ fontFamily: 'sans-serif' }),
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     addEventListener() {}, setTimeout, clearTimeout,
   });
+  network.streams[0].sendModel(model);
   await flush();
   for (const [index, node] of nodes.entries()) {
     assert.equal(node.attributes.role, 'link');
@@ -111,6 +155,7 @@ test('map nodes with escaped and colliding ids navigate to the original module n
       assert.equal(prevented, true);
     }
   }
+  assert.deepEqual(network.requests, []);
 });
 
 test('overlapping live renders preserve scroll and let the latest model and route win', async t => {
@@ -156,7 +201,8 @@ test('overlapping live renders preserve scroll and let the latest model and rout
         latest.routes = { Delivery: diagram(latest, latest.flows[0]) };
         return latest;
       };
-      const renders = [], streams = [], listeners = {};
+      const renders = [], listeners = {};
+      const network = transport();
       const mermaid = { initialize() {}, render: (id, source) => new Promise(resolve => {
         renders.push({ source, finish: () => resolve({ svg: '<svg></svg>' }) });
       }) };
@@ -169,14 +215,14 @@ test('overlapping live renders preserve scroll and let the latest model and rout
           createElement: makeElement, fonts: { ready: Promise.resolve() },
         },
         window, mermaid, location,
-        EventSource: class { constructor() { streams.push(this); } },
-        fetch: async () => ({ ok: true, json: async () => structuredClone(current) }),
+        EventSource: network.EventSource, fetch: network.fetch,
         getComputedStyle: () => ({ fontFamily: 'sans-serif' }),
         matchMedia: () => ({ matches: false, addEventListener() {} }),
         addEventListener: (type, handler) => { listeners[type] = handler; }, setTimeout, clearTimeout,
       });
-      const update = async label => { current = flowModel(label); streams[0].onmessage(); await flush(); };
+      const update = async label => { current = flowModel(label); network.streams[0].sendModel(current); await flush(); };
       const rendered = node => [node.innerHTML, ...node.children.map(rendered)].join('\n');
+      network.streams[0].sendModel(current);
       await flush();
       assert.equal(renders.length, 1);
       renders[0].finish();
@@ -208,6 +254,7 @@ test('overlapping live renders preserve scroll and let the latest model and rout
       await flush();
       assert.equal(elements.get('system-name').textContent, 'Independent edit');
       assert.deepEqual([window.scrollX, window.scrollY, sidebar.scrollTop], [40, 300, 80]);
+      assert.deepEqual(network.requests, []);
     });
   }
 });

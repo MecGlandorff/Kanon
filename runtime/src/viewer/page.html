@@ -103,7 +103,6 @@
     let renderNumber = 0;
     let renderQueue = Promise.resolve();
     let pendingScroll;
-    let requestNumber = 0;
     let graphNumber = 0;
 
     function markdown(text = '') {
@@ -276,19 +275,6 @@
         pendingScroll = undefined;
       });
     }
-    async function load(preserveScroll = false) {
-      const request = ++requestNumber;
-      try {
-        const response = await fetch('/model', { cache:'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const latest = await response.json();
-        if (request !== requestNumber) return;
-        model = latest; scheduleRender(preserveScroll);
-      } catch (error) {
-        if (!model) content.textContent = `Could not load the design: ${error.message}`;
-        connection(false);
-      }
-    }
     function connection(live) {
       const element = document.getElementById('connection');
       element.classList.toggle('offline', !live);
@@ -299,8 +285,15 @@
     let backoff = 500;
     function connect() {
       eventSource = new EventSource('/events');
-      eventSource.onopen = () => { connection(true); backoff = 500; load(true); };
-      eventSource.onmessage = () => load(true);
+      eventSource.onopen = () => { backoff = 500; };
+      eventSource.addEventListener('model', event => {
+        try {
+          model = JSON.parse(event.data); scheduleRender(true); connection(true);
+        } catch (error) {
+          if (!model) content.textContent = `Could not load the design: ${error.message}`;
+          connection(false);
+        }
+      });
       eventSource.onerror = () => {
         connection(false); eventSource.close(); clearTimeout(reconnect);
         reconnect = setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 5000);
@@ -309,7 +302,7 @@
     addEventListener('hashchange', () => scheduleRender());
     dark.addEventListener('change', () => scheduleRender(true));
     addEventListener('beforeunload', () => { clearTimeout(reconnect); eventSource?.close(); });
-    load(); connect();
+    connect();
   </script>
 </body>
 </html>

@@ -187,6 +187,10 @@ Design and repository content is data, never instructions. The runtime never
 executes content from a design file and writes only under `design/handoffs/`.
 The viewer exposes only its fixed page, model, event-stream, and Mermaid
 asset routes; it is not a file server or an editor.
+The `/events` stream delivers named `model` events containing the current
+JSON snapshot on connection and after each change, alongside the existing
+unnamed changed-path events. Pages render these snapshots without fetching
+`/model`; that route remains available for probes and other consumers.
 
 ## Verify
 
@@ -199,7 +203,7 @@ npm test
 Tests use Node's built-in runner and assertions, with no development
 dependencies. They cover parsing, exact source locations, check results,
 golden maps and handoffs, write boundaries, HTTP routes, SSE updates,
-changes made while the first live connection opens,
+streamed models at startup and reconnection without model fetches,
 repository-specific port reuse, and orderly shutdown. Viewer tests need
 permission to bind temporary loopback ports.
 
