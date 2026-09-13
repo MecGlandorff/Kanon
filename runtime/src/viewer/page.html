@@ -102,6 +102,7 @@
     let showAll = false;
     let renderNumber = 0;
     let renderQueue = Promise.resolve();
+    let pendingScroll;
     let requestNumber = 0;
     let graphNumber = 0;
 
@@ -250,7 +251,8 @@
     }
     function scheduleRender(preserveScroll = false) {
       const version = ++renderNumber;
-      const scroll = { x:window.scrollX, y:window.scrollY, sidebar:document.querySelector('.sidebar').scrollTop };
+      const scroll = pendingScroll ??= { x:window.scrollX, y:window.scrollY, sidebar:document.querySelector('.sidebar').scrollTop };
+      if (!preserveScroll) { scroll.x = 0; scroll.y = 0; }
       renderQueue = renderQueue.catch(() => {}).then(async () => {
         if (!model || version !== renderNumber) return;
         let view;
@@ -265,9 +267,14 @@
         else { heading('Unknown view'); card('<a href="#overview">Back to the overview</a>'); }
         if (version === renderNumber) {
           document.querySelector('.sidebar').scrollTop = scroll.sidebar;
-          window.scrollTo(preserveScroll ? scroll.x : 0, preserveScroll ? scroll.y : 0);
+          window.scrollTo(scroll.x, scroll.y);
+          pendingScroll = undefined;
         }
-      }).catch(error => { content.textContent = `Could not display the design: ${error.message}`; });
+      }).catch(error => {
+        if (version !== renderNumber) return;
+        content.textContent = `Could not display the design: ${error.message}`;
+        pendingScroll = undefined;
+      });
     }
     async function load(preserveScroll = false) {
       const request = ++requestNumber;

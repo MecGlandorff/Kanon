@@ -112,3 +112,102 @@ test('map nodes with escaped and colliding ids navigate to the original module n
     }
   }
 });
+
+test('overlapping live renders preserve scroll and let the latest model and route win', async t => {
+  for (const changeRoute of [false, true]) {
+    await t.test(changeRoute ? 'explicit navigation resets page scroll' : 'live updates retain page scroll', async () => {
+      let maxX = 0, maxY = 0;
+      const window = { scrollX: 0, scrollY: 0, scrollTo(x, y) { this.scrollX = Math.min(x, maxX); this.scrollY = Math.min(y, maxY); } };
+      const sidebar = element();
+      const svg = {
+        style: {}, getBBox: () => ({ x: 0, y: 0, width: 400, height: 2000 }),
+        setAttribute() {}, removeAttribute() {}, querySelectorAll: () => [],
+      };
+      const makeElement = () => {
+        let html = '';
+        return {
+          ...element(),
+          get innerHTML() { return html; },
+          set innerHTML(value) {
+            html = value;
+            if (this.className === 'diagram') { maxX = 200; maxY = 2000; }
+            if (this.id === 'module-nav') sidebar.scrollTop = 0;
+          },
+          querySelector: selector => selector === 'svg' ? svg : null,
+          insertAdjacentHTML(position, value) { this.innerHTML += value; },
+        };
+      };
+      const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection'].map(id => {
+        const node = makeElement(); node.id = id; return [id, node];
+      }));
+      elements.set('.sidebar', sidebar);
+      elements.get('content').replaceChildren = function () {
+        this.children = []; maxX = 0; maxY = 0;
+        window.scrollTo(window.scrollX, window.scrollY);
+      };
+      const flowModel = label => {
+        const latest = snapshot(label);
+        latest.name = label;
+        latest.modules[0].uses = [{ name: 'worker', label }];
+        latest.flows = [{ name: 'Delivery', modules: ['worker'], sections: [{ title: 'Scenario', text: label }],
+          steps: [{ number: 1, type: 'transfer', from: 'worker', to: 'worker', text: label }] }];
+        latest.nodeIds = nodeIds(latest);
+        latest.map = diagram(latest);
+        latest.routes = { Delivery: diagram(latest, latest.flows[0]) };
+        return latest;
+      };
+      const renders = [], streams = [], listeners = {};
+      const mermaid = { initialize() {}, render: (id, source) => new Promise(resolve => {
+        renders.push({ source, finish: () => resolve({ svg: '<svg></svg>' }) });
+      }) };
+      window.mermaid = mermaid;
+      const location = { hash: '#flows' };
+      let current = flowModel('Initial design');
+      runInNewContext(script, {
+        document: {
+          getElementById: id => elements.get(id), querySelector: selector => elements.get(selector),
+          createElement: makeElement, fonts: { ready: Promise.resolve() },
+        },
+        window, mermaid, location,
+        EventSource: class { constructor() { streams.push(this); } },
+        fetch: async () => ({ ok: true, json: async () => structuredClone(current) }),
+        getComputedStyle: () => ({ fontFamily: 'sans-serif' }),
+        matchMedia: () => ({ matches: false, addEventListener() {} }),
+        addEventListener: (type, handler) => { listeners[type] = handler; }, setTimeout, clearTimeout,
+      });
+      const update = async label => { current = flowModel(label); streams[0].onmessage(); await flush(); };
+      const rendered = node => [node.innerHTML, ...node.children.map(rendered)].join('\n');
+      await flush();
+      assert.equal(renders.length, 1);
+      renders[0].finish();
+      await flush();
+      window.scrollTo(80, 700); sidebar.scrollTop = 190;
+
+      await update('First edit');
+      assert.equal(renders.length, 2);
+      assert.deepEqual([window.scrollX, window.scrollY, sidebar.scrollTop], [0, 0, 0]);
+      await update('Second edit');
+      if (changeRoute) { location.hash = '#overview'; listeners.hashchange(); }
+      await update('Latest edit');
+      renders[1].finish();
+      await flush();
+      assert.equal(renders.length, 3);
+      assert.equal(renders[2].source, changeRoute ? current.map : current.routes.Delivery);
+      renders[2].finish();
+      await flush();
+      assert.equal(elements.get('system-name').textContent, 'Latest edit');
+      assert.equal(location.hash, changeRoute ? '#overview' : '#flows');
+      assert.doesNotMatch(rendered(elements.get('content')), /First edit|Second edit|diagram-error/);
+      assert.deepEqual([window.scrollX, window.scrollY], changeRoute ? [0, 0] : [80, 700]);
+      assert.equal(sidebar.scrollTop, 190);
+
+      window.scrollTo(40, 300); sidebar.scrollTop = 80;
+      await update('Independent edit');
+      assert.equal(renders.length, 4);
+      renders[3].finish();
+      await flush();
+      assert.equal(elements.get('system-name').textContent, 'Independent edit');
+      assert.deepEqual([window.scrollX, window.scrollY, sidebar.scrollTop], [40, 300, 80]);
+    });
+  }
+});

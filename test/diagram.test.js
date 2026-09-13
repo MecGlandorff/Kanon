@@ -73,7 +73,7 @@ test('the bundled flowchart parser accepts keyword declarations and edge endpoin
   }
 });
 
-test('public Mermaid parsing preserves literal design labels without applying directives', async t => {
+test('public Mermaid parsing preserves literal design labels without interpreting their syntax', async t => {
   const context = {};
   runInNewContext(readFileSync(new URL('../runtime/vendor/mermaid.min.js', import.meta.url), 'utf8'), context);
   const { mermaid } = context;
@@ -86,19 +86,26 @@ test('public Mermaid parsing preserves literal design labels without applying di
   assert.equal(mermaid.mermaidAPI.getConfig().theme, 'dark');
   assert.equal((await mermaid.mermaidAPI.getDiagramFromText(rawDirective)).db.getVertices().get('control').text, 'before  after');
 
+  const literalText = text => text.replace(/\uFB02\u00B0(\u00B0?)(\w+)\u00B6\u00DF/g, (entity, numeric, code) =>
+    numeric ? String.fromCodePoint(Number(code)) : ({ quot: '"', lt: '<', gt: '>', amp: '&' }[code] ?? entity));
   const labels = [
-    ['init', "before %%{init: {'theme': 'dark'}}%% after", "before #37;#37;{init: {'theme': 'dark'}}#37;#37; after"],
-    ['initialize', "%%{initialize: {'flowchart': {'curve': 'linear'}}}%%", "#37;#37;{initialize: {'flowchart': {'curve': 'linear'}}}#37;#37;"],
-    ['wrap', '%%{wrap}%%', '#37;#37;{wrap}#37;#37;'],
-    ['percent and entities', '50% %% #37; &#37; &amp; #quot; " < > |', '50#37; #37;#37; #35;37; #38;#35;37; #38;amp; #35;quot; #quot; #lt; #gt; #124;'],
-    ['entity-like directive', "#37;#37;{init: {'theme': 'dark'}}#37;#37;", "#35;37;#35;37;{init: {'theme': 'dark'}}#35;37;#35;37;"],
-    ['ordinary', 'an ordinary label', 'an ordinary label'],
+    ['init', "before %%{init: {'theme': 'dark'}}%% after"],
+    ['initialize', "%%{initialize: {'flowchart': {'curve': 'linear'}}}%%"],
+    ['wrap', '%%{wrap}%%'],
+    ['percent and entities', '50% %% #37; &#37; &amp; #quot; " < > |'],
+    ['entity-like directive', "#37;#37;{init: {'theme': 'dark'}}#37;#37;"],
+    ['backticks', '`job` request'],
+    ['Markdown delimiters', '`**job**`'],
+    ['style percent', 'style:50%'],
+    ['classDef percent', 'classDef:50%'],
+    ['style entities', 'style:#37; &#37; &amp; #quot;'],
+    ['classDef entities', 'classDef:#37; &#37; &amp; #quot;'],
+    ['mixed syntax', "`style:50%` %%{init: {'theme': 'dark'}}%% #96; &#58;"],
+    ['ordinary', 'an ordinary label'],
   ];
-  for (const [name, label, literalEncoding] of labels) {
+  for (const [name, label] of labels) {
     await t.test(name, async () => {
       mermaid.initialize(settings);
-      const reference = await mermaid.mermaidAPI.getDiagramFromText(`flowchart LR\nreference["${literalEncoding}"]\n`);
-      const expected = reference.db.getVertices().get('reference').text;
       const sample = {
         modules: [
           { name: 'a', status: 'agreed', kind: 'library', uses: [{ name: 'b', label }] },
@@ -124,10 +131,10 @@ test('public Mermaid parsing preserves literal design labels without applying di
         const parsed = await mermaid.mermaidAPI.getDiagramFromText(source);
         assert.equal(parsed.db.getVertices().size, 3);
         assert.equal(parsed.db.getVertices().get(ids.a).text, 'a');
-        assert.equal(parsed.db.getVertices().get(ids[label]).text, expected);
-        assert.deepEqual(Array.from(parsed.db.getEdges(), edge => edge.text), flow
-          ? [`1 ${expected}`, '2 ordinary transfer', `3 repeat until ${expected}`]
-          : [expected]);
+        assert.equal(literalText(parsed.db.getVertices().get(ids[label]).text), label);
+        assert.deepEqual(Array.from(parsed.db.getEdges(), edge => literalText(edge.text)), flow
+          ? [`1 ${label}`, '2 ordinary transfer', `3 repeat until ${label}`]
+          : [label]);
       }
     });
   }
