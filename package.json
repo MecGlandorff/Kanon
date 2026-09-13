@@ -7,5 +7,5 @@
   "author": "mecglandorff",
   "engines": { "node": ">=20" },
   "scripts": { "test": "node --test" },
-  "files": [".claude-plugin", ".codex-plugin", "skills", "runtime", "README.md", "LICENSE"]
+  "files": [".claude-plugin", ".codex-plugin", "skills", "runtime", "docs", "README.md", "LICENSE"]
 }
