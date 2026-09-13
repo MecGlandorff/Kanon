@@ -1,7 +1,7 @@
 {
   "name": "@mecglandorff/kanon",
   "version": "2.0.0-dev",
-  "description": "Design systems with agents, inspect a live map, and hand agreed slices to coding agents.",
+  "description": "Build systems in the terminal with agents and a live visual map that stays current.",
   "type": "module",
   "license": "MIT",
   "author": "mecglandorff",

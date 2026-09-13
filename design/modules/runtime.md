@@ -1,6 +1,6 @@
 ---
 kind: service
-status: proposed
+status: built
 uses:
   - design-folder: reads the design, writes handoffs
   - viewer: starts the server
@@ -20,5 +20,11 @@ packets, and starts the viewer.
 A missing design folder exits 1 with the path it looked for. A file that
 cannot be parsed is reported and skipped; the rest still loads.
 
+## Implementation evidence
+Implemented in `runtime/cli.js` and `runtime/src/`. The authorized v2 build
+and its validation are recorded in `KANON_V2_BUILD.md`, Report. The 24-test
+suite passed on Node 20 and Node 25; the unpacked package also passed check,
+diagram, handoff, and viewer smoke checks on Node 20 on 2026-09-13.
+
 ## Open questions
-- [ ] Is a dependency cycle an error or a warning? Some systems have legitimate cycles through events. (blocks: core-v1)
+- [x] Is a dependency cycle an error or a warning? Some systems have legitimate cycles through events. Answer: neither in v2; cycle detection is deferred by the accepted checker specification. See D-009. (blocks: core-v1)

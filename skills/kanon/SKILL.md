@@ -1,24 +1,28 @@
 ---
 name: kanon
 description: >-
-  Design a system with an engineer using repository modules and flows, inspect
-  its live map, record explicit agreement, and prepare or sync a coding-agent
-  handoff. Use for this design workflow, rather than ordinary implementation.
+  Build and evolve a system with an engineer in the terminal while keeping
+  its repository design and live visual map current. Use for collaborative
+  system design, live architecture updates, and agreed coding-agent handoffs.
 ---
 
 # Kanon
 
-Kanon helps an engineer and AI agents design a system together before code is
-written. Text in `design/` is authoritative and the viewer derives its map from
-that text. Agreed slices become packets for coding agents, whose reports bring
-implementation discoveries back into the design.
+Kanon keeps a live system map beside the engineer's terminal work. The agent
+maintains `design/`; the viewer redraws from that text. Keep it current through
+design and implementation. Agreed slices can become coding-agent packets.
 
-## Design
+## Work with the live map
 
-Choose the moment from the engineer's request and the state of `design/`.
-Write and update modules, open questions, and flows; explain what changed and
-why. For an existing codebase, first record what you find as proposed modules.
-Start with the smallest useful system and one concrete scenario.
+Open the project viewer when needed and keep the same window during the work.
+After each meaningful change, update the affected modules, implementation
+statuses, flows, decisions, and questions; explain what changed and why.
+Chrome follows those file edits; source-code edits alone do not update the
+map. Reconcile recorded answers during this work, without waiting for a
+separate sync request.
+
+For an existing codebase, record observed behavior separately from proposed
+changes. Start with the smallest useful system and one concrete scenario.
 
 On request, challenge cycles, missing data ownership, absent failure paths,
 or modules too large for one slice. Record challenges as open questions;
@@ -28,14 +32,18 @@ Run `check` after edits. Correct structural errors you introduced and surface
 pending agreement or blocking questions. Never change a status or check off
 a question merely to make the checker green.
 
-## Agree
+## Keep decisions current
 
-Only the engineer can agree a module or resolve a question. When they say
-which modules are agreed, record those status changes and append decisions
-with their reasons to `design/decisions.md`. Check off a question only when
-recording the engineer's explicit answer. Agents never grant agreement or
-resolve questions on their own. Preserve earlier decisions; supersede them
-with a new dated entry when necessary.
+The engineer owns design choices. Before asking a question, check their
+current and prior instructions and the specs or decisions they accepted.
+When those already settle it, record the answer and its source, check off
+the question, and explain the update. Do not ask for the same answer again.
+Implementation evidence describes what exists; it does not grant approval.
+Leave genuinely unresolved choices open and ask when they affect the work.
+
+Record module agreement from the engineer's authorization. Preserve earlier
+decisions in `design/decisions.md`; supersede them with a dated entry when an
+accepted choice changes. Do not invent answers to remove a blocker.
 
 ## Handoff
 
@@ -50,10 +58,12 @@ The coding agent fills only the slice's Report section under `design/`, with
 what was built, deviations and why, and new questions; it does not rewrite
 the design to match its implementation.
 
-After the report exists and the engineer says "sync", fold it back: record
-built modules and turn deviations into decisions or new questions. Preserve
-unresolved questions and explain the changes. A report's existence does not
-prove its acceptance criteria passed; inspect its supporting results.
+After authorized implementation, reconcile its outcome during normal work;
+do not wait for a separate "sync" request. Inspect the implementation and
+supporting results before recording affected modules as `built`. Cite that
+evidence and note unverified behavior. Fold deviations into decisions when
+already authorized, or into open questions when a new choice is needed.
+Code or a report alone does not prove agreement or successful checks.
 
 ## Commands
 

@@ -290,10 +290,9 @@
     let eventSource;
     let reconnect;
     let backoff = 500;
-    let connectedBefore = false;
     function connect() {
       eventSource = new EventSource('/events');
-      eventSource.onopen = () => { connection(true); backoff = 500; if (connectedBefore) load(true); connectedBefore = true; };
+      eventSource.onopen = () => { connection(true); backoff = 500; load(true); };
       eventSource.onmessage = () => load(true);
       eventSource.onerror = () => {
         connection(false); eventSource.close(); clearTimeout(reconnect);

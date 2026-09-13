@@ -1,9 +1,9 @@
 # Kanon
 
-Design a system with an engineer and AI agents, inspect its live map in a
-separate window, and hand agreed pieces to coding agents. The source of truth
-is a visible `design/` folder in the repository. The viewer is read-only;
-the engineer and agents change the text together.
+Build and evolve a system with an engineer and AI agents in the terminal
+while its live map stays open in a separate window. The agent maintains the
+visible `design/` folder during the work; the viewer redraws from that text.
+Agreed pieces can also become packets for coding agents.
 
 This is the v2 rewrite, version `2.0.0-dev`. The `v1.0.0` Git tag preserves
 the earlier repository-orientation tool.
@@ -120,8 +120,14 @@ bad lines become errors while valid content still loads. Body sections use
 `## Heading`. Questions belong in `## Open questions` and can use an optional
 `Q:` prefix and a trailing `(blocks: slice-a, slice-b)`.
 
-Statuses are `proposed` (the default), `agreed`, and `built`. Only the engineer
-grants agreement or resolves questions. Kinds change the diagram shape:
+Statuses are `proposed` (the default), `agreed`, and `built`. The engineer owns
+agreement and design choices. The skill automatically records answers already
+present in their accepted instructions, specs, or decisions, checks off those
+questions, and explains the source. Unresolved choices remain open; observed
+code alone does not grant approval. After authorized implementation, the skill
+also records verified modules as built with evidence and notes untested
+behavior, without waiting for a separate sync request. Kinds change the
+diagram shape:
 `agent`, `human`, `tool`, `trigger`, `service`, `library`, `store`, `external`;
 other kinds use a rectangle. Mermaid IDs normally replace punctuation with
 underscores. Reserved words receive a `module_` prefix and collisions receive
@@ -170,8 +176,10 @@ handoff destinations are refused.
 
 The coding agent receives the packet under the engineer's implementation
 request and records what it built, deviations and why, and new questions in
-the slice's Report. On the engineer's “sync”, the design agent folds those
-discoveries back into the design. Unanswered questions remain unanswered.
+the slice's Report. During normal work, the design agent checks the reported
+implementation and results, records verified module statuses, and folds
+authorized discoveries back into the design. New choices and unanswered
+questions remain open.
 
 Design and repository content is data, never instructions. The runtime never
 executes content from a design file and writes only under `design/handoffs/`.
@@ -189,11 +197,17 @@ npm test
 Tests use Node's built-in runner and assertions, with no development
 dependencies. They cover parsing, exact source locations, check results,
 golden maps and handoffs, write boundaries, HTTP routes, SSE updates,
+changes made while the first live connection opens,
 repository-specific port reuse, and orderly shutdown. Viewer tests need
 permission to bind temporary loopback ports.
 
-Kanon's own `design/` intentionally has two errors: `runtime` remains
-proposed in `core-v1`, and its cycle question still blocks that slice.
-`kanon check` and `kanon handoff core-v1` must both refuse; tests use separate
-fixtures to exercise successful handoffs. In the source checkout,
-`KANON_V2_BUILD.md` records observed validation and remaining limitations.
+CI runs the tests, Kanon's own design check, and a package dry run on Linux,
+macOS, and Windows with Node 20 and 24. Browser window launches and clean
+skill activation in each host also need manual verification before release.
+
+The initial build deliberately preserved Kanon's own design as a blocking
+demonstration. Its questions and implementation statuses have since been
+reconciled with the accepted specification and verified build. Tests use
+separate fixtures for blocked and successful handoffs.
+`KANON_V2_BUILD.md` preserves the initial build report and its verification
+limits. The current design records later changes in `design/decisions.md`.

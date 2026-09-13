@@ -3,11 +3,11 @@
   "name": "kanon",
   "displayName": "Kanon",
   "version": "2.0.0-dev",
-  "description": "Design systems with an engineer, inspect a live map, and hand agreed slices to coding agents.",
+  "description": "Build systems in the terminal with an engineer while keeping the live visual map current.",
   "author": { "name": "mecglandorff", "url": "https://github.com/MecGlandorff" },
   "homepage": "https://github.com/MecGlandorff/Kanon#readme",
   "repository": "https://github.com/MecGlandorff/Kanon",
   "license": "MIT",
-  "keywords": ["system-design", "architecture", "handoff", "agents"],
+  "keywords": ["system-design", "live-map", "architecture", "agents"],
   "skills": "./skills/"
 }
