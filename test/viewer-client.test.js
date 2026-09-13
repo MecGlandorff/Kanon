@@ -107,7 +107,7 @@ function flowClient({ hash = '#module/worker', load, pool = { active: 0 } } = {}
     node.insertAdjacentHTML = (position, html) => { node.innerHTML += html; };
     return node;
   };
-  const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection', '.sidebar'].map(id => [id, makeElement('div')]));
+  const elements = new Map(['content', 'system-name', 'counts', 'primary-nav', 'module-nav', 'connection', 'reference-status', '.sidebar'].map(id => [id, makeElement('div')]));
   elements.get('content').textContent = 'Loading the design…';
   elements.get('connection').lastElementChild.textContent = 'Connecting…';
   const listeners = {};
@@ -119,6 +119,7 @@ function flowClient({ hash = '#module/worker', load, pool = { active: 0 } } = {}
   const mermaid = { initialize() {}, render: async () => ({ svg: '<svg></svg>' }) };
   window.mermaid = mermaid;
   const network = transport({ opened: () => { pool.active++; }, closed: () => { pool.active--; } });
+  const copied = [];
   let retry;
   const ready = runPage({
     document: {
@@ -126,6 +127,7 @@ function flowClient({ hash = '#module/worker', load, pool = { active: 0 } } = {}
       createElement: makeElement, fonts: { ready: Promise.resolve() },
     },
     window, mermaid, location, EventSource: network.EventSource, fetch: network.fetch,
+    navigator: { clipboard: { writeText: reference => { copied.push(reference); return Promise.resolve(); } } },
     getComputedStyle: () => ({ fontFamily: 'sans-serif' }),
     matchMedia: () => ({ matches: false, addEventListener() {} }),
     addEventListener: (type, callback) => { listeners[type] = callback; },
@@ -133,7 +135,7 @@ function flowClient({ hash = '#module/worker', load, pool = { active: 0 } } = {}
     requestAnimationFrame: () => 1, cancelAnimationFrame() {}, ResizeObserver: class { observe() {} disconnect() {} },
   }, load);
   return {
-    ...network, elements, window, location, ready,
+    ...network, copied, elements, window, location, ready,
     navigate: hash => { location.hash = hash; },
     unload: () => listeners.beforeunload(),
     retry: () => { const callback = retry; retry = undefined; callback(); },
@@ -196,7 +198,12 @@ test('six module/map windows await both flow assets before SSE and keep flow nav
         assert.equal(client.location.hash, '#flow/delivery/7/inspect');
         assert.match(client.elements.get('content').textContent, /Inspect: Latest edit/);
         assert.doesNotMatch(client.elements.get('content').textContent, /Obsolete edit/);
-        client.control('Copy #inspect.4');
+        client.control('Copy #inspect.4').click();
+      }
+      await flush();
+      for (const client of clients) {
+        assert.deepEqual(client.copied, ['#inspect.4']);
+        assert.equal(client.elements.get('reference-status').textContent, 'Copied #inspect.4');
         client.navigate('#flow/delivery');
       }
       await flush();
