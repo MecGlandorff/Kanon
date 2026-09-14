@@ -71,3 +71,10 @@ Why: The engineer asked for automatic maintenance of the question list while usi
 Scope: skill, runtime, viewer
 Decision: After authorized implementation, the agent checks the implementation and supporting results, records affected modules as built with evidence, and keeps unverified behavior or unresolved deviations explicit. It does this during normal work without a separate sync request.
 Why: The engineer found that the implemented skill, runtime, and viewer still appeared as proposed. The original build preserved their statuses as a demonstration, and the later workflow retained a manual sync step. The current live map must reflect the authorized work already completed; a build record does not grant approval for new choices.
+
+
+## D-015 · 2026-09-14 · Explore connected process blocks with explicit inner flows
+Scope: runtime, viewer, skill
+Supersedes: D-006
+Decision: The viewer draws flows as connected process blocks, with optional Markdown headings grouping adjacent steps, copyable readable IDs, and step-level (flow: name) references that open inner flows under breadcrumbs. Main flows have no incoming references. Missing references and nesting cycles are errors; module dependency cycles remain allowed. The CLI Mermaid route export stays available.
+Why: The engineer rejected the sequence-diagram prototype and approved the compact connected-box demo, then requested its implementation and PR through no-mistakes. They also asked why only one step opens an inner flow: grouping exposes existing steps, while only an explicitly authored reference creates a subflow link.

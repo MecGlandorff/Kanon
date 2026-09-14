@@ -4,7 +4,8 @@
 
 Invoke Kanon in Codex or Claude Code, put the live architecture map on your second
 screen, and keep building. Your coding agent maintains the design as it works, and
-the graph updates automatically.
+the graph updates automatically. Explore connected process blocks, open
+inner flows with breadcrumbs, and copy step IDs back into the terminal.
 
 ![Kanon showing McChess modules, dependencies, and proposed and built statuses](docs/images/kanon-mcchess.png)
 

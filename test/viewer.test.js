@@ -113,6 +113,7 @@ test('viewer serves fixed routes and vendored bytes, broadcasts live changes, re
   assert.equal(model.name, 'Parcel workshop');
   assert.equal(model.modules.length, 4);
   assert.equal(model.findings.length, 0);
+  assert.deepEqual(model.mainFlows, ['process']);
   assert.ok(model.routes.process.includes('3 repeat until'));
   const page = await request(base, '/');
   assert.equal(page.status, 200);
@@ -122,6 +123,16 @@ test('viewer serves fixed routes and vendored bytes, broadcasts live changes, re
   assert.equal(vendor.status, 200);
   assert.equal(vendor.headers['content-type'], 'text/javascript; charset=utf-8');
   assert.equal(vendor.body, readFileSync(new URL('../runtime/vendor/mermaid.min.js', import.meta.url), 'utf8'));
+  for (const [path, file, type] of [
+    ['/flow.js', '../runtime/src/flow.js', 'text/javascript; charset=utf-8'],
+    ['/viewer/flows.js', '../runtime/src/viewer/flows.js', 'text/javascript; charset=utf-8'],
+    ['/viewer/flows.css', '../runtime/src/viewer/flows.css', 'text/css; charset=utf-8'],
+  ]) {
+    const asset = await request(base, path);
+    assert.equal(asset.status, 200);
+    assert.equal(asset.headers['content-type'], type);
+    assert.equal(asset.body, readFileSync(new URL(file, import.meta.url), 'utf8'));
+  }
   for (const path of ['/../package.json', '/package.json', '/design/system.md', '/%2e%2e/package.json', '/vendor/../cli.js', '/unknown']) assert.equal((await request(base, path)).status, 404, path);
   assert.equal((await request(base, '/model', { Host: 'other.example' })).status, 403);
   const first = await sse(base);
@@ -158,6 +169,29 @@ test('viewer serves fixed routes and vendored bytes, broadcasts live changes, re
   assert.equal(instance.child.signalCode, process.platform === 'win32' ? 'SIGTERM' : null);
   assert.equal(instance.output().stderr, '');
   await assert.rejects(request(base, '/model'), /ECONNREFUSED|ECONNRESET/);
+});
+
+test('flow URLs and live snapshots carry authored blocks and nested references', { timeout: 10000 }, async t => {
+  const root = copyFixture(t);
+  const parent = join(root, 'design/flows/process.md');
+  writeFileSync(parent, '## Steps\n### Process a parcel\nPreserve its identity.\n1. operator -> worker: inspect (flow: inspect 100%)\n');
+  writeFileSync(join(root, 'design/flows/inspect 100%.md'), '## Steps\n1. worker -> queue: read the next parcel\n');
+  const instance = await startViewer(join(root, 'design'), { port: await freePort(), view:'flow/process/1/inspect%20100%25', open:false, log() {} });
+  t.after(() => instance.close());
+  assert.equal(new URL(instance.url).hash, '#flow/process/1/inspect%20100%25');
+  const stream = await sse(instance.url); t.after(() => stream.close());
+  const initial = JSON.parse(await stream.next('model'));
+  assert.deepEqual(initial.mainFlows, ['process']);
+  const flow = initial.flows.find(item => item.name === 'process');
+  assert.equal(flow.steps[0].flow, 'inspect 100%');
+  assert.equal(flow.steps[0].line, 4);
+  assert.deepEqual(flow.blocks, [{ title:'Process a parcel', summary:'Preserve its identity.', steps:[1], line:2 }]);
+  const next = stream.next('model');
+  writeFileSync(parent, '## Steps\n### Updated block\n1. operator -> worker: inspect the updated parcel (flow: inspect 100%)\n');
+  const updated = JSON.parse(await next);
+  assert.deepEqual(updated.mainFlows, ['process']);
+  assert.equal(updated.flows.find(item => item.name === 'process').blocks[0].title, 'Updated block');
+  await instance.close();
 });
 
 test('viewer.close ends live streams, removes signal handlers, and releases its port', { timeout: 10000 }, async t => {

@@ -32,6 +32,30 @@ export function check(model) {
       add(flow.file, step.line, `repeat from ${step.fromStep} must refer to an earlier step`);
     }
   }
+  const flows = new Map(model.flows.map(flow => [flow.name, flow]));
+  for (const flow of model.flows) for (const step of flow.steps) {
+    if (step.flow && !flows.has(step.flow)) add(flow.file, step.line, `step references unknown flow "${step.flow}"`);
+  }
+  // Iterative DFS avoids imposing a JavaScript call-stack limit on nesting.
+  const visited = new Set();
+  const active = new Set();
+  for (const root of model.flows) {
+    if (visited.has(root.name)) continue;
+    const stack = [{ flow: root, index: 0 }];
+    active.add(root.name);
+    while (stack.length) {
+      const frame = stack.at(-1);
+      const step = frame.flow.steps[frame.index++];
+      if (!step) { active.delete(frame.flow.name); visited.add(frame.flow.name); stack.pop(); continue; }
+      if (!step.flow || !flows.has(step.flow)) continue;
+      if (active.has(step.flow)) {
+        add(frame.flow.file, step.line, step.flow === frame.flow.name ? 'a flow cannot reference itself' : `nested flow cycle through "${step.flow}"`);
+      } else if (!visited.has(step.flow)) {
+        active.add(step.flow);
+        stack.push({ flow: flows.get(step.flow), index: 0 });
+      }
+    }
+  }
   return findings;
 }
 

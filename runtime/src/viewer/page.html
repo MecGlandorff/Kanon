@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>Kanon · System design</title>
+  <link rel="stylesheet" href="/viewer/flows.css">
   <style>
     :root { color-scheme: light dark; --bg:#f5f6f8; --panel:#fff; --nav:#f9fafb; --ink:#202b3b; --muted:#667085; --line:#e1e6ed; --accent:#285bc5; --tint:#eaf0fc; --red:#b42318; --red-bg:#fff2f0; --green:#16805a; --shadow:0 2px 7px #16243a04; }
     @media (prefers-color-scheme:dark) { :root { --bg:#10151d; --panel:#181f2a; --nav:#141b25; --ink:#e4eaf3; --muted:#a2aec0; --line:#2b3748; --accent:#91b2ff; --tint:#223455; --red:#ffb4a9; --red-bg:#3b2427; --green:#78d6b4; --shadow:none; } }
@@ -89,6 +90,7 @@
     <header class="header"><div><div class="eyebrow">System design</div><h1 id="system-name">Kanon</h1></div><div id="counts" class="counts"></div></header>
     <div id="content" aria-live="polite"><p class="muted">Loading the design…</p></div>
   </main>
+  <div id="reference-status" class="reference-status" role="status" aria-live="polite"></div>
   <script src="/vendor/mermaid.min.js"></script>
   <script>
     const content = document.getElementById('content');
@@ -104,6 +106,29 @@
     let renderQueue = Promise.resolve();
     let pendingScroll;
     let graphNumber = 0;
+    let flowAssets;
+    let activeFlow;
+    let copyTimer;
+    const selectedSteps = new Map();
+    const referenceButton = reference => `<button class="reference-button" data-copy="${escapeHTML(reference)}" aria-label="Copy ${escapeHTML(reference)}">${escapeHTML(reference)}</button>`;
+    const rootFlows = () => {
+      const referenced = new Set(model.flows.flatMap(flow => flow.steps.filter(step => step.flow).map(step => step.flow)));
+      return model.flows.filter(flow => !referenced.has(flow.name));
+    };
+    async function copyReference(reference) {
+      let copied = false;
+      try { await navigator.clipboard.writeText(reference); copied = true; }
+      catch {
+        const focused = document.activeElement;
+        const field = document.createElement('textarea'); field.value = reference;
+        field.style.position = 'fixed'; field.style.left = '-10000px'; document.body.append(field); field.select();
+        try { copied = document.execCommand('copy'); } catch {}
+        field.remove(); focused?.focus({ preventScroll: true });
+      }
+      const status = document.getElementById('reference-status');
+      status.textContent = copied ? `Copied ${reference}` : `Could not copy. Reference: ${reference}`;
+      clearTimeout(copyTimer); copyTimer = setTimeout(() => { status.textContent = ''; }, 3000);
+    }
 
     function markdown(text = '') {
       const output = [];
@@ -188,16 +213,31 @@
       } catch (error) { host.innerHTML = `<div class="diagram-error"><p>Could not render this diagram: ${escapeHTML(error.message)}</p><pre>${escapeHTML(source)}</pre></div>`; }
     }
     function navigation(view) {
+      const primary = view.startsWith('flow/') ? 'flows' : view === 'map' ? 'overview' : view;
       document.getElementById('system-name').textContent = model.name;
       document.title = `${model.name} · Kanon`;
       document.getElementById('counts').innerHTML = ['modules','flows','slices'].map(key => `<span class="count"><strong>${model[key].length}</strong> ${key}</span>`).join('') + `<span class="count ${model.findings.length ? 'errors' : ''}"><strong>${model.findings.length}</strong> errors</span>`;
-      document.getElementById('primary-nav').innerHTML = ['Overview','Flows','Decisions','Questions','Slices'].map(label => `<a href="#${label.toLowerCase()}" ${view === label.toLowerCase() ? 'aria-current="page"' : ''}>${label}</a>`).join('');
+      document.getElementById('primary-nav').innerHTML = ['Overview','Flows','Decisions','Questions','Slices'].map(label => `<a href="#${label.toLowerCase()}" ${primary === label.toLowerCase() ? 'aria-current="page"' : ''}>${label}</a>`).join('');
       document.getElementById('module-nav').innerHTML = ['proposed','agreed','built'].map(status => {
         const modules = model.modules.filter(module => module.status === status);
         return modules.length ? `<div class="nav-label">${status} · ${modules.length}</div>` + modules.map(module => `<a class="module-link" href="#module/${encodeURIComponent(module.name)}" ${view === `module/${module.name}` ? 'aria-current="page"' : ''}><span class="dot ${status}"></span><span>${escapeHTML(module.name)}</span></a>`).join('') : '';
       }).join('');
     }
-    async function overview() {
+    async function overview(showMap = false) {
+      const roots = rootFlows();
+      if (!showMap && roots.length) {
+        heading('Overview', roots.length === 1 ? 'The main flow of this system' : 'Choose a main flow', '<a href="#map">Module map</a>');
+        if (roots.length === 1) await flowsView(`#flow/${encodeURIComponent(roots[0].name)}`, true);
+        else {
+          const purpose = getSection(model.system, 'Purpose')?.text;
+          if (purpose) card(`<div class="markdown">${markdown(purpose)}</div>`);
+          for (const flow of roots) card(`<h3><a href="#flow/${encodeURIComponent(flow.name)}">${escapeHTML(flow.name)} ▸</a></h3><div class="markdown muted">${markdown(getSection(flow, 'Scenario')?.text)}</div>`);
+        }
+        if (model.findings.length) card(`<h3>Design needs attention</h3>${model.findings.map(finding => `<div class="finding"><code>${escapeHTML(finding.file)}:${finding.line}</code><p>${escapeHTML(finding.message)}</p></div>`).join('')}`);
+        const constraints = getSection(model.system, 'Constraints')?.text;
+        if (constraints) card(`<details><summary>System constraints</summary><div class="markdown">${markdown(constraints)}</div></details>`);
+        return;
+      }
       const collapsed = model.modules.length > 10 && !showAll;
       const title = heading('Overview', collapsed ? 'Actors and entry points · select a module to inspect it' : 'Modules and dependencies · select a module to inspect it', model.modules.length > 10 ? `<button id="zoom-toggle">${showAll ? 'Show actors' : 'Show all'}</button>` : '');
       title.querySelector('button')?.addEventListener('click', () => { showAll = !showAll; scheduleRender(true); });
@@ -214,23 +254,34 @@
     }
     function moduleView(name) {
       const module = model.modules.find(item => item.name === name);
-      heading(name, 'Module');
+      heading(name, 'Module', referenceButton(`#${name}`));
       if (!module) { card('<p>This module has not been defined.</p><a href="#overview">Back to the overview</a>'); return; }
       const usedBy = model.modules.filter(item => item.uses.some(ref => ref.name === name));
-      card(`<div class="metadata">${badge(module.status, module.status)}${module.kind ? badge(module.kind) : ''}<span class="source">${escapeHTML(module.file)}</span></div><div class="columns"><div><h3>Uses</h3>${module.uses.length ? '<ul>' + module.uses.map(ref => `<li>${moduleLink(ref.name)}${ref.label ? ` — ${escapeHTML(ref.label)}` : ''}</li>`).join('') + '</ul>' : '<p class="muted">No dependencies.</p>'}</div><div><h3>Used by</h3>${usedBy.length ? '<ul>' + usedBy.map(item => `<li>${moduleLink(item.name)}</li>`).join('') + '</ul>' : '<p class="muted">No dependents.</p>'}</div></div>`);
+      card(`<div class="metadata">${badge(module.status, module.status)}${module.kind ? badge(module.kind) : ''}<span class="source">${escapeHTML(module.file)}</span></div><div class="columns"><div><h3>Uses</h3>${module.uses.length ? '<ul>' + module.uses.map(ref => `<li>${moduleLink(ref.name)}${ref.label ? ` — ${escapeHTML(ref.label)}` : ''} ${referenceButton(`#${name}>${ref.name}`)}</li>`).join('') + '</ul>' : '<p class="muted">No dependencies.</p>'}</div><div><h3>Used by</h3>${usedBy.length ? '<ul>' + usedBy.map(item => `<li>${moduleLink(item.name)}</li>`).join('') + '</ul>' : '<p class="muted">No dependents.</p>'}</div></div>`);
       card(sections(module));
       const flows = model.flows.filter(flow => flow.modules.includes(name));
       const slices = model.slices.filter(slice => slice.modules.includes(name));
-      card(`<div class="columns"><div><h3>Flows</h3>${flows.length ? flows.map(flow => `<p><a href="#flows">${escapeHTML(flow.name)}</a></p>`).join('') : '<p class="muted">No flows yet.</p>'}</div><div><h3>Slices</h3>${slices.length ? slices.map(slice => `<p><a href="#slices">${escapeHTML(slice.name)}</a> ${badge(slice.done ? 'done' : 'open')}</p>`).join('') : '<p class="muted">No slices yet.</p>'}</div></div>`);
+      card(`<div class="columns"><div><h3>Flows</h3>${flows.length ? flows.map(flow => `<p><a href="#flow/${encodeURIComponent(flow.name)}">${escapeHTML(flow.name)}</a></p>`).join('') : '<p class="muted">No flows yet.</p>'}</div><div><h3>Slices</h3>${slices.length ? slices.map(slice => `<p><a href="#slices">${escapeHTML(slice.name)}</a> ${badge(slice.done ? 'done' : 'open')}</p>`).join('') : '<p class="muted">No slices yet.</p>'}</div></div>`);
     }
-    async function flowsView() {
-      heading('Flows', 'Scenarios, fan-out and bounded loops');
+    async function flowsView(hash = null, fromOverview = false) {
+      if (!fromOverview) heading('Flows', 'Connected process blocks · open an authored inner flow with ▸', '<a href="#map">Module map</a>');
       if (!model.flows.length) { card('<p class="empty">No flows yet.</p>'); return; }
-      for (const flow of model.flows) {
-        const panel = card(`<h2>${escapeHTML(flow.name)}</h2><div class="markdown">${markdown(getSection(flow, 'Scenario')?.text)}</div>`);
-        await graph(model.routes[flow.name], panel);
-        panel.insertAdjacentHTML('beforeend', `<div style="margin-top:23px">${sections(flow, ['scenario'])}</div>`);
+      const version = renderNumber;
+      const [helpers, renderer] = await flowAssets;
+      if (version !== renderNumber) return;
+      const roots = rootFlows();
+      const choices = roots.length ? roots : model.flows;
+      let trail;
+      try { trail = hash ? helpers.flowTrail(hash, model) : [{ flow: choices[0].name, step: null }]; }
+      catch (error) { card(`<p>${escapeHTML(error.message)}</p><a href="#flows">Choose a flow</a>`); return; }
+      if (!fromOverview) {
+        const tabs = document.createElement('nav'); tabs.className = 'flow-tabs'; tabs.setAttribute('aria-label', 'Main flows');
+        tabs.innerHTML = choices.map(flow => `<a href="#flow/${encodeURIComponent(flow.name)}" ${trail[0].flow === flow.name ? 'aria-current="page"' : ''}>${escapeHTML(flow.name)}</a>`).join(''); content.append(tabs);
       }
+      if (!roots.length) card('<p class="diagram-error">No main flow: every flow is referenced. Check the design for a nesting cycle.</p>');
+      const name = trail.at(-1).flow;
+      activeFlow = renderer.renderFlow(content, { model, trail, copy: copyReference, navigate: hash => { location.hash = hash; },
+        selected: selectedSteps.get(name), select: number => selectedSteps.set(name, number) });
     }
     function decisionsView() {
       heading('Decisions', 'What was chosen and why');
@@ -256,10 +307,13 @@
         if (!model || version !== renderNumber) return;
         let view;
         try { view = decodeURIComponent(location.hash.slice(1) || 'overview'); } catch { view = 'overview'; }
+        activeFlow?.destroy(); activeFlow = undefined;
         content.replaceChildren(); navigation(view); configureMermaid();
         if (view === 'overview') await overview();
+        else if (view === 'map') await overview(true);
         else if (view.startsWith('module/')) moduleView(view.slice(7));
         else if (view === 'flows') await flowsView();
+        else if (view.startsWith('flow/')) await flowsView(location.hash);
         else if (view === 'decisions') decisionsView();
         else if (view === 'questions') questionsView();
         else if (view === 'slices') slicesView();
@@ -275,15 +329,17 @@
         pendingScroll = undefined;
       });
     }
-    function connection(live) {
+    function connection(live, label = live ? 'Live' : 'Reconnecting…') {
       const element = document.getElementById('connection');
       element.classList.toggle('offline', !live);
-      element.lastElementChild.textContent = live ? 'Live' : 'Reconnecting…';
+      element.lastElementChild.textContent = label;
     }
     let eventSource;
     let reconnect;
     let backoff = 500;
+    let unloaded = false;
     function connect() {
+      if (unloaded) return;
       eventSource = new EventSource('/events');
       eventSource.onopen = () => { backoff = 500; };
       eventSource.addEventListener('model', event => {
@@ -300,9 +356,18 @@
       };
     }
     addEventListener('hashchange', () => scheduleRender());
+    addEventListener('click', event => {
+      const button = event.target.closest?.('[data-copy]');
+      if (button) void copyReference(button.getAttribute('data-copy'));
+    });
     dark.addEventListener('change', () => scheduleRender(true));
-    addEventListener('beforeunload', () => { clearTimeout(reconnect); eventSource?.close(); });
-    connect();
+    addEventListener('beforeunload', () => { unloaded = true; clearTimeout(reconnect); clearTimeout(copyTimer); activeFlow?.destroy(); eventSource?.close(); });
+    flowAssets = Promise.all([import('/flow.js'), import('/viewer/flows.js')]);
+    flowAssets.then(connect).catch(error => {
+      if (unloaded) return;
+      content.textContent = `Could not load the viewer: ${error.message}. Reload to try again.`;
+      connection(false, 'Reload required');
+    });
   </script>
 </body>
 </html>

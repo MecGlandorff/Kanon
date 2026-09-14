@@ -4,13 +4,25 @@ Chrome window shows the changing system. This flow uses the existing file
 watcher; the agent updates the design as part of the conversation.
 
 ## Steps
+### Open the viewer
+Keep the system visible alongside the terminal.
 1. skill -> runtime: open or reuse the project viewer
 2. runtime -> viewer: serve the current system map
+
+### Describe a change
 3. engineer -> skill: request a module or behavior change
+
+### Update the design
+Record the change and check its structure.
 4. skill -> design-folder: update the design, known answers, and verified build statuses
 5. skill -> runtime: check the changed design
+
+### Refresh the view
+Send the current model to the open browser.
 6. viewer -> design-folder: detect and read the file changes
-7. viewer -> browser: send the update and redraw the map
+7. viewer -> browser: send the update and redraw the map (flow: refresh-view)
+
+### Inspect and continue
 8. browser -> engineer: show the revised system
 9. repeat from 3 until this part of the system is settled
 
