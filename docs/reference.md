@@ -123,7 +123,8 @@ Frontmatter supports flat scalars, `[a, b]` lists, and two-space block lists
 of names or `name: label` pairs. Quote text containing list commas or YAML
 punctuation. Nested YAML, aliases, and multiline operators are unsupported;
 bad lines become errors while valid content still loads. Body sections use
-`## Heading`. Questions belong in `## Open questions` and can use an optional
+`## Heading`. Headings in fenced code examples stay in their surrounding section.
+Questions belong in `## Open questions` and can use an optional
 `Q:` prefix and a trailing `(blocks: slice-a, slice-b)`.
 
 Statuses are `proposed` (the default), `agreed`, and `built`. The engineer owns
@@ -232,6 +233,9 @@ Responsibility sections, proposed modules included in slices, unanswered
 questions blocking existing slices, invalid loop references, malformed or
 missing subflow references, empty process blocks, and nesting cycles.
 Module dependency cycles remain allowed; there is no warning category.
+
+A draft slice can leave Goal and Acceptance criteria empty. Add text to both
+sections before running `handoff`.
 
 Handoff checks the chosen slice, its modules, explicit blockers from any
 owner, and parser errors in copied shared content or dependency interfaces.

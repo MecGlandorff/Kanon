@@ -89,12 +89,23 @@ export function parseDocument(raw, file) {
     }
   }
   let current;
+  let fence = '';
   for (let i = bodyStart; i < lines.length; i++) {
-    const heading = lines[i].match(/^## (.+?)\s*$/);
+    const text = lines[i];
+    const marker = text.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+    if (marker) {
+      const [, run, rest] = marker;
+      if (fence) {
+        if (run.startsWith(fence) && !rest.trim()) fence = '';
+      } else if (run[0] === '~' || !rest.includes('`')) {
+        fence = run;
+      }
+    }
+    const heading = !fence && text.match(/^## (.+?)\s*$/);
     if (heading) {
       current = { title: heading[1], line: i + 1, text: '', lines: [] };
       document.sections.push(current);
-    } else if (current) current.lines.push({ text: lines[i], line: i + 1 });
+    } else if (current) current.lines.push({ text, line: i + 1 });
   }
   for (const item of document.sections) item.text = item.lines.map(line => line.text).join('\n').trim();
   return document;
