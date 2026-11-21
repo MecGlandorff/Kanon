@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { parseDesign } from '../runtime/src/parse.js';
+import { check } from '../runtime/src/check.js';
 import { writeHandoff } from '../runtime/src/handoff.js';
 
 const cli = fileURLToPath(new URL('../runtime/cli.js', import.meta.url));
@@ -35,6 +36,43 @@ test('buildable handoff matches its golden and includes only relevant external i
   assert.ok(packet.includes(original));
   assert.doesNotMatch(packet, /private storage detail|D-003/);
   assert.equal(readFileSync(join(root, 'design', 'modules', 'worker.md'), 'utf8'), original);
+});
+
+test('handoff keeps headings inside code examples and the constraints that follow them', t => {
+  const design = join(fixture(t), 'design');
+  for (const fence of ['```', '~~~']) {
+    const constraints = [
+      'Use this receipt format:',
+      fence + 'markdown',
+      '## Receipt',
+      fence,
+      'Keep the original currency.',
+    ].join('\n');
+    writeFileSync(join(design, 'system.md'), `## Constraints\n${constraints}\n\n## Notes\nDraft notes.\n`);
+    const result = writeHandoff(parseDesign(design), 'first-parcel');
+    assert.deepEqual(result.findings, []);
+    const packet = readFileSync(result.path, 'utf8');
+    assert.ok(packet.includes(`## Constraints\n\n${constraints}\n\n## Modules in scope`));
+  }
+});
+
+test('a slice can be drafted before its goal and acceptance criteria are ready for handoff', t => {
+  const design = join(fixture(t), 'design');
+  const slice = join(design, 'slices', 'first-parcel.md');
+  for (const [body, title, line] of [
+    ['## Acceptance criteria\nThe receipt keeps its currency.', 'Goal', 1],
+    ['## Goal\nPrint a receipt.\n## Acceptance criteria\n  ', 'Acceptance criteria', 6],
+  ]) {
+    writeFileSync(slice, `---\nmodules: [worker]\n---\n${body}\n`);
+    const model = parseDesign(design);
+    assert.deepEqual(check(model), []);
+    const result = writeHandoff(model, 'first-parcel');
+    assert.deepEqual(result.findings, [{
+      level: 'error', file: 'design/slices/first-parcel.md', line,
+      message: `Add text under "## ${title}" before handoff.`,
+    }]);
+    assert.equal(existsSync(join(design, 'handoffs')), false);
+  }
 });
 
 test('unrelated broken slices and questions that block other slices do not block this handoff', t => {

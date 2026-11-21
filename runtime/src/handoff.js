@@ -46,6 +46,17 @@ export function writeHandoff(model, name) {
   const slice = model.slices.find(item => item.name === name);
   if (!slice) throw new Error(`unknown slice "${name}"`);
   const findings = findingsForSlice(model, slice);
+  for (const title of ['Goal', 'Acceptance criteria']) {
+    const part = section(slice, title);
+    if (!part?.text) {
+      findings.push({
+        level: 'error',
+        file: slice.file,
+        line: part?.line ?? 1,
+        message: `Add text under "## ${title}" before handoff.`,
+      });
+    }
+  }
   if (findings.length) return { findings, path: null };
   const folder = join(model.designDir, 'handoffs');
   try { mkdirSync(folder); } catch (error) { if (error.code !== 'EEXIST') throw error; }
